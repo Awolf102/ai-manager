@@ -11,7 +11,14 @@ import { streamAgent } from './agent-runner'
 import { runGraph, resumeGraph, type NodeIO } from './graph'
 import { actingModeFor, buildOrchestratorGraph, seedRunState, type Eng } from './nodes'
 import { createRunStore, type RunStore } from './run-store'
-import { getAgent, getCheckpointDir, getSettings, saveRun } from './project-store'
+import {
+  autoPullFromTeam,
+  autoPushToTeam,
+  getAgent,
+  getCheckpointDir,
+  getSettings,
+  saveRun
+} from './project-store'
 
 const active = new Map<string, AbortController>()
 
@@ -66,6 +73,11 @@ async function drive(wc: WebContents, state: RunState, abort: AbortController): 
   } catch {
     // non-fatal
   }
+  try {
+    await autoPullFromTeam() // B2b: best-effort pull of the linked team brain before the run
+  } catch {
+    // auto-sync must never block a run
+  }
   const final = await runGraph(buildOrchestratorGraph(eng), state, store, io)
   await finishRun(wc, final, store)
 }
@@ -98,6 +110,11 @@ async function finishRun(wc: WebContents, final: RunState, store: RunStore): Pro
     await store.remove(final.runId)
   } catch {
     // ignore
+  }
+  try {
+    await autoPushToTeam() // B2b: best-effort push of this run's new portable lessons to the team brain
+  } catch {
+    // auto-sync must never break finishing a run
   }
   emit(wc, { runId: final.runId, type: 'run-finished', status: toRunStatus(final.status), error: final.error })
 }
