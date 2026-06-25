@@ -50,18 +50,25 @@ The single prioritized to-do. **1 = do next / most important; higher = later.**
 
 ---
 
-## 1. Compounding-team (b2) — living team / cross-project sync  ← NEXT (bigger — brainstorm before building)
-B1 (snapshot export/import) is done. B2 makes a team a persistent entity: a central "team brain" that
-portable lessons sync back to after every run, so improvements propagate to every project the team
-touches — plus conflict merge and identity matching (uses the `memberId` B1 already stamps). Needs its
-own spec + storage-model design pass. Bigger than B1; only worth it if you want true cross-project
-compounding rather than one-time clones.
+## 1. Compounding-team (b2a) — living team / manual brain sync  ← IN DESIGN
+The "team brain" = a B1 bundle file + a `teamId`; a project records a `linkedTeam` and gets two
+buttons: **Sync to team** (push this project's new `[portable]` lessons back into the brain by
+`memberId`, growing the roster) and **Refresh from team** (pull the brain's lessons into matching
+agents via `mergeMemory`). Implicit linking (first sync click creates/joins the brain via a dialog).
+All merges are union + dedup-by-text (lossless). **Deferred to b2b:** automatic triggers
+(push-after-reflection, pull-at-run-start). Decided: allow-roster-growth, implicit linking.
 
-## 2. Stage 3 — resume usable + memory-approval gate (HITL)  ⏸ ON HOLD (user — until needed)
+## 2. Orchestrator auto-writes agent roles from the goal  (user idea, 2026-06-25)
+Today `role.md` is a hand-edited template (workers default to "general-purpose specialist"), which
+weakens routing. Idea: the orchestrator reads the goal and authors a tailored specialty role for each
+agent (the *brain*/memory already self-authors via reflection — this is the role half). A step toward
+the deferred dynamic-agent-spawning (#4). Separate from B2 (which syncs lessons, not roles).
+
+## 3. Stage 3 — resume usable + memory-approval gate (HITL)  ⏸ ON HOLD (user — until needed)
 Runtime already supports resume/interrupts; not reachable from the app. Wire `resumeRun` to IPC,
 add a resume-on-launch banner, and `reflectNode` interrupt for a `requireMemoryApproval` setting.
 
-## 3. Deferred to the dynamic-spawn era  (lowest)
+## 4. Deferred to the dynamic-spawn era  (lowest)
 Local semantic-memory RAG (sqlite-vec/LanceDB) once memory outgrows a prompt; ephemeral
 memory-seeded spawn agents. The compounding-team foundation (a + b1) now exists; B2 would strengthen it.
 
