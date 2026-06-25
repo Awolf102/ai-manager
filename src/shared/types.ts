@@ -5,6 +5,16 @@ export type AgentKind = 'orchestrator' | 'manager' | 'worker'
 
 export type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | 'auto'
 
+/** One agent the orchestrator proposes when building a team. `reportsTo` is another
+ *  member's temp `id` or the literal "orchestrator" (cycle-free after parsing). */
+export interface SpawnedMember {
+  id: string
+  name: string
+  kind: 'manager' | 'worker'
+  role: string
+  reportsTo: string
+}
+
 export interface AgentNodeData {
   id: string
   name: string
@@ -356,7 +366,9 @@ export const IPC = {
   importTeam: 'team:import',
   syncTeam: 'team:syncTo',
   refreshTeam: 'team:refreshFrom',
-  draftRoles: 'roles:draft'
+  draftRoles: 'roles:draft',
+  spawnTeam: 'team:spawn',
+  applySpawn: 'team:applySpawn'
 } as const
 
 /** The typed API the preload bridge exposes on window.api. */
@@ -398,4 +410,10 @@ export interface RendererApi {
     drafts?: { agentId: string; name: string; role: string }[]
     error?: string
   }>
+  spawnTeam: (input: { goal: string; orchestratorId: string }) => Promise<{
+    ok: boolean
+    members?: SpawnedMember[]
+    error?: string
+  }>
+  applySpawnedTeam: (input: { members: SpawnedMember[]; orchestratorId: string }) => Promise<ProjectGraph>
 }

@@ -19,11 +19,13 @@ import {
   syncToTeam,
   refreshFromTeam,
   writeRole,
+  readRole,
   rosterForDrafting,
   readTeamBrain,
   autoPullFromTeam,
   autoPushToTeam,
-  updateSettings
+  updateSettings,
+  applySpawnedTeam
 } from './project-store'
 
 async function tmpProject(): Promise<string> {
@@ -190,5 +192,41 @@ describe('auto team-brain sync', () => {
     await fs.writeFile(brainPath, JSON.stringify(withNew), 'utf8')
     expect(await autoPullFromTeam()).toBe(1)
     expect(await readMemory(dana.id)).toContain('- [portable] read errors fully')
+  })
+})
+
+describe('applySpawnedTeam', () => {
+  it('creates the proposed agents with roles + reporting edges', async () => {
+    await openProject(await tmpProject())
+    const g = await createAgent({ name: 'Boss', kind: 'orchestrator' })
+    const boss = g.nodes.find((n) => n.name === 'Boss')!
+    const after = await applySpawnedTeam(
+      [
+        { id: 'm1', name: 'Lead', kind: 'manager', role: '# Role: Lead\nA backend lead.', reportsTo: 'orchestrator' },
+        { id: 'w1', name: 'API Dev', kind: 'worker', role: '# Role: API', reportsTo: 'm1' }
+      ],
+      boss.id
+    )
+    expect(after.nodes).toHaveLength(3) // Boss + Lead + API Dev
+    const lead = after.nodes.find((n) => n.name === 'Lead')!
+    const apiDev = after.nodes.find((n) => n.name === 'API Dev')!
+    expect(lead.kind).toBe('manager')
+    expect(await readRole(lead.id)).toContain('backend lead')
+    expect(after.edges.some((e) => e.source === boss.id && e.target === lead.id)).toBe(true) // Boss → Lead
+    expect(after.edges.some((e) => e.source === lead.id && e.target === apiDev.id)).toBe(true) // Lead → API Dev
+  })
+
+  it('creates the agent but skips the edge when reportsTo is an unknown temp id', async () => {
+    await openProject(await tmpProject())
+    const g = await createAgent({ name: 'Boss', kind: 'orchestrator' })
+    const boss = g.nodes.find((n) => n.name === 'Boss')!
+    const after = await applySpawnedTeam(
+      [{ id: 'w1', name: 'Solo Dev', kind: 'worker', role: '# Role: Solo', reportsTo: 'ghost' }],
+      boss.id
+    )
+    expect(after.nodes).toHaveLength(2) // Boss + Solo Dev
+    const soloDev = after.nodes.find((n) => n.name === 'Solo Dev')!
+    expect(soloDev.kind).toBe('worker')
+    expect(after.edges.some((e) => e.target === soloDev.id)).toBe(false) // no edge to Solo Dev
   })
 })

@@ -12,7 +12,8 @@ import type {
   ProjectMeta,
   ProjectSettings,
   RunRecord,
-  RunSummary
+  RunSummary,
+  SpawnedMember
 } from '../../shared/types'
 import { DEFAULT_MODEL_BY_KIND, DEFAULT_SETTINGS } from '../../shared/types'
 import { iconForName } from '../../shared/icons'
@@ -629,6 +630,59 @@ export async function importTeam(bundle: TeamBundle, brainPath?: string): Promis
     if (source && target) graph.edges.push({ id: `${source}->${target}`, source, target })
   }
   if (bundle.teamId && brainPath) graph.linkedTeam = { teamId: bundle.teamId, path: brainPath }
+  return saveGraph()
+}
+
+/** Create the orchestrator's proposed team: new agents (fresh ids, uniquified slugs,
+ * proposed roles, fresh memory), wired by reportsTo, laid out under the orchestrator. */
+export async function applySpawnedTeam(
+  members: SpawnedMember[],
+  orchestratorId: string
+): Promise<ProjectGraph> {
+  const { path, graph } = requireCurrent()
+  const base = graph.nodes.find((n) => n.id === orchestratorId)?.position ?? { x: 120, y: 120 }
+  const byTemp = new Map(members.map((m) => [m.id, m]))
+  const depthOf = (m: SpawnedMember): number => {
+    let d = 1
+    let cur = m.reportsTo
+    let hops = 0
+    while (cur !== 'orchestrator' && byTemp.has(cur) && hops++ < members.length) {
+      d++
+      cur = byTemp.get(cur)!.reportsTo
+    }
+    return d
+  }
+  const perDepth = new Map<number, number>()
+  const taken = new Set(graph.nodes.map((n) => n.slug))
+  const idByTemp = new Map<string, string>()
+  for (const m of members) {
+    const id = randomUUID()
+    idByTemp.set(m.id, id)
+    const slug = uniqueSlug(slugify(m.name), taken)
+    taken.add(slug)
+    const d = depthOf(m)
+    const col = perDepth.get(d) ?? 0
+    perDepth.set(d, col + 1)
+    const dir = aimPath(path, AGENTS_DIR, slug)
+    await fs.mkdir(dir, { recursive: true })
+    await fs.writeFile(join(dir, 'role.md'), m.role, 'utf8')
+    await fs.writeFile(join(dir, 'memory.md'), memoryTemplate(m.name), 'utf8')
+    graph.nodes.push({
+      id,
+      name: m.name,
+      slug,
+      kind: m.kind,
+      icon: iconForName(m.name, m.kind),
+      model: DEFAULT_MODEL_BY_KIND[m.kind],
+      permissionMode: 'acceptEdits',
+      position: { x: base.x + col * 220, y: base.y + d * 150 }
+    })
+  }
+  for (const m of members) {
+    const childId = idByTemp.get(m.id)!
+    const parentId = m.reportsTo === 'orchestrator' ? orchestratorId : idByTemp.get(m.reportsTo)
+    if (parentId) graph.edges.push({ id: `${parentId}->${childId}`, source: parentId, target: childId })
+  }
   return saveGraph()
 }
 
