@@ -1,0 +1,111 @@
+import { useStore } from './store'
+import type { Autonomy, ProjectSettings, ReviewMode } from '../shared/types'
+
+const MODES: { id: ReviewMode; label: string; desc: string }[] = [
+  { id: 'none', label: 'Review → memory only', desc: 'Review and record lessons; no redo.' },
+  { id: 'once', label: '+ one repair pass', desc: 'Failed tasks get one redo, then re-review.' },
+  { id: 'loop', label: '+ repair loop', desc: 'Redo until pass or max attempts.' }
+]
+
+export default function SettingsModal({ onClose }: { onClose: () => void }) {
+  const graph = useStore((s) => s.graph)
+  const setGraph = useStore((s) => s.setGraph)
+  if (!graph) return null
+  const s = graph.settings
+
+  const update = async (patch: Partial<ProjectSettings>): Promise<void> => {
+    setGraph(await window.api.updateSettings(patch))
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h2>Settings</h2>
+
+        <div className="field">
+          <label>Review &amp; repair</label>
+          <div className="radio-list">
+            {MODES.map((m) => (
+              <label key={m.id} className={`radio-row ${s.reviewMode === m.id ? 'sel' : ''}`}>
+                <input
+                  type="radio"
+                  name="reviewMode"
+                  checked={s.reviewMode === m.id}
+                  onChange={() => void update({ reviewMode: m.id })}
+                />
+                <div>
+                  <div className="radio-title">{m.label}</div>
+                  <div className="radio-desc">{m.desc}</div>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {s.reviewMode === 'loop' && (
+          <div className="field">
+            <label>Max repair attempts</label>
+            <input
+              type="number"
+              min={1}
+              max={6}
+              value={s.maxRepairAttempts}
+              onChange={(e) =>
+                void update({
+                  maxRepairAttempts: Math.max(1, Math.min(6, Number(e.target.value) || 1))
+                })
+              }
+            />
+          </div>
+        )}
+
+        <div className="field">
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={s.reflection}
+              onChange={(e) => void update({ reflection: e.target.checked })}
+            />
+            Update agent memory after runs
+          </label>
+        </div>
+
+        <div className="field">
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={s.adaptiveEffort}
+              onChange={(e) => void update({ adaptiveEffort: e.target.checked })}
+            />
+            Adaptive effort — managers assign reasoning effort by task difficulty
+          </label>
+        </div>
+
+        <div className="field">
+          <label>Autonomy (acting steps)</label>
+          <select
+            value={s.autonomy}
+            onChange={(e) => void update({ autonomy: e.target.value as Autonomy })}
+          >
+            <option value="auto">Auto — run safe commands, deny risky ones</option>
+            <option value="full">Full auto — bypass all permission checks</option>
+            <option value="cautious">Cautious — edits only, no command execution</option>
+          </select>
+          <div className="radio-desc" style={{ marginTop: 4 }}>
+            {s.autonomy === 'auto' &&
+              'Planning stays read-only; the review can run tests, and risky commands are blocked by a classifier.'}
+            {s.autonomy === 'full' && 'Nothing is gated during a run — keep the project under git.'}
+            {s.autonomy === 'cautious' &&
+              'Workers edit files, but commands (including the review’s tests) are blocked.'}
+          </div>
+        </div>
+
+        <div className="modal-actions">
+          <button className="btn primary" onClick={onClose}>
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}

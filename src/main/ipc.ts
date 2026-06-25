@@ -1,0 +1,84 @@
+import { dialog, ipcMain } from 'electron'
+import type { IpcMainInvokeEvent } from 'electron'
+import { IPC } from '../shared/types'
+import type {
+  AgentNodeData,
+  CreateAgentInput,
+  GraphEdge,
+  ProjectSettings,
+  RunHeadlessInput,
+  SpawnPtyInput,
+  StartRunInput
+} from '../shared/types'
+import * as store from './engine/project-store'
+import * as runner from './engine/agent-runner'
+import * as ptyMgr from './engine/pty-manager'
+import * as orchestrator from './engine/orchestrator'
+import { checkAuth } from './engine/auth'
+
+export function registerIpc(): void {
+  // ---- project ----
+  ipcMain.handle(IPC.pickProjectFolder, async () => {
+    const r = await dialog.showOpenDialog({
+      title: 'Choose a project folder for your agents',
+      properties: ['openDirectory', 'createDirectory']
+    })
+    if (r.canceled || r.filePaths.length === 0) return null
+    return store.openProject(r.filePaths[0])
+  })
+  ipcMain.handle(IPC.openProject, (_e, path: string) => store.openProject(path))
+  ipcMain.handle(IPC.getRecentProjects, () => store.getRecentProjects())
+
+  // ---- graph / agents ----
+  ipcMain.handle(IPC.createAgent, (_e, input: CreateAgentInput) => store.createAgent(input))
+  ipcMain.handle(IPC.updateAgent, (_e, agent: Partial<AgentNodeData> & { id: string }) =>
+    store.updateAgent(agent)
+  )
+  ipcMain.handle(IPC.deleteAgent, (_e, agentId: string) => store.deleteAgent(agentId))
+  ipcMain.handle(IPC.setEdges, (_e, edges: GraphEdge[]) => store.setEdges(edges))
+  ipcMain.handle(
+    IPC.setNodePositions,
+    (_e, positions: { id: string; position: { x: number; y: number } }[]) =>
+      store.setNodePositions(positions)
+  )
+  ipcMain.handle(IPC.updateSettings, (_e, patch: Partial<ProjectSettings>) =>
+    store.updateSettings(patch)
+  )
+
+  // ---- role / memory ----
+  ipcMain.handle(IPC.readRole, (_e, id: string) => store.readRole(id))
+  ipcMain.handle(IPC.writeRole, (_e, id: string, content: string) => store.writeRole(id, content))
+  ipcMain.handle(IPC.readMemory, (_e, id: string) => store.readMemory(id))
+  ipcMain.handle(IPC.writeMemory, (_e, id: string, content: string) =>
+    store.writeMemory(id, content)
+  )
+
+  // ---- headless runs ----
+  ipcMain.handle(IPC.runHeadless, (e: IpcMainInvokeEvent, input: RunHeadlessInput) =>
+    runner.runHeadless(e.sender, input)
+  )
+  ipcMain.handle(IPC.cancelHeadless, (_e, runId: string) => runner.cancelHeadless(runId))
+
+  // ---- interactive pty ----
+  ipcMain.handle(IPC.spawnPty, (e: IpcMainInvokeEvent, input: SpawnPtyInput) =>
+    ptyMgr.spawnPty(e.sender, input)
+  )
+  ipcMain.on(IPC.writePty, (_e, ptyId: string, data: string) => ptyMgr.writePty(ptyId, data))
+  ipcMain.on(IPC.resizePty, (_e, ptyId: string, cols: number, rows: number) =>
+    ptyMgr.resizePty(ptyId, cols, rows)
+  )
+  ipcMain.on(IPC.killPty, (_e, ptyId: string) => ptyMgr.killPty(ptyId))
+
+  // ---- orchestration runs ----
+  ipcMain.handle(IPC.startRun, (e: IpcMainInvokeEvent, input: StartRunInput) =>
+    orchestrator.startRun(e.sender, input)
+  )
+  ipcMain.handle(IPC.stopRun, (_e, runId: string) => orchestrator.stopRun(runId))
+
+  // ---- auth ----
+  ipcMain.handle(IPC.checkAuth, () => checkAuth())
+
+  // ---- run history ----
+  ipcMain.handle(IPC.listRuns, () => store.listRuns())
+  ipcMain.handle(IPC.loadRun, (_e, file: string) => store.loadRun(file))
+}

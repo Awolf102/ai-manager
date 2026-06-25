@@ -1,0 +1,380 @@
+// Shared types + IPC contract. MUST stay free of node/DOM-only imports so both
+// the main and renderer processes can import it.
+
+export type AgentKind = 'orchestrator' | 'manager' | 'worker'
+
+export type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | 'auto'
+
+export interface AgentNodeData {
+  id: string
+  name: string
+  /** filesystem-safe slug used for .ai-manager/agents/<slug>/ */
+  slug: string
+  kind: AgentKind
+  /** icon key resolved from the name; the renderer maps it to a lucide icon */
+  icon: string
+  model: string
+  permissionMode: PermissionMode
+  /** plugin-qualified skill ids this agent may use (see shared/skill-catalog) */
+  skills?: string[]
+  /** last Claude Code session id captured from a headless run (for --resume) */
+  sessionId?: string
+  position: { x: number; y: number }
+}
+
+export interface GraphEdge {
+  id: string
+  /** "delegates to": source delegates work to target */
+  source: string
+  target: string
+}
+
+export interface ProjectMeta {
+  path: string
+  name: string
+}
+
+export type ReviewMode = 'none' | 'once' | 'loop'
+
+/** Permission level for the acting steps during an orchestration run. */
+export type Autonomy = 'auto' | 'full' | 'cautious'
+
+/** Reasoning-effort level the manager can assign per task (maps to the SDK `effort`). */
+export type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+/** Ordered low→max so the engine can pick the highest in a worker's batch. */
+export const EFFORT_LEVELS: Effort[] = ['low', 'medium', 'high', 'xhigh', 'max']
+
+export interface ProjectSettings {
+  /** 'none' = review→memory only, 'once' = +1 repair pass, 'loop' = repair loop */
+  reviewMode: ReviewMode
+  /** repair attempts when reviewMode === 'loop' */
+  maxRepairAttempts: number
+  /** write reflections to memory.md after a run */
+  reflection: boolean
+  /** 'auto' = run safe commands, 'full' = bypass all checks, 'cautious' = edits only */
+  autonomy: Autonomy
+  /** manager assesses task difficulty and assigns a reasoning effort per task */
+  adaptiveEffort: boolean
+}
+
+export const DEFAULT_SETTINGS: ProjectSettings = {
+  reviewMode: 'loop',
+  maxRepairAttempts: 3,
+  reflection: true,
+  autonomy: 'auto',
+  adaptiveEffort: true
+}
+
+export interface ProjectGraph {
+  project: ProjectMeta
+  nodes: AgentNodeData[]
+  edges: GraphEdge[]
+  settings: ProjectSettings
+}
+
+// ---- IPC payloads ----
+
+export interface CreateAgentInput {
+  name: string
+  kind: AgentKind
+  model?: string
+  permissionMode?: PermissionMode
+  position?: { x: number; y: number }
+}
+
+export interface RunHeadlessInput {
+  agentId: string
+  prompt: string
+  /** resume the agent's prior session if one exists */
+  resume?: boolean
+}
+
+export interface SpawnPtyInput {
+  agentId: string
+  cols: number
+  rows: number
+  /** resume the agent's prior session if one exists */
+  resume?: boolean
+}
+
+/** A normalized stream chunk emitted from a headless agent run. */
+export interface AgentStreamEvent {
+  agentId: string
+  runId: string
+  /** orchestration step this output belongs to (absent for manual runs) */
+  stepId?: string
+  kind: 'system' | 'assistant' | 'tool_use' | 'tool_result' | 'result' | 'error' | 'stderr'
+  /** text already formatted (with ANSI ok) for a terminal pane */
+  text: string
+  /** present on the final 'result' event */
+  sessionId?: string
+  isFinal?: boolean
+}
+
+export interface PtyDataEvent {
+  ptyId: string
+  data: string
+}
+
+export interface PtyExitEvent {
+  ptyId: string
+  exitCode: number
+}
+
+export interface AuthStatus {
+  state: 'ok' | 'logged-out' | 'no-cli' | 'error'
+  message?: string
+}
+
+// ---- orchestration (Phase 2) ----
+
+export type StepStatus =
+  | 'idle'
+  | 'planning'
+  | 'assigning'
+  | 'working'
+  | 'reviewing'
+  | 'reflecting'
+  | 'done'
+  | 'error'
+  | 'skipped'
+
+export interface TaskVerdict {
+  taskId: string
+  /** the worker that owns this task, or null if unassigned */
+  nodeId: string | null
+  verdict: 'pass' | 'fail'
+  feedback: string
+}
+
+export interface RunTask {
+  id: string
+  title: string
+  description: string
+}
+
+export interface Assignment {
+  taskId: string
+  /** a direct child agent id, or null = no matching child (unassigned) */
+  childId: string | null
+  /** reasoning effort the manager assigned by assessing the task's difficulty */
+  effort?: Effort
+  reason: string
+}
+
+export interface StartRunInput {
+  goal: string
+  orchestratorId: string
+}
+
+export type RunStatus = 'completed' | 'cancelled' | 'error'
+
+/** Events streamed from the orchestration engine to the renderer. */
+export type OrchestrationEvent =
+  | { runId: string; type: 'run-started'; orchestratorId: string; goal: string }
+  | { runId: string; type: 'status'; nodeId: string; status: StepStatus; taskTitles?: string[] }
+  | { runId: string; type: 'plan'; nodeId: string; tasks: RunTask[] }
+  | { runId: string; type: 'assignments'; nodeId: string; assignments: Assignment[] }
+  | { runId: string; type: 'verdict'; attempt: number; tasks: TaskVerdict[] }
+  | {
+      runId: string
+      type: 'reflection'
+      nodeId: string
+      win: string
+      loss: string
+      lessons: string[]
+    }
+  | { runId: string; type: 'final'; text: string }
+  | { runId: string; type: 'run-finished'; status: RunStatus; error?: string }
+
+export interface RunStepRecord {
+  nodeId: string
+  nodeName: string
+  kind: AgentKind
+  status: StepStatus
+  tasks?: RunTask[]
+  assignments?: Assignment[]
+  output?: string
+}
+
+export interface RunRecord {
+  runId: string
+  goal: string
+  orchestratorId: string
+  startedAt: string
+  finishedAt: string
+  status: RunStatus
+  plan: RunTask[]
+  steps: RunStepRecord[]
+  reviews: { attempt: number; tasks: TaskVerdict[] }[]
+  reflections: { nodeId: string; win: string; loss: string; lessons: string[] }[]
+  final: string
+  error?: string
+}
+
+export interface RunSummary {
+  file: string
+  goal: string
+  startedAt: string
+  status: RunStatus
+  taskCount: number
+}
+
+// ---- durable run state (checkpointing) ----
+
+export type RunPhase =
+  | 'planning'
+  | 'routing'
+  | 'executing'
+  | 'reviewing'
+  | 'repairing'
+  | 'reflecting'
+  | 'synthesizing'
+  | 'done'
+
+/** Live status of an in-flight or finished run (a superset of RunStatus). */
+export type LiveRunStatus = 'running' | 'interrupted' | 'completed' | 'cancelled' | 'error'
+
+export type TaskExecStatus = 'pending' | 'running' | 'done' | 'failed' | 'passed'
+
+/** A request to pause the run for human input (Stage 3 — the runtime carries it now). */
+export interface Interrupt {
+  kind: string
+  prompt: string
+  payload?: unknown
+}
+
+export interface TaskState {
+  task: RunTask
+  /** worker that owns this task, or null if unassigned */
+  ownerId: string | null
+  status: TaskExecStatus
+  /** times a worker has run this task (initial run + repairs) */
+  attempts: number
+  /** latest worker output for the task */
+  output: string
+  verdict?: { verdict: 'pass' | 'fail'; feedback: string }
+  /** reasoning effort assigned by the routing manager (maps to the SDK `effort`) */
+  effort?: Effort
+  /** task ids that must finish first (Stage 4 — unused in Stage 1) */
+  dependsOn?: string[]
+}
+
+/**
+ * The full, serializable state of an orchestration run. Written to a checkpoint
+ * after every transition so a run survives a crash and can later be resumed.
+ * A superset of RunRecord (which is the read-only History projection).
+ */
+export interface RunState {
+  runId: string
+  goal: string
+  orchestratorId: string
+  startedAt: string
+  updatedAt: string
+  status: LiveRunStatus
+  phase: RunPhase
+  /** resume pointer — coarse phase marker now, the graph node in Stage 2 */
+  cursor: string
+  actingMode: PermissionMode
+  plan: RunTask[]
+  /** taskId -> per-task execution state */
+  tasks: Record<string, TaskState>
+  /** nodeId -> run-view step record */
+  steps: Record<string, RunStepRecord>
+  reviews: { attempt: number; tasks: TaskVerdict[] }[]
+  reflections: { nodeId: string; win: string; loss: string; lessons: string[] }[]
+  final: string
+  error?: string
+  /** set when the run paused for human input (Stage 3) */
+  pendingInterrupt?: Interrupt
+  /** human decision injected on resume; the paused node reads then clears it (Stage 3) */
+  resumeInput?: unknown
+}
+
+// ---- constants ----
+
+export const MODELS = [
+  { id: 'claude-opus-4-8', label: 'Opus 4.8' },
+  { id: 'claude-sonnet-4-6', label: 'Sonnet 4.6' },
+  { id: 'claude-haiku-4-5', label: 'Haiku 4.5' }
+] as const
+
+export const PERMISSION_MODES: PermissionMode[] = [
+  'default',
+  'acceptEdits',
+  'bypassPermissions',
+  'plan',
+  'auto'
+]
+
+export const AGENT_KINDS: AgentKind[] = ['orchestrator', 'manager', 'worker']
+
+export const DEFAULT_MODEL_BY_KIND: Record<AgentKind, string> = {
+  orchestrator: 'claude-opus-4-8',
+  manager: 'claude-opus-4-8',
+  worker: 'claude-sonnet-4-6'
+}
+
+/** Channel names — single source of truth for main + preload. */
+export const IPC = {
+  pickProjectFolder: 'project:pick',
+  openProject: 'project:open',
+  getRecentProjects: 'project:recents',
+  createAgent: 'agent:create',
+  updateAgent: 'agent:update',
+  deleteAgent: 'agent:delete',
+  setEdges: 'graph:setEdges',
+  setNodePositions: 'graph:setPositions',
+  updateSettings: 'settings:update',
+  readRole: 'role:read',
+  writeRole: 'role:write',
+  readMemory: 'memory:read',
+  writeMemory: 'memory:write',
+  runHeadless: 'run:headless',
+  cancelHeadless: 'run:cancel',
+  agentStream: 'run:stream',
+  spawnPty: 'pty:spawn',
+  writePty: 'pty:write',
+  resizePty: 'pty:resize',
+  killPty: 'pty:kill',
+  ptyData: 'pty:data',
+  ptyExit: 'pty:exit',
+  startRun: 'run:start',
+  stopRun: 'run:stop',
+  orchestration: 'run:orchestration',
+  checkAuth: 'auth:check',
+  listRuns: 'runs:list',
+  loadRun: 'runs:load'
+} as const
+
+/** The typed API the preload bridge exposes on window.api. */
+export interface RendererApi {
+  pickProjectFolder: () => Promise<ProjectGraph | null>
+  openProject: (path: string) => Promise<ProjectGraph | null>
+  getRecentProjects: () => Promise<ProjectMeta[]>
+  createAgent: (input: CreateAgentInput) => Promise<ProjectGraph>
+  updateAgent: (agent: Partial<AgentNodeData> & { id: string }) => Promise<ProjectGraph>
+  deleteAgent: (agentId: string) => Promise<ProjectGraph>
+  setEdges: (edges: GraphEdge[]) => Promise<ProjectGraph>
+  setNodePositions: (positions: { id: string; position: { x: number; y: number } }[]) => Promise<void>
+  updateSettings: (patch: Partial<ProjectSettings>) => Promise<ProjectGraph>
+  readRole: (agentId: string) => Promise<string>
+  writeRole: (agentId: string, content: string) => Promise<void>
+  readMemory: (agentId: string) => Promise<string>
+  writeMemory: (agentId: string, content: string) => Promise<void>
+  runHeadless: (input: RunHeadlessInput) => Promise<{ runId: string }>
+  cancelHeadless: (runId: string) => Promise<void>
+  onAgentStream: (cb: (e: AgentStreamEvent) => void) => () => void
+  spawnPty: (input: SpawnPtyInput) => Promise<{ ptyId: string }>
+  writePty: (ptyId: string, data: string) => void
+  resizePty: (ptyId: string, cols: number, rows: number) => void
+  killPty: (ptyId: string) => void
+  onPtyData: (cb: (e: PtyDataEvent) => void) => () => void
+  onPtyExit: (cb: (e: PtyExitEvent) => void) => () => void
+  startRun: (input: StartRunInput) => Promise<{ runId: string }>
+  stopRun: (runId: string) => Promise<void>
+  onOrchestration: (cb: (e: OrchestrationEvent) => void) => () => void
+  checkAuth: () => Promise<AuthStatus>
+  listRuns: () => Promise<RunSummary[]>
+  loadRun: (file: string) => Promise<RunRecord | null>
+}

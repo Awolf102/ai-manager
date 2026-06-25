@@ -1,0 +1,199 @@
+import { create } from 'zustand'
+import type {
+  AgentNodeData,
+  Assignment,
+  OrchestrationEvent,
+  ProjectGraph,
+  RunTask,
+  StepStatus,
+  TaskVerdict
+} from '../shared/types'
+
+export type TerminalMode = 'interactive' | 'headless'
+
+export interface TerminalTab {
+  id: string
+  agentId: string
+  agentName: string
+  mode: TerminalMode
+}
+
+export interface RunState {
+  runId: string | null
+  running: boolean
+  goal: string
+  orchestratorId: string | null
+  nodeStatus: Record<string, StepStatus>
+  nodeTasks: Record<string, string[]>
+  plan: RunTask[]
+  assignments: Record<string, Assignment[]>
+  verdict: Record<string, TaskVerdict>
+  reviewAttempt: number
+  memoryUpdated: Record<string, number>
+  final: string
+  error?: string
+  selectedStepId: string | null
+}
+
+const emptyRun: RunState = {
+  runId: null,
+  running: false,
+  goal: '',
+  orchestratorId: null,
+  nodeStatus: {},
+  nodeTasks: {},
+  plan: [],
+  assignments: {},
+  verdict: {},
+  reviewAttempt: 0,
+  memoryUpdated: {},
+  final: '',
+  error: undefined,
+  selectedStepId: null
+}
+
+interface AppState {
+  graph: ProjectGraph | null
+  selectedAgentId: string | null
+  terminals: TerminalTab[]
+  activeDockId: string | null
+  run: RunState
+  showRunView: boolean
+  showHistory: boolean
+
+  setGraph: (g: ProjectGraph | null) => void
+  patchPositions: (list: { id: string; position: { x: number; y: number } }[]) => void
+  select: (id: string | null) => void
+  openTerminal: (agent: AgentNodeData, mode: TerminalMode) => void
+  closeTerminal: (id: string) => void
+  setActiveDock: (id: string) => void
+
+  beginRun: (runId: string, goal: string, orchestratorId: string) => void
+  applyOrchestration: (e: OrchestrationEvent) => void
+  selectStep: (id: string) => void
+  setShowRunView: (v: boolean) => void
+  openHistory: () => void
+
+  agentById: (id: string) => AgentNodeData | undefined
+}
+
+let counter = 0
+
+export const useStore = create<AppState>((set, get) => ({
+  graph: null,
+  selectedAgentId: null,
+  terminals: [],
+  activeDockId: null,
+  run: emptyRun,
+  showRunView: false,
+  showHistory: false,
+
+  setGraph: (g) => set({ graph: g }),
+
+  patchPositions: (list) =>
+    set((s) => {
+      if (!s.graph) return {}
+      const map = new Map(list.map((p) => [p.id, p.position]))
+      return {
+        graph: {
+          ...s.graph,
+          nodes: s.graph.nodes.map((n) =>
+            map.has(n.id) ? { ...n, position: map.get(n.id)! } : n
+          )
+        }
+      }
+    }),
+
+  select: (id) => set({ selectedAgentId: id }),
+
+  openTerminal: (agent, mode) =>
+    set((s) => {
+      const id = `term-${++counter}`
+      const tab: TerminalTab = { id, agentId: agent.id, agentName: agent.name, mode }
+      return { terminals: [...s.terminals, tab], activeDockId: id }
+    }),
+
+  closeTerminal: (id) =>
+    set((s) => {
+      const terminals = s.terminals.filter((t) => t.id !== id)
+      const fallback = terminals.at(-1)?.id ?? (s.showRunView ? 'run' : null)
+      const activeDockId = s.activeDockId === id ? fallback : s.activeDockId
+      return { terminals, activeDockId }
+    }),
+
+  setActiveDock: (id) => set({ activeDockId: id }),
+
+  beginRun: (runId, goal, orchestratorId) =>
+    set({
+      run: {
+        ...emptyRun,
+        runId,
+        running: true,
+        goal,
+        orchestratorId,
+        nodeStatus: { [orchestratorId]: 'planning' },
+        selectedStepId: orchestratorId
+      },
+      showRunView: true,
+      activeDockId: 'run'
+    }),
+
+  applyOrchestration: (e) =>
+    set((s) => {
+      const run = { ...s.run }
+      switch (e.type) {
+        case 'run-started':
+          return {
+            run: {
+              ...emptyRun,
+              runId: e.runId,
+              running: true,
+              goal: e.goal,
+              orchestratorId: e.orchestratorId,
+              nodeStatus: { [e.orchestratorId]: 'planning' },
+              selectedStepId: e.orchestratorId
+            },
+            showRunView: true,
+            activeDockId: 'run'
+          }
+        case 'status':
+          run.nodeStatus = { ...run.nodeStatus, [e.nodeId]: e.status }
+          if (e.taskTitles) run.nodeTasks = { ...run.nodeTasks, [e.nodeId]: e.taskTitles }
+          if (e.status === 'planning' || e.status === 'assigning' || e.status === 'working') {
+            run.selectedStepId = e.nodeId
+          }
+          return { run }
+        case 'plan':
+          run.plan = e.tasks
+          return { run }
+        case 'assignments':
+          run.assignments = { ...run.assignments, [e.nodeId]: e.assignments }
+          return { run }
+        case 'verdict': {
+          const verdict = { ...run.verdict }
+          for (const t of e.tasks) verdict[t.taskId] = t
+          run.verdict = verdict
+          run.reviewAttempt = e.attempt
+          return { run }
+        }
+        case 'reflection':
+          run.memoryUpdated = { ...run.memoryUpdated, [e.nodeId]: e.lessons.length }
+          return { run }
+        case 'final':
+          run.final = e.text
+          return { run }
+        case 'run-finished':
+          run.running = false
+          run.error = e.error
+          return { run }
+        default:
+          return {}
+      }
+    }),
+
+  selectStep: (id) => set((s) => ({ run: { ...s.run, selectedStepId: id } })),
+  setShowRunView: (v) => set({ showRunView: v }),
+  openHistory: () => set({ showHistory: true, activeDockId: 'history' }),
+
+  agentById: (id) => get().graph?.nodes.find((n) => n.id === id)
+}))
