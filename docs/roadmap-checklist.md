@@ -33,17 +33,21 @@ The single prioritized to-do. **1 = do next / most important; higher = later.**
   `depsSatisfied` (only blocks on owned, not-yet-executed deps) with a cycle guard (run-the-rest when
   nothing's ready) so it can never hang. No-deps runs are byte-for-byte the old single-wave behavior.
   Orchestrator role template notes deps. 59 tests green; **live-verified.**
+- **Compounding-team (a) — memory quality.** Reflected lessons are tagged `[portable]` (general SWE)
+  vs `[project]` (this-codebase fact) inline in memory.md; routing digest (`lessonsDigest`) excludes
+  `[project]` so managers route on capability not trivia. New `src/shared/lessons.ts` is the single
+  marker source of truth; `mergeMemory` dedups by stripped text; no shared-type churn. Built via
+  subagent-driven TDD (74 tests green, whole-branch review clean). **Repo is now git-initialized.**
+  Spec/plan under `docs/superpowers/`. **live smoke pending.**
 - **Decisions:** Bedrock dropped (provider + Knowledge Bases). Multi-chart-within-a-project dropped.
 
 ---
 
-## 1. Compounding-team work  ← NEXT (bigger — brainstorm before building)
-Two coupled pieces for "agents that keep getting better across projects":
-- **(a) Memory quality** — reflections tag lessons as *portable SWE* vs *project-specific* (kills
-  negative transfer). *Where:* `project-store.ts` (`mergeMemory`/`applyReflection`), `reflectPrompt`.
-- **(b) Portable team** — carry a roster + its memories across project folders (today a team is
-  folder-locked; stopgap = copy `.ai-manager/graph.json` + `agents/`). *Where:* `project-store.ts`
-  storage model — needs its own design pass.
+## 1. Compounding-team (b) — portable team across folders  ← NEXT (bigger — brainstorm before building)
+Carry a roster + its memories across project folders (today a team is folder-locked; stopgap = copy
+`.ai-manager/graph.json` + `agents/`). *Where:* `project-store.ts` storage model — needs its own
+design pass. **Now unblocked:** sub-project (a) lesson tagging is done, so B can carry only `[portable]`
+lessons and treat untagged as project-specific (don't transfer) per the documented asymmetry.
 
 ## 2. Stage 3 — resume usable + memory-approval gate (HITL)  ⏸ ON HOLD (user — until needed)
 Runtime already supports resume/interrupts; not reachable from the app. Wire `resumeRun` to IPC,
