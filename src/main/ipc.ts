@@ -1,5 +1,6 @@
 import { dialog, ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
+import { promises as fs } from 'node:fs'
 import { IPC } from '../shared/types'
 import type {
   AgentNodeData,
@@ -11,6 +12,7 @@ import type {
   StartRunInput
 } from '../shared/types'
 import * as store from './engine/project-store'
+import { validateTeamBundle } from '../shared/team-bundle'
 import * as runner from './engine/agent-runner'
 import * as ptyMgr from './engine/pty-manager'
 import * as orchestrator from './engine/orchestrator'
@@ -81,4 +83,35 @@ export function registerIpc(): void {
   // ---- run history ----
   ipcMain.handle(IPC.listRuns, () => store.listRuns())
   ipcMain.handle(IPC.loadRun, (_e, file: string) => store.loadRun(file))
+
+  // ---- portable team ----
+  ipcMain.handle(IPC.exportTeam, async () => {
+    const bundle = await store.exportTeam()
+    const r = await dialog.showSaveDialog({
+      title: 'Export team',
+      defaultPath: `${bundle.name || 'team'}.aimteam.json`,
+      filters: [{ name: 'AI Manager team', extensions: ['json'] }]
+    })
+    if (r.canceled || !r.filePath) return { saved: false }
+    await fs.writeFile(r.filePath, JSON.stringify(bundle, null, 2), 'utf8')
+    return { saved: true, path: r.filePath }
+  })
+  ipcMain.handle(IPC.importTeam, async () => {
+    const r = await dialog.showOpenDialog({
+      title: 'Import team',
+      properties: ['openFile'],
+      filters: [{ name: 'AI Manager team', extensions: ['json'] }]
+    })
+    if (r.canceled || r.filePaths.length === 0) return { imported: false }
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(await fs.readFile(r.filePaths[0], 'utf8'))
+    } catch {
+      return { imported: false, error: 'That file is not valid JSON.' }
+    }
+    const v = validateTeamBundle(parsed)
+    if (!v.ok) return { imported: false, error: v.error }
+    const graph = await store.importTeam(v.bundle)
+    return { imported: true, graph }
+  })
 }

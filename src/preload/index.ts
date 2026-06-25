@@ -42,7 +42,9 @@ const api: RendererApi = {
   onOrchestration: (cb) => sub<OrchestrationEvent>(IPC.orchestration, cb),
   checkAuth: () => ipcRenderer.invoke(IPC.checkAuth),
   listRuns: () => ipcRenderer.invoke(IPC.listRuns),
-  loadRun: (file) => ipcRenderer.invoke(IPC.loadRun, file)
+  loadRun: (file) => ipcRenderer.invoke(IPC.loadRun, file),
+  exportTeam: () => ipcRenderer.invoke(IPC.exportTeam),
+  importTeam: () => ipcRenderer.invoke(IPC.importTeam)
 }
 
 contextBridge.exposeInMainWorld('api', api)
