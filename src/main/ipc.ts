@@ -18,6 +18,7 @@ import * as runner from './engine/agent-runner'
 import * as ptyMgr from './engine/pty-manager'
 import * as orchestrator from './engine/orchestrator'
 import { checkAuth } from './engine/auth'
+import { draftRoles } from './engine/role-drafter'
 
 export function registerIpc(): void {
   // ---- project ----
@@ -157,4 +158,23 @@ export function registerIpc(): void {
     const { updated, graph } = await store.refreshFromTeam(v.bundle, brainPath)
     return { refreshed: true, updated, graph }
   })
+
+  // ---- role drafting ----
+  ipcMain.handle(
+    IPC.draftRoles,
+    async (e: IpcMainInvokeEvent, input: { goal: string; orchestratorId: string }) => {
+      try {
+        const drafts = await draftRoles({
+          goal: input.goal,
+          orchestratorId: input.orchestratorId,
+          wc: e.sender,
+          abort: new AbortController(),
+          runId: 'draft-roles'
+        })
+        return { ok: true, drafts }
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) }
+      }
+    }
+  )
 }

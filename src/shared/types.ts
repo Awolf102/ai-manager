@@ -352,7 +352,8 @@ export const IPC = {
   exportTeam: 'team:export',
   importTeam: 'team:import',
   syncTeam: 'team:syncTo',
-  refreshTeam: 'team:refreshFrom'
+  refreshTeam: 'team:refreshFrom',
+  draftRoles: 'roles:draft'
 } as const
 
 /** The typed API the preload bridge exposes on window.api. */
@@ -389,4 +390,9 @@ export interface RendererApi {
   importTeam: () => Promise<{ imported: boolean; graph?: ProjectGraph; error?: string }>
   syncToTeam: () => Promise<{ synced: boolean; graph?: ProjectGraph; teamPath?: string }>
   refreshFromTeam: () => Promise<{ refreshed: boolean; graph?: ProjectGraph; updated?: number; error?: string }>
+  draftRoles: (input: { goal: string; orchestratorId: string }) => Promise<{
+    ok: boolean
+    drafts?: { agentId: string; name: string; role: string }[]
+    error?: string
+  }>
 }
