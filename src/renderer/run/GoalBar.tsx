@@ -1,7 +1,9 @@
 import { useState } from 'react'
-import { Play, Sparkles, Square, Target } from 'lucide-react'
+import { Network, Play, Sparkles, Square, Target } from 'lucide-react'
 import { useStore } from '../store'
 import RoleDraftModal from '../RoleDraftModal'
+import TeamSpawnModal from '../TeamSpawnModal'
+import type { SpawnedMember } from '../../shared/types'
 
 export default function GoalBar() {
   const graph = useStore((s) => s.graph)
@@ -12,6 +14,8 @@ export default function GoalBar() {
   const [goal, setGoal] = useState('')
   const [drafting, setDrafting] = useState(false)
   const [drafts, setDrafts] = useState<{ agentId: string; name: string; role: string }[] | null>(null)
+  const [spawning, setSpawning] = useState(false)
+  const [spawned, setSpawned] = useState<SpawnedMember[] | null>(null)
 
   const orchestrators = graph?.nodes.filter((n) => n.kind === 'orchestrator') ?? []
   const selectedOrch = orchestrators.find((o) => o.id === selectedId)
@@ -19,6 +23,19 @@ export default function GoalBar() {
   const canRun = !!target && !!goal.trim() && !running
   const hasSpecialists = (graph?.nodes.some((n) => n.kind !== 'orchestrator')) ?? false
   const canDraft = !!target && !!goal.trim() && hasSpecialists && !running && !drafting
+  const canBuild = !!target && !!goal.trim() && !running && !spawning
+
+  const buildTeam = async (): Promise<void> => {
+    if (!target || !goal.trim() || running || spawning) return
+    setSpawning(true)
+    try {
+      const r = await window.api.spawnTeam({ goal: goal.trim(), orchestratorId: target.id })
+      if (r.ok && r.members && r.members.length) setSpawned(r.members)
+      else window.alert(r.error ?? 'Could not build a team.')
+    } finally {
+      setSpawning(false)
+    }
+  }
 
   const draftRoles = async (): Promise<void> => {
     if (!target || !goal.trim() || !hasSpecialists || running || drafting) return
@@ -74,6 +91,14 @@ export default function GoalBar() {
       >
         <Sparkles size={14} /> {drafting ? 'Drafting…' : 'Draft roles'}
       </button>
+      <button
+        className="btn"
+        onClick={() => void buildTeam()}
+        disabled={!canBuild}
+        title="Have the orchestrator design and create a team for this goal"
+      >
+        <Network size={14} /> {spawning ? 'Building…' : 'Build team'}
+      </button>
       {running ? (
         <button className="btn danger" onClick={stop}>
           <Square size={13} /> Stop
@@ -84,6 +109,9 @@ export default function GoalBar() {
         </button>
       )}
       {drafts && <RoleDraftModal drafts={drafts} onClose={() => setDrafts(null)} />}
+      {spawned && target && (
+        <TeamSpawnModal members={spawned} orchestratorId={target.id} onClose={() => setSpawned(null)} />
+      )}
     </div>
   )
 }
