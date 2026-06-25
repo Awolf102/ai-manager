@@ -58,6 +58,12 @@ The single prioritized to-do. **1 = do next / most important; higher = later.**
   call), shown in an editable preview; nothing writes until Apply (reuses `writeRole`). New pure
   `shared/role-draft.ts` + `engine/role-drafter.ts` (seam-tested) + `rosterForDrafting`. Built via
   subagent-driven TDD (103 tests green; whole-branch review clean). **live smoke pending.**
+- **Compounding-team (b2b) — automatic brain sync.** Opt-in `autoSyncTeam` setting (default off,
+  Settings checkbox): when on + linked, `orchestrator.ts` auto-pulls the team brain before a run and
+  auto-pushes new `[portable]` lessons after. New `project-store` `readTeamBrain`/`autoPullFromTeam`/
+  `autoPushToTeam` wrap b2a's sync; double-walled try/catch so it never blocks/breaks a run. Built via
+  subagent-driven TDD (105 tests green; whole-branch review clean). **Compounding-team a+b1+b2a+b2b
+  complete.** **live smoke pending.**
 - **Decisions:** Bedrock dropped (provider + Knowledge Bases). Multi-chart-within-a-project dropped.
 
 ---
@@ -71,13 +77,9 @@ own design pass. Partly unblocked — role-authoring (done) is the role half; th
 Runtime already supports resume/interrupts; not reachable from the app. Wire `resumeRun` to IPC,
 add a resume-on-launch banner, and `reflectNode` interrupt for a `requireMemoryApproval` setting.
 
-## 3. Compounding-team (b2b) — automatic brain sync  (optional polish on b2a)
-Wire the b2a manual sync to fire automatically: push after a run's reflection, pull at run start. Thin
-layer over b2a's `syncToTeam`/`refreshFromTeam`; only worth it once the manual flow proves useful.
-
-## 4. Local semantic-memory RAG  (lowest)
+## 3. Local semantic-memory RAG  (lowest)
 sqlite-vec/LanceDB once an agent's memory outgrows a single prompt. (Ephemeral memory-seeded spawn
-agents fold into #1's dynamic-spawn design.) The compounding-team foundation (a + b1 + b2a) now exists.
+agents fold into #1's dynamic-spawn design.) The compounding-team foundation (a + b1 + b2a + b2b) exists.
 
 ## Intentionally NOT doing
 Amazon Bedrock (provider + Knowledge Bases); multiple charts within one project folder.
