@@ -64,22 +64,27 @@ The single prioritized to-do. **1 = do next / most important; higher = later.**
   `autoPushToTeam` wrap b2a's sync; double-walled try/catch so it never blocks/breaks a run. Built via
   subagent-driven TDD (105 tests green; whole-branch review clean). **Compounding-team a+b1+b2a+b2b
   complete.** **live smoke pending.**
+- **Dynamic agent spawning — orchestrator CREATES the team.** A **Build team** button (GoalBar) has the
+  orchestrator PROPOSE a hierarchical team (agents + roles + reporting tree) from the goal — read-only
+  call — shown in an editable, depth-indented preview; nothing is created until Apply. New pure
+  `shared/team-spawn.ts` (`spawnTeamPrompt` + cycle-safe `parseSpawnedTeam`) + `engine/team-spawner.ts`
+  (seam-tested, retry-once) + `project-store.applySpawnedTeam` (mirrors `importTeam`: create agents +
+  roles + reporting edges, non-destructive) + IPC `team:spawn`/`team:applySpawn` + `TeamSpawnModal`.
+  The named follow-on to role-drafting (which authored roles for a team you placed; this also creates the
+  nodes + topology). Built via subagent-driven TDD (115 tests green; whole-branch review clean; merged to
+  main `--no-ff`). **live smoke pending.**
 - **Decisions:** Bedrock dropped (provider + Knowledge Bases). Multi-chart-within-a-project dropped.
 
 ---
 
-## 1. Dynamic agent spawning — orchestrator CREATES the team  ← NEXT (bigger — brainstorm before building)
-The named follow-on to role-drafting: the orchestrator reads the goal and creates the agents (+ topology
-+ roles), not just roles for a team you placed. Reverses the manual free-form default, so it needs its
-own design pass. Partly unblocked — role-authoring (done) is the role half; this adds creating the nodes.
-
-## 2. Stage 3 — resume usable + memory-approval gate (HITL)  ⏸ ON HOLD (user — until needed)
+## 1. Stage 3 — resume usable + memory-approval gate (HITL)  ⏸ ON HOLD (user — until needed)
 Runtime already supports resume/interrupts; not reachable from the app. Wire `resumeRun` to IPC,
 add a resume-on-launch banner, and `reflectNode` interrupt for a `requireMemoryApproval` setting.
 
-## 3. Local semantic-memory RAG  (lowest)
+## 2. Local semantic-memory RAG  (lowest)
 sqlite-vec/LanceDB once an agent's memory outgrows a single prompt. (Ephemeral memory-seeded spawn
-agents fold into #1's dynamic-spawn design.) The compounding-team foundation (a + b1 + b2a + b2b) exists.
+agents were folded into the now-shipped dynamic-spawn design.) The compounding-team foundation
+(a + b1 + b2a + b2b) exists.
 
 ## Intentionally NOT doing
 Amazon Bedrock (provider + Knowledge Bases); multiple charts within one project folder.
