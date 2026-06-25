@@ -456,6 +456,20 @@ describe('lessonsDigest', () => {
     expect(out.length).toBe(51) // 50 chars + ellipsis
     expect(out.endsWith('…')).toBe(true)
   })
+
+  it('excludes project-specific lessons and strips the marker from portable ones', () => {
+    const mem = '## Lessons\n- [portable] verify renders return 200\n- [project] api key in config/secrets.json\n'
+    expect(lessonsDigest(mem)).toEqual(['verify renders return 200'])
+  })
+
+  it('keeps untagged (legacy) lessons eligible for routing', () => {
+    const mem = '## Lessons\n- [portable] write tests first\n- old untagged lesson\n- [project] local quirk\n'
+    expect(lessonsDigest(mem)).toEqual(['write tests first', 'old untagged lesson'])
+  })
+
+  it('matches the marker case-insensitively', () => {
+    expect(lessonsDigest('## Lessons\n- [PORTABLE] reusable rule\n')).toEqual(['reusable rule'])
+  })
 })
 
 describe('depsSatisfied', () => {

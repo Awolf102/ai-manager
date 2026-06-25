@@ -22,6 +22,7 @@ import type {
   TaskVerdict
 } from '../../shared/types'
 import { EFFORT_LEVELS } from '../../shared/types'
+import { parseLessonBullet } from '../../shared/lessons'
 import { END, type CompiledGraph, type NodeIO, type NodeResult } from './graph'
 import {
   applyReflection,
@@ -592,14 +593,15 @@ export function lessonsDigest(memory: string, maxLessons = 5, maxLen = 160): str
     const raw = lines[i].trim()
     if (/^##\s+/.test(raw)) break // next section
     if (!raw.startsWith('- ')) continue
-    let text = raw
+    const bullet = raw
       .slice(2)
       .replace(/<!--.*?-->/g, '')
       .replace(/\s+/g, ' ')
       .trim()
-    if (!text || /^\(none yet\)$/i.test(text)) continue
-    if (text.length > maxLen) text = text.slice(0, maxLen) + '…'
-    out.push(text)
+    if (!bullet || /^\(none yet\)$/i.test(bullet)) continue
+    const { scope, text } = parseLessonBullet(bullet)
+    if (scope === 'project') continue // project-specific trivia is not a routing signal
+    out.push(text.length > maxLen ? text.slice(0, maxLen) + '…' : text)
   }
   return out
 }
