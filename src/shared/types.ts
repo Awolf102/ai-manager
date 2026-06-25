@@ -5,6 +5,16 @@ export type AgentKind = 'orchestrator' | 'manager' | 'worker'
 
 export type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | 'auto'
 
+/** One agent the orchestrator proposes when building a team. `reportsTo` is another
+ *  member's temp `id` or the literal "orchestrator" (cycle-free after parsing). */
+export interface SpawnedMember {
+  id: string
+  name: string
+  kind: 'manager' | 'worker'
+  role: string
+  reportsTo: string
+}
+
 export interface AgentNodeData {
   id: string
   name: string
