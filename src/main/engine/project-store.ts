@@ -557,9 +557,9 @@ export async function readTeamBrain(path: string): Promise<TeamBundle | null> {
 /** Auto PULL (B2b): if enabled + linked, refresh agents from the linked brain.
  * Returns agents updated (0 when off / unlinked / unreadable / failed). Best-effort. */
 export async function autoPullFromTeam(): Promise<number> {
-  const link = getLinkedTeam()
-  if (!getSettings().autoSyncTeam || !link) return 0
   try {
+    const link = getLinkedTeam()
+    if (!getSettings().autoSyncTeam || !link) return 0
     const brain = await readTeamBrain(link.path)
     if (!brain) return 0
     const { updated } = await refreshFromTeam(brain, link.path)
@@ -571,9 +571,9 @@ export async function autoPullFromTeam(): Promise<number> {
 
 /** Auto PUSH (B2b): if enabled + linked, sync this project's portable lessons to the linked brain. Best-effort. */
 export async function autoPushToTeam(): Promise<void> {
-  const link = getLinkedTeam()
-  if (!getSettings().autoSyncTeam || !link) return
   try {
+    const link = getLinkedTeam()
+    if (!getSettings().autoSyncTeam || !link) return
     await syncToTeam(link.path, link.teamId)
   } catch {
     // best-effort: never let auto-sync surface an error
