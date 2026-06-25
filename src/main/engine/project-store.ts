@@ -16,6 +16,7 @@ import type {
 } from '../../shared/types'
 import { DEFAULT_MODEL_BY_KIND, DEFAULT_SETTINGS } from '../../shared/types'
 import { iconForName } from '../../shared/icons'
+import { parseLessonBullet } from '../../shared/lessons'
 
 const AIM_DIR = '.ai-manager'
 const GRAPH_FILE = 'graph.json'
@@ -444,7 +445,7 @@ function replaceSection(
   return rebuilt.join('\n').replace(/\n{3,}/g, '\n\n')
 }
 
-function mergeMemory(
+export function mergeMemory(
   content: string,
   { win, loss, lessons, label }: { win: string; loss: string; lessons: string[]; label: string }
 ): string {
@@ -452,19 +453,21 @@ function mergeMemory(
   if (!/^##\s+Lessons/im.test(text)) text += '\n## Lessons\n'
   if (!/^##\s+Task log/im.test(text)) text += '\n## Task log\n'
 
-  // Lessons: merge new bullets newest-first, dedupe, cap 40
+  // Lessons: merge new bullets newest-first, dedupe BY TEXT (ignoring the scope
+  // marker so a re-learned lesson isn't stored twice), cap 40
   text = replaceSection(text, /^##\s+Lessons\s*$/im, (body) => {
     const existing = body
       .split('\n')
       .map((l) => l.trim())
       .filter((l) => l.startsWith('- ') && !/\(none yet\)/i.test(l))
+    const existingTexts = existing.map((e) => norm(parseLessonBullet(e.slice(2)).text))
     const fresh = lessons
       .map((l) => `- ${l.trim()}`)
-      .filter(
-        (l) =>
-          l.length > 2 &&
-          !existing.some((e) => norm(e).includes(norm(l)) || norm(l).includes(norm(e)))
-      )
+      .filter((l) => {
+        if (l.length <= 2) return false
+        const lt = norm(parseLessonBullet(l.slice(2)).text)
+        return !existingTexts.some((e) => e.includes(lt) || lt.includes(e))
+      })
     return [...fresh, ...existing].slice(0, 40).join('\n')
   })
 
