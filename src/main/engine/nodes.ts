@@ -22,7 +22,7 @@ import type {
   TaskVerdict
 } from '../../shared/types'
 import { EFFORT_LEVELS } from '../../shared/types'
-import { formatLessonBullet, parseLessonBullet, type LessonScope } from '../../shared/lessons'
+import { formatLessonBullet, lessonBullets, parseLessonBullet, type LessonScope } from '../../shared/lessons'
 import { END, type CompiledGraph, type NodeIO, type NodeResult } from './graph'
 import {
   applyReflection,
@@ -585,20 +585,9 @@ function parseEffort(v: unknown): Effort | undefined {
  * each lesson, and caps how many are returned so the routing prompt stays bounded.
  */
 export function lessonsDigest(memory: string, maxLessons = 5, maxLen = 160): string[] {
-  const lines = memory.split('\n')
-  const start = lines.findIndex((l) => /^##\s+lessons\s*$/i.test(l.trim()))
-  if (start === -1) return []
   const out: string[] = []
-  for (let i = start + 1; i < lines.length && out.length < maxLessons; i++) {
-    const raw = lines[i].trim()
-    if (/^##\s+/.test(raw)) break // next section
-    if (!raw.startsWith('- ')) continue
-    const bullet = raw
-      .slice(2)
-      .replace(/<!--.*?-->/g, '')
-      .replace(/\s+/g, ' ')
-      .trim()
-    if (!bullet || /^\(none yet\)$/i.test(bullet)) continue
+  for (const bullet of lessonBullets(memory)) {
+    if (out.length >= maxLessons) break
     const { scope, text } = parseLessonBullet(bullet)
     if (scope === 'project') continue // project-specific trivia is not a routing signal
     out.push(text.length > maxLen ? text.slice(0, maxLen) + '…' : text)
