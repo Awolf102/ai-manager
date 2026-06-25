@@ -53,15 +53,19 @@ The single prioritized to-do. **1 = do next / most important; higher = later.**
   New pure `src/shared/team-brain.ts` (`mergeBrainPush`/`planBrainPull`/`mergeLessons`); union +
   dedup-by-text (lossless, idempotent). Built via subagent-driven TDD (96 tests green; whole-branch
   review clean). **live smoke pending.**
+- **Orchestrator-drafted agent roles.** A **Draft roles** button (GoalBar) has the orchestrator author
+  a complete, complementary `role.md` for each non-orchestrator agent from the goal + roster (read-only
+  call), shown in an editable preview; nothing writes until Apply (reuses `writeRole`). New pure
+  `shared/role-draft.ts` + `engine/role-drafter.ts` (seam-tested) + `rosterForDrafting`. Built via
+  subagent-driven TDD (103 tests green; whole-branch review clean). **live smoke pending.**
 - **Decisions:** Bedrock dropped (provider + Knowledge Bases). Multi-chart-within-a-project dropped.
 
 ---
 
-## 1. Orchestrator auto-writes agent roles from the goal  ← NEXT (user idea, 2026-06-25)
-Today `role.md` is a hand-edited template (workers default to "general-purpose specialist"), which
-weakens routing. Idea: the orchestrator reads the goal and authors a tailored specialty role for each
-agent (the *brain*/memory already self-authors via reflection — this is the role half). A step toward
-the deferred dynamic-agent-spawning (#4). Separate from B2 (which syncs lessons, not roles).
+## 1. Dynamic agent spawning — orchestrator CREATES the team  ← NEXT (bigger — brainstorm before building)
+The named follow-on to role-drafting: the orchestrator reads the goal and creates the agents (+ topology
++ roles), not just roles for a team you placed. Reverses the manual free-form default, so it needs its
+own design pass. Partly unblocked — role-authoring (done) is the role half; this adds creating the nodes.
 
 ## 2. Stage 3 — resume usable + memory-approval gate (HITL)  ⏸ ON HOLD (user — until needed)
 Runtime already supports resume/interrupts; not reachable from the app. Wire `resumeRun` to IPC,
@@ -71,9 +75,9 @@ add a resume-on-launch banner, and `reflectNode` interrupt for a `requireMemoryA
 Wire the b2a manual sync to fire automatically: push after a run's reflection, pull at run start. Thin
 layer over b2a's `syncToTeam`/`refreshFromTeam`; only worth it once the manual flow proves useful.
 
-## 4. Deferred to the dynamic-spawn era  (lowest)
-Local semantic-memory RAG (sqlite-vec/LanceDB) once memory outgrows a prompt; ephemeral
-memory-seeded spawn agents. The compounding-team foundation (a + b1 + b2a) now exists.
+## 4. Local semantic-memory RAG  (lowest)
+sqlite-vec/LanceDB once an agent's memory outgrows a single prompt. (Ephemeral memory-seeded spawn
+agents fold into #1's dynamic-spawn design.) The compounding-team foundation (a + b1 + b2a) now exists.
 
 ## Intentionally NOT doing
 Amazon Bedrock (provider + Knowledge Bases); multiple charts within one project folder.
