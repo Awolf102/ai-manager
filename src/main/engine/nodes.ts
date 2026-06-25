@@ -22,7 +22,7 @@ import type {
   TaskVerdict
 } from '../../shared/types'
 import { EFFORT_LEVELS } from '../../shared/types'
-import { parseLessonBullet } from '../../shared/lessons'
+import { formatLessonBullet, parseLessonBullet, type LessonScope } from '../../shared/lessons'
 import { END, type CompiledGraph, type NodeIO, type NodeResult } from './graph'
 import {
   applyReflection,
@@ -488,7 +488,7 @@ async function reflectStep(
     )
     const p = parsed as { win?: unknown; loss?: unknown; lessons?: unknown }
     const lessons = Array.isArray(p.lessons)
-      ? p.lessons.map((x) => String(x).trim()).filter(Boolean).slice(0, 6)
+      ? p.lessons.map(normalizeLessonInput).filter((l): l is string => l !== null).slice(0, 6)
       : []
     return { win: String(p.win ?? '').trim(), loss: String(p.loss ?? '').trim(), lessons }
   } catch {
@@ -604,6 +604,24 @@ export function lessonsDigest(memory: string, maxLessons = 5, maxLen = 160): str
     out.push(text.length > maxLen ? text.slice(0, maxLen) + '…' : text)
   }
   return out
+}
+
+/** Normalize one raw lesson from a reflect JSON into a marker-tagged bullet, or null to drop it. */
+export function normalizeLessonInput(raw: unknown): string | null {
+  if (typeof raw === 'string') {
+    const text = raw.trim()
+    if (!text) return null
+    if (/^\[(portable|project)\]/i.test(text)) return text // already tagged → keep
+    return formatLessonBullet('project', text) // bare/legacy string → conservative
+  }
+  if (raw && typeof raw === 'object') {
+    const o = raw as { text?: unknown; scope?: unknown }
+    const text = String(o.text ?? '').trim()
+    if (!text) return null
+    const scope: LessonScope = o.scope === 'portable' ? 'portable' : 'project'
+    return formatLessonBullet(scope, text)
+  }
+  return null
 }
 
 /** The highest effort in a worker's batch (so the hardest task is served), or undefined. */
@@ -833,10 +851,13 @@ ${list}
 Capture, honestly and concisely:
 - win: the single most useful thing that worked.
 - loss: the main thing that went wrong or fell short (empty string if nothing did).
-- lessons: 1-4 short, reusable rules for your future self — especially how to avoid repeating any mistake the reviewer flagged.
+- lessons: 1-4 short, reusable rules for your future self — especially how to avoid repeating any mistake the reviewer flagged. For EACH lesson set a "scope":
+    - "portable": general software-engineering wisdom that would help on ANY project (testing, verification, debugging, review habits).
+    - "project": a fact or convention specific to THIS codebase or goal (file paths, commands, config locations, domain quirks) that would NOT transfer elsewhere.
+  When unsure, use "project".
 
 Reply with ONLY this JSON code block (no other text):
 \`\`\`json
-{ "win": "...", "loss": "...", "lessons": ["..."] }
+{ "win": "...", "loss": "...", "lessons": [ { "text": "...", "scope": "portable" } ] }
 \`\`\``
 }

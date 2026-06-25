@@ -6,6 +6,7 @@ import {
   maxEffort,
   lessonsDigest,
   depsSatisfied,
+  normalizeLessonInput,
   type Eng,
   type AgentRunner
 } from './nodes'
@@ -120,7 +121,9 @@ function cannedAgent() {
     }
     if (p.includes('Reflect on the work')) {
       rec('reflect')
-      return { text: '```json\n{"win":"w","loss":"l","lessons":["learned"]}\n```' }
+      return {
+        text: '```json\n{"win":"w","loss":"l","lessons":[{"text":"learned","scope":"portable"}]}\n```'
+      }
     }
     if (p.includes('Write a clear final report')) {
       rec('synth')
@@ -469,6 +472,33 @@ describe('lessonsDigest', () => {
 
   it('matches the marker case-insensitively', () => {
     expect(lessonsDigest('## Lessons\n- [PORTABLE] reusable rule\n')).toEqual(['reusable rule'])
+  })
+})
+
+describe('normalizeLessonInput', () => {
+  it('formats an object with an explicit portable scope', () => {
+    expect(normalizeLessonInput({ text: 'write tests first', scope: 'portable' })).toBe(
+      '[portable] write tests first'
+    )
+  })
+
+  it('defaults a missing or unknown scope to project', () => {
+    expect(normalizeLessonInput({ text: 'local quirk' })).toBe('[project] local quirk')
+    expect(normalizeLessonInput({ text: 'local quirk', scope: 'banana' })).toBe('[project] local quirk')
+  })
+
+  it('treats a bare string as a project lesson', () => {
+    expect(normalizeLessonInput('learned something')).toBe('[project] learned something')
+  })
+
+  it('keeps an already-tagged string as-is', () => {
+    expect(normalizeLessonInput('[portable] already tagged')).toBe('[portable] already tagged')
+  })
+
+  it('drops empty or non-lesson input', () => {
+    expect(normalizeLessonInput({ text: '   ' })).toBeNull()
+    expect(normalizeLessonInput('')).toBeNull()
+    expect(normalizeLessonInput(42)).toBeNull()
   })
 })
 
