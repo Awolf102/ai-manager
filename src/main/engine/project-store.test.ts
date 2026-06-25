@@ -19,7 +19,11 @@ import {
   syncToTeam,
   refreshFromTeam,
   writeRole,
-  rosterForDrafting
+  rosterForDrafting,
+  readTeamBrain,
+  autoPullFromTeam,
+  autoPushToTeam,
+  updateSettings
 } from './project-store'
 
 async function tmpProject(): Promise<string> {
@@ -139,5 +143,52 @@ describe('rosterForDrafting', () => {
     expect(agents.map((a) => a.name)).toEqual(['Dana']) // orchestrator excluded
     expect(agents[0].role).toContain('data specialist')
     expect(edges).toHaveLength(1)
+  })
+})
+
+describe('auto team-brain sync', () => {
+  it('readTeamBrain returns a bundle for a valid file, null otherwise', async () => {
+    const path = join(await tmpProject(), 'brain.json')
+    expect(await readTeamBrain(path)).toBeNull() // missing
+    await fs.writeFile(path, 'not json', 'utf8')
+    expect(await readTeamBrain(path)).toBeNull() // invalid JSON
+    await fs.writeFile(
+      path,
+      JSON.stringify({ kind: 'ai-manager-team', version: 1, teamId: 't', name: 'n', exportedAt: 'x', members: [], edges: [] }),
+      'utf8'
+    )
+    expect((await readTeamBrain(path))?.teamId).toBe('t')
+  })
+
+  it('auto-sync is gated by the setting (off = no-op, on = push + pull)', async () => {
+    const brainPath = join(await tmpProject(), 'brain.aimteam.json')
+    await openProject(await tmpProject())
+    const g = await createAgent({ name: 'Dana', kind: 'worker' })
+    const dana = g.nodes.find((n) => n.name === 'Dana')!
+    await writeMemory(dana.id, '# Memory\n\n## Lessons\n- [portable] write tests first\n\n## Task log\n')
+    await syncToTeam(brainPath, 'team-1') // creates the brain + links the project
+
+    // Dana learns a new portable lesson locally (not yet pushed)
+    await writeMemory(
+      dana.id,
+      '# Memory\n\n## Lessons\n- [portable] write tests first\n- [portable] verify renders\n\n## Task log\n'
+    )
+
+    // setting OFF → both are no-ops
+    await autoPushToTeam()
+    expect((await readTeamBrain(brainPath))!.members[0].lessons).not.toContain('verify renders')
+    expect(await autoPullFromTeam()).toBe(0)
+
+    // setting ON → push sends the new lesson up
+    await updateSettings({ autoSyncTeam: true })
+    await autoPushToTeam()
+    expect((await readTeamBrain(brainPath))!.members[0].lessons).toContain('verify renders')
+
+    // ON → pull merges a brain-only lesson down into the matching agent
+    const brain = (await readTeamBrain(brainPath))!
+    const withNew = { ...brain, members: brain.members.map((m) => ({ ...m, lessons: [...m.lessons, 'read errors fully'] })) }
+    await fs.writeFile(brainPath, JSON.stringify(withNew), 'utf8')
+    expect(await autoPullFromTeam()).toBe(1)
+    expect(await readMemory(dana.id)).toContain('- [portable] read errors fully')
   })
 })

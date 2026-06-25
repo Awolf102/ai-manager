@@ -57,6 +57,8 @@ export interface ProjectSettings {
   autonomy: Autonomy
   /** manager assesses task difficulty and assigns a reasoning effort per task */
   adaptiveEffort: boolean
+  /** auto pull the linked team brain before a run + push after (B2b) */
+  autoSyncTeam: boolean
 }
 
 export const DEFAULT_SETTINGS: ProjectSettings = {
@@ -64,7 +66,8 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   maxRepairAttempts: 3,
   reflection: true,
   autonomy: 'auto',
-  adaptiveEffort: true
+  adaptiveEffort: true,
+  autoSyncTeam: false
 }
 
 export interface ProjectGraph {

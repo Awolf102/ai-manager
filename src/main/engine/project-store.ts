@@ -544,6 +544,42 @@ export async function refreshFromTeam(
   return { updated, graph: saved }
 }
 
+/** Read + validate a team-brain file. Returns null on missing/unreadable/invalid. */
+export async function readTeamBrain(path: string): Promise<TeamBundle | null> {
+  try {
+    const v = validateTeamBundle(JSON.parse(await fs.readFile(path, 'utf8')))
+    return v.ok ? v.bundle : null
+  } catch {
+    return null
+  }
+}
+
+/** Auto PULL (B2b): if enabled + linked, refresh agents from the linked brain.
+ * Returns agents updated (0 when off / unlinked / unreadable / failed). Best-effort. */
+export async function autoPullFromTeam(): Promise<number> {
+  const link = getLinkedTeam()
+  if (!getSettings().autoSyncTeam || !link) return 0
+  try {
+    const brain = await readTeamBrain(link.path)
+    if (!brain) return 0
+    const { updated } = await refreshFromTeam(brain, link.path)
+    return updated
+  } catch {
+    return 0
+  }
+}
+
+/** Auto PUSH (B2b): if enabled + linked, sync this project's portable lessons to the linked brain. Best-effort. */
+export async function autoPushToTeam(): Promise<void> {
+  const link = getLinkedTeam()
+  if (!getSettings().autoSyncTeam || !link) return
+  try {
+    await syncToTeam(link.path, link.teamId)
+  } catch {
+    // best-effort: never let auto-sync surface an error
+  }
+}
+
 /** Snapshot the open project's team into a portable bundle (portable lessons only). */
 export async function exportTeam(): Promise<TeamBundle> {
   const { graph } = requireCurrent()
