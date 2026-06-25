@@ -7,6 +7,10 @@ function norm(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 }
 
+// Dedup is intentional EXACT normalized-text equality (not the substring rule
+// `mergeMemory` uses): the team-brain sync is a second writer into an agent's
+// memory, and exact-match avoids silently swallowing distinct-but-overlapping
+// lessons. Keep it exact — do not "align" it with mergeMemory's `includes` rule.
 function unionLessons(existing: string[], incoming: string[]): string[] {
   const out = [...existing]
   const seen = new Set(existing.map(norm))
