@@ -46,31 +46,34 @@ The single prioritized to-do. **1 = do next / most important; higher = later.**
   `exportTeam`/`importTeam` in project-store (saveGraph last); IPC + top-bar Export/Import buttons.
   `AgentNodeData.memberId?` added for B2. Project settings NOT carried. Built via subagent-driven TDD
   (89 tests green incl. fs round-trip + edge-remap; whole-branch review clean). **live-verified.**
+- **Compounding-team (b2a) — living team / manual brain sync.** Team brain = a B1 bundle file + a
+  `teamId`; a project records `linkedTeam` and gets **Sync to team** (push `[portable]` lessons into
+  the brain by `memberId`, roster-growth) + **Refresh from team** (pull lessons into matching agents
+  via the new `mergeLessons`). Implicit linking (first sync = save/open dialog; B1 import auto-links).
+  New pure `src/shared/team-brain.ts` (`mergeBrainPush`/`planBrainPull`/`mergeLessons`); union +
+  dedup-by-text (lossless, idempotent). Built via subagent-driven TDD (96 tests green; whole-branch
+  review clean). **live smoke pending.**
 - **Decisions:** Bedrock dropped (provider + Knowledge Bases). Multi-chart-within-a-project dropped.
 
 ---
 
-## 1. Compounding-team (b2a) — living team / manual brain sync  ← IN DESIGN
-The "team brain" = a B1 bundle file + a `teamId`; a project records a `linkedTeam` and gets two
-buttons: **Sync to team** (push this project's new `[portable]` lessons back into the brain by
-`memberId`, growing the roster) and **Refresh from team** (pull the brain's lessons into matching
-agents via `mergeMemory`). Implicit linking (first sync click creates/joins the brain via a dialog).
-All merges are union + dedup-by-text (lossless). **Deferred to b2b:** automatic triggers
-(push-after-reflection, pull-at-run-start). Decided: allow-roster-growth, implicit linking.
-
-## 2. Orchestrator auto-writes agent roles from the goal  (user idea, 2026-06-25)
+## 1. Orchestrator auto-writes agent roles from the goal  ← NEXT (user idea, 2026-06-25)
 Today `role.md` is a hand-edited template (workers default to "general-purpose specialist"), which
 weakens routing. Idea: the orchestrator reads the goal and authors a tailored specialty role for each
 agent (the *brain*/memory already self-authors via reflection — this is the role half). A step toward
 the deferred dynamic-agent-spawning (#4). Separate from B2 (which syncs lessons, not roles).
 
-## 3. Stage 3 — resume usable + memory-approval gate (HITL)  ⏸ ON HOLD (user — until needed)
+## 2. Stage 3 — resume usable + memory-approval gate (HITL)  ⏸ ON HOLD (user — until needed)
 Runtime already supports resume/interrupts; not reachable from the app. Wire `resumeRun` to IPC,
 add a resume-on-launch banner, and `reflectNode` interrupt for a `requireMemoryApproval` setting.
 
+## 3. Compounding-team (b2b) — automatic brain sync  (optional polish on b2a)
+Wire the b2a manual sync to fire automatically: push after a run's reflection, pull at run start. Thin
+layer over b2a's `syncToTeam`/`refreshFromTeam`; only worth it once the manual flow proves useful.
+
 ## 4. Deferred to the dynamic-spawn era  (lowest)
 Local semantic-memory RAG (sqlite-vec/LanceDB) once memory outgrows a prompt; ephemeral
-memory-seeded spawn agents. The compounding-team foundation (a + b1) now exists; B2 would strengthen it.
+memory-seeded spawn agents. The compounding-team foundation (a + b1 + b2a) now exists.
 
 ## Intentionally NOT doing
 Amazon Bedrock (provider + Knowledge Bases); multiple charts within one project folder.
