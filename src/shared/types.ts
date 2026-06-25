@@ -72,6 +72,8 @@ export interface ProjectGraph {
   nodes: AgentNodeData[]
   edges: GraphEdge[]
   settings: ProjectSettings
+  /** the team brain this project syncs portable lessons with (B2 living team) */
+  linkedTeam?: { teamId: string; path: string }
 }
 
 // ---- IPC payloads ----

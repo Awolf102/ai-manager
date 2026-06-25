@@ -15,7 +15,9 @@ import {
   exportTeam,
   importTeam,
   mergeMemory,
-  setEdges
+  setEdges,
+  syncToTeam,
+  refreshFromTeam
 } from './project-store'
 
 async function tmpProject(): Promise<string> {
@@ -55,6 +57,44 @@ describe('team export/import round-trip', () => {
     expect(after.edges).toHaveLength(1)
     expect(after.edges[0].source).toBe(imported.id)   // imported Dana
     expect(after.edges[0].target).toBe(importedQuinn.id)
+  })
+})
+
+describe('team brain sync', () => {
+  it('pushes portable lessons to a brain and pulls new ones into another project', async () => {
+    const brainPath = join(await tmpProject(), 'brain.aimteam.json')
+
+    // project 1: a team learns a portable + a project lesson, then pushes
+    await openProject(await tmpProject())
+    await createAgent({ name: 'Dana', kind: 'worker' })
+    const g1 = await createAgent({ name: 'Quinn', kind: 'worker' })
+    const dana = g1.nodes.find((n) => n.name === 'Dana')!
+    const quinn = g1.nodes.find((n) => n.name === 'Quinn')!
+    await setEdges([{ id: 'e1', source: dana.id, target: quinn.id }])
+    await writeMemory(dana.id, '# Memory: Dana\n\n## Lessons\n- [portable] write tests first\n- [project] api key in config\n\n## Task log\n')
+
+    const push = await syncToTeam(brainPath, 'team-1')
+    expect(push.graph.linkedTeam).toEqual({ teamId: 'team-1', path: brainPath })
+    const brain = JSON.parse(await fs.readFile(brainPath, 'utf8'))
+    expect(brain.teamId).toBe('team-1')
+    expect(brain.edges).toHaveLength(1)
+    expect(brain.members.find((m: { name: string }) => m.name === 'Dana').lessons).toEqual(['write tests first'])
+
+    // project 2: import the team (links + seeds), then pull a newly-added brain lesson
+    await openProject(await tmpProject())
+    await importTeam(brain, brainPath)
+    const updatedBrain = {
+      ...brain,
+      members: brain.members.map((m: { name: string; lessons: string[] }) =>
+        m.name === 'Dana' ? { ...m, lessons: [...m.lessons, 'verify renders'] } : m
+      )
+    }
+    const pull = await refreshFromTeam(updatedBrain, brainPath)
+    expect(pull.updated).toBe(1)
+    const dana2 = pull.graph.nodes.find((n) => n.name === 'Dana')!
+    const mem2 = await readMemory(dana2.id)
+    expect(mem2).toContain('- [portable] verify renders')
+    expect(mem2).toContain('- [portable] write tests first')
   })
 })
 

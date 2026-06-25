@@ -18,7 +18,8 @@ import { DEFAULT_MODEL_BY_KIND, DEFAULT_SETTINGS } from '../../shared/types'
 import { iconForName } from '../../shared/icons'
 import { slugify, uniqueSlug } from '../../shared/slug'
 import { parseLessonBullet } from '../../shared/lessons'
-import { buildTeamBundle, planTeamImport, type TeamBundle } from '../../shared/team-bundle'
+import { buildTeamBundle, planTeamImport, validateTeamBundle, type TeamBundle } from '../../shared/team-bundle'
+import { mergeBrainPush, planBrainPull, mergeLessons } from '../../shared/team-brain'
 
 const AIM_DIR = '.ai-manager'
 const GRAPH_FILE = 'graph.json'
@@ -470,6 +471,67 @@ export function mergeMemory(
 
 // ---------- portable team (export / import) ----------
 
+export function getLinkedTeam(): { teamId: string; path: string } | null {
+  return requireCurrent().graph.linkedTeam ?? null
+}
+
+/** PUSH: this project's portable lessons into the brain file at brainPath. */
+export async function syncToTeam(
+  brainPath: string,
+  fallbackTeamId: string
+): Promise<{ brain: TeamBundle; graph: ProjectGraph }> {
+  const { graph } = requireCurrent()
+  for (const n of graph.nodes) if (!n.memberId) n.memberId = n.id
+  const files: Record<string, { role: string; memory: string }> = {}
+  for (const n of graph.nodes) files[n.id] = { role: await readRole(n.id), memory: await readMemory(n.id) }
+  const projectBundle = buildTeamBundle({
+    name: graph.project.name,
+    exportedAt: new Date().toISOString(),
+    nodes: graph.nodes,
+    edges: graph.edges,
+    files
+  })
+  let existing: TeamBundle | null = null
+  try {
+    const v = validateTeamBundle(JSON.parse(await fs.readFile(brainPath, 'utf8')))
+    if (v.ok) existing = v.bundle
+  } catch {
+    existing = null // fresh brain
+  }
+  const teamId = existing?.teamId ?? fallbackTeamId
+  const base: TeamBundle = existing
+    ? { ...existing, teamId }
+    : { kind: 'ai-manager-team', version: 1, teamId, name: graph.project.name, exportedAt: new Date().toISOString(), members: [], edges: [] }
+  const brain: TeamBundle = { ...mergeBrainPush(base, projectBundle), teamId, exportedAt: new Date().toISOString() }
+  await fs.writeFile(brainPath, JSON.stringify(brain, null, 2), 'utf8')
+  graph.linkedTeam = { teamId, path: brainPath }
+  const saved = await saveGraph()
+  return { brain, graph: saved }
+}
+
+/** PULL: merge the brain's portable lessons into matching agents' memory.md. */
+export async function refreshFromTeam(
+  brain: TeamBundle,
+  brainPath: string
+): Promise<{ updated: number; graph: ProjectGraph }> {
+  const { graph } = requireCurrent()
+  const teamId = brain.teamId ?? randomUUID()
+  if (!brain.teamId) await fs.writeFile(brainPath, JSON.stringify({ ...brain, teamId }, null, 2), 'utf8')
+  let updated = 0
+  for (const p of planBrainPull(brain, graph.nodes)) {
+    if (p.lessons.length === 0) continue
+    const memory = await readMemory(p.agentId)
+    const next = mergeLessons(memory, p.lessons)
+    if (next !== memory) {
+      await writeMemory(p.agentId, next)
+      updated++
+    }
+  }
+  graph.linkedTeam = { teamId, path: brainPath }
+  const saved = await saveGraph()
+  return { updated, graph: saved }
+}
+
 /** Snapshot the open project's team into a portable bundle (portable lessons only). */
 export async function exportTeam(): Promise<TeamBundle> {
   const { graph } = requireCurrent()
@@ -488,7 +550,7 @@ export async function exportTeam(): Promise<TeamBundle> {
 
 /** Add a bundle's team into the open project: new agents (fresh ids, uniquified
  * slugs, seeded memory), remapped edges. Saves the graph LAST for atomicity. */
-export async function importTeam(bundle: TeamBundle): Promise<ProjectGraph> {
+export async function importTeam(bundle: TeamBundle, brainPath?: string): Promise<ProjectGraph> {
   const { path, graph } = requireCurrent()
   const plan = planTeamImport(bundle, graph.nodes.map((n) => n.slug))
   const idByMember = new Map<string, string>()
@@ -518,6 +580,7 @@ export async function importTeam(bundle: TeamBundle): Promise<ProjectGraph> {
     const target = idByMember.get(e.target)
     if (source && target) graph.edges.push({ id: `${source}->${target}`, source, target })
   }
+  if (bundle.teamId && brainPath) graph.linkedTeam = { teamId: bundle.teamId, path: brainPath }
   return saveGraph()
 }
 
