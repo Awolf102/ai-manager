@@ -1147,3 +1147,27 @@ button {
   font-size: 11px;
   white-space: nowrap;
 }
+
+.modal-wide {
+  width: 640px;
+  max-width: 90vw;
+  max-height: 86vh;
+  overflow: auto;
+}
+.draft-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.draft-role {
+  width: 100%;
+  min-height: 150px;
+  resize: vertical;
+  background: var(--panel-2);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  border-radius: 7px;
+  padding: 8px 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
