@@ -10,7 +10,8 @@ import type {
   ProjectSettings,
   RunHeadlessInput,
   SpawnPtyInput,
-  StartRunInput
+  StartRunInput,
+  SpawnedMember
 } from '../shared/types'
 import * as store from './engine/project-store'
 import { validateTeamBundle } from '../shared/team-bundle'
@@ -19,6 +20,7 @@ import * as ptyMgr from './engine/pty-manager'
 import * as orchestrator from './engine/orchestrator'
 import { checkAuth } from './engine/auth'
 import { draftRoles } from './engine/role-drafter'
+import { spawnTeam } from './engine/team-spawner'
 
 export function registerIpc(): void {
   // ---- project ----
@@ -176,5 +178,29 @@ export function registerIpc(): void {
         return { ok: false, error: err instanceof Error ? err.message : String(err) }
       }
     }
+  )
+
+  // ---- team spawning ----
+  ipcMain.handle(
+    IPC.spawnTeam,
+    async (e: IpcMainInvokeEvent, input: { goal: string; orchestratorId: string }) => {
+      try {
+        const members = await spawnTeam({
+          goal: input.goal,
+          orchestratorId: input.orchestratorId,
+          wc: e.sender,
+          abort: new AbortController(),
+          runId: 'spawn-team'
+        })
+        return { ok: true, members }
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) }
+      }
+    }
+  )
+  ipcMain.handle(
+    IPC.applySpawn,
+    (_e, input: { members: SpawnedMember[]; orchestratorId: string }) =>
+      store.applySpawnedTeam(input.members, input.orchestratorId)
   )
 }

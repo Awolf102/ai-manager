@@ -47,7 +47,9 @@ const api: RendererApi = {
   importTeam: () => ipcRenderer.invoke(IPC.importTeam),
   syncToTeam: () => ipcRenderer.invoke(IPC.syncTeam),
   refreshFromTeam: () => ipcRenderer.invoke(IPC.refreshTeam),
-  draftRoles: (input) => ipcRenderer.invoke(IPC.draftRoles, input)
+  draftRoles: (input) => ipcRenderer.invoke(IPC.draftRoles, input),
+  spawnTeam: (input) => ipcRenderer.invoke(IPC.spawnTeam, input),
+  applySpawnedTeam: (input) => ipcRenderer.invoke(IPC.applySpawn, input)
 }
 
 contextBridge.exposeInMainWorld('api', api)

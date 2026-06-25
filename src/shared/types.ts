@@ -366,7 +366,9 @@ export const IPC = {
   importTeam: 'team:import',
   syncTeam: 'team:syncTo',
   refreshTeam: 'team:refreshFrom',
-  draftRoles: 'roles:draft'
+  draftRoles: 'roles:draft',
+  spawnTeam: 'team:spawn',
+  applySpawn: 'team:applySpawn'
 } as const
 
 /** The typed API the preload bridge exposes on window.api. */
@@ -408,4 +410,10 @@ export interface RendererApi {
     drafts?: { agentId: string; name: string; role: string }[]
     error?: string
   }>
+  spawnTeam: (input: { goal: string; orchestratorId: string }) => Promise<{
+    ok: boolean
+    members?: SpawnedMember[]
+    error?: string
+  }>
+  applySpawnedTeam: (input: { members: SpawnedMember[]; orchestratorId: string }) => Promise<ProjectGraph>
 }
