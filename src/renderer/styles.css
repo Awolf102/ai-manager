@@ -1138,3 +1138,12 @@ button {
   font-size: 12.5px;
   margin-bottom: 3px;
 }
+
+.team-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}

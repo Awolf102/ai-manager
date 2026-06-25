@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Clock, Download, FolderOpen, Plus, Settings as SettingsIcon, Upload } from 'lucide-react'
+import { Clock, CloudDownload, CloudUpload, Download, FolderOpen, Plus, Settings as SettingsIcon, Upload, Users } from 'lucide-react'
 import { useStore } from './store'
 import OrgChart from './canvas/OrgChart'
 import AgentConfigPanel from './panels/AgentConfigPanel'
@@ -98,6 +98,36 @@ export default function App() {
           }}
         >
           <Download size={14} />
+        </button>
+        {graph.linkedTeam && (
+          <span className="team-link" title={`Linked team brain: ${graph.linkedTeam.path}`}>
+            <Users size={12} /> {graph.linkedTeam.path.split(/[\\/]/).pop()}
+          </span>
+        )}
+        <button
+          className="btn"
+          title="Sync this project's portable lessons to the team brain"
+          onClick={async () => {
+            const r = await window.api.syncToTeam()
+            if (r.synced && r.graph) setGraph(r.graph)
+          }}
+        >
+          <CloudUpload size={14} />
+        </button>
+        <button
+          className="btn"
+          title="Refresh this project's agents from the team brain"
+          onClick={async () => {
+            const r = await window.api.refreshFromTeam()
+            if (r.refreshed && r.graph) {
+              setGraph(r.graph)
+              window.alert(`Updated ${r.updated} agent(s) from the team brain.`)
+            } else if (r.error) {
+              window.alert(r.error)
+            }
+          }}
+        >
+          <CloudDownload size={14} />
         </button>
         <button className="btn" title="Settings" onClick={() => setShowSettings(true)}>
           <SettingsIcon size={14} />
