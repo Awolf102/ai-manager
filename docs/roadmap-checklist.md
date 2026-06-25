@@ -39,15 +39,23 @@ The single prioritized to-do. **1 = do next / most important; higher = later.**
   marker source of truth; `mergeMemory` dedups by stripped text; no shared-type churn. Built via
   subagent-driven TDD (74 tests green, whole-branch review clean). **Repo is now git-initialized.**
   Spec/plan under `docs/superpowers/`. **live smoke pending.**
+- **Compounding-team (b1) — portable team export/import.** Export the open project's team (roster +
+  roles + PORTABLE-only lessons) to a versioned `.json` bundle; import into another project → new
+  agents with seeded `[portable]` memory + empty task log, edges remapped by stable `memberId`.
+  Pure core in `src/shared/team-bundle.ts` (+ extracted `shared/slug.ts`, `portableLessons`);
+  `exportTeam`/`importTeam` in project-store (saveGraph last); IPC + top-bar Export/Import buttons.
+  `AgentNodeData.memberId?` added for B2. Project settings NOT carried. Built via subagent-driven TDD
+  (89 tests green incl. fs round-trip + edge-remap; whole-branch review clean). **live smoke pending.**
 - **Decisions:** Bedrock dropped (provider + Knowledge Bases). Multi-chart-within-a-project dropped.
 
 ---
 
-## 1. Compounding-team (b) — portable team across folders  ← NEXT (bigger — brainstorm before building)
-Carry a roster + its memories across project folders (today a team is folder-locked; stopgap = copy
-`.ai-manager/graph.json` + `agents/`). *Where:* `project-store.ts` storage model — needs its own
-design pass. **Now unblocked:** sub-project (a) lesson tagging is done, so B can carry only `[portable]`
-lessons and treat untagged as project-specific (don't transfer) per the documented asymmetry.
+## 1. Compounding-team (b2) — living team / cross-project sync  ← NEXT (bigger — brainstorm before building)
+B1 (snapshot export/import) is done. B2 makes a team a persistent entity: a central "team brain" that
+portable lessons sync back to after every run, so improvements propagate to every project the team
+touches — plus conflict merge and identity matching (uses the `memberId` B1 already stamps). Needs its
+own spec + storage-model design pass. Bigger than B1; only worth it if you want true cross-project
+compounding rather than one-time clones.
 
 ## 2. Stage 3 — resume usable + memory-approval gate (HITL)  ⏸ ON HOLD (user — until needed)
 Runtime already supports resume/interrupts; not reachable from the app. Wire `resumeRun` to IPC,
@@ -55,7 +63,7 @@ add a resume-on-launch banner, and `reflectNode` interrupt for a `requireMemoryA
 
 ## 3. Deferred to the dynamic-spawn era  (lowest)
 Local semantic-memory RAG (sqlite-vec/LanceDB) once memory outgrows a prompt; ephemeral
-memory-seeded spawn agents. Need #1 first.
+memory-seeded spawn agents. The compounding-team foundation (a + b1) now exists; B2 would strengthen it.
 
 ## Intentionally NOT doing
 Amazon Bedrock (provider + Knowledge Bases); multiple charts within one project folder.
