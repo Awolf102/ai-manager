@@ -16,6 +16,7 @@ import type {
 } from '../../shared/types'
 import { DEFAULT_MODEL_BY_KIND, DEFAULT_SETTINGS } from '../../shared/types'
 import { iconForName } from '../../shared/icons'
+import { slugify, uniqueSlug } from '../../shared/slug'
 import { parseLessonBullet } from '../../shared/lessons'
 
 const AIM_DIR = '.ai-manager'
@@ -44,25 +45,6 @@ export function getAgent(agentId: string): AgentNodeData {
   const agent = graph.nodes.find((n) => n.id === agentId)
   if (!agent) throw new Error(`Unknown agent: ${agentId}`)
   return agent
-}
-
-// ---------- slug helpers ----------
-
-function slugify(name: string): string {
-  return (
-    name
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '') || 'agent'
-  )
-}
-
-function uniqueSlug(base: string, taken: Set<string>): string {
-  let slug = base
-  let i = 2
-  while (taken.has(slug)) slug = `${base}-${i++}`
-  return slug
 }
 
 // ---------- templates ----------

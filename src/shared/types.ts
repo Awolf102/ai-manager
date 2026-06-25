@@ -19,6 +19,8 @@ export interface AgentNodeData {
   skills?: string[]
   /** last Claude Code session id captured from a headless run (for --resume) */
   sessionId?: string
+  /** stable team-member identity that survives export/import (used by the portable-team feature) */
+  memberId?: string
   position: { x: number; y: number }
 }
 
