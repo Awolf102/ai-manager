@@ -24,6 +24,8 @@ export interface TeamMember {
 export interface TeamBundle {
   kind: 'ai-manager-team'
   version: 1
+  /** stable team identity — present in a "team brain"; absent in a plain snapshot */
+  teamId?: string
   name: string
   exportedAt: string
   members: TeamMember[]
