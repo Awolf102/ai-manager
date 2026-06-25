@@ -350,7 +350,9 @@ export const IPC = {
   listRuns: 'runs:list',
   loadRun: 'runs:load',
   exportTeam: 'team:export',
-  importTeam: 'team:import'
+  importTeam: 'team:import',
+  syncTeam: 'team:syncTo',
+  refreshTeam: 'team:refreshFrom'
 } as const
 
 /** The typed API the preload bridge exposes on window.api. */
@@ -385,4 +387,6 @@ export interface RendererApi {
   loadRun: (file: string) => Promise<RunRecord | null>
   exportTeam: () => Promise<{ saved: boolean; path?: string }>
   importTeam: () => Promise<{ imported: boolean; graph?: ProjectGraph; error?: string }>
+  syncToTeam: () => Promise<{ synced: boolean; graph?: ProjectGraph; teamPath?: string }>
+  refreshFromTeam: () => Promise<{ refreshed: boolean; graph?: ProjectGraph; updated?: number; error?: string }>
 }

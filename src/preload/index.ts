@@ -44,7 +44,9 @@ const api: RendererApi = {
   listRuns: () => ipcRenderer.invoke(IPC.listRuns),
   loadRun: (file) => ipcRenderer.invoke(IPC.loadRun, file),
   exportTeam: () => ipcRenderer.invoke(IPC.exportTeam),
-  importTeam: () => ipcRenderer.invoke(IPC.importTeam)
+  importTeam: () => ipcRenderer.invoke(IPC.importTeam),
+  syncToTeam: () => ipcRenderer.invoke(IPC.syncTeam),
+  refreshFromTeam: () => ipcRenderer.invoke(IPC.refreshTeam)
 }
 
 contextBridge.exposeInMainWorld('api', api)

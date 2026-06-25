@@ -1,6 +1,7 @@
 import { dialog, ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { promises as fs } from 'node:fs'
+import { randomUUID } from 'node:crypto'
 import { IPC } from '../shared/types'
 import type {
   AgentNodeData,
@@ -111,7 +112,49 @@ export function registerIpc(): void {
     }
     const v = validateTeamBundle(parsed)
     if (!v.ok) return { imported: false, error: v.error }
-    const graph = await store.importTeam(v.bundle)
+    const graph = await store.importTeam(v.bundle, r.filePaths[0])
     return { imported: true, graph }
+  })
+
+  // ---- team brain (B2 living team) ----
+  ipcMain.handle(IPC.syncTeam, async () => {
+    const linked = store.getLinkedTeam()
+    let brainPath: string
+    if (linked) brainPath = linked.path
+    else {
+      const r = await dialog.showSaveDialog({
+        title: 'Sync to team',
+        defaultPath: 'team.aimteam.json',
+        filters: [{ name: 'AI Manager team', extensions: ['json'] }]
+      })
+      if (r.canceled || !r.filePath) return { synced: false }
+      brainPath = r.filePath
+    }
+    const { graph } = await store.syncToTeam(brainPath, randomUUID())
+    return { synced: true, graph, teamPath: brainPath }
+  })
+  ipcMain.handle(IPC.refreshTeam, async () => {
+    const linked = store.getLinkedTeam()
+    let brainPath: string
+    if (linked) brainPath = linked.path
+    else {
+      const r = await dialog.showOpenDialog({
+        title: 'Refresh from team',
+        properties: ['openFile'],
+        filters: [{ name: 'AI Manager team', extensions: ['json'] }]
+      })
+      if (r.canceled || r.filePaths.length === 0) return { refreshed: false }
+      brainPath = r.filePaths[0]
+    }
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(await fs.readFile(brainPath, 'utf8'))
+    } catch {
+      return { refreshed: false, error: 'That team file is not valid JSON.' }
+    }
+    const v = validateTeamBundle(parsed)
+    if (!v.ok) return { refreshed: false, error: v.error }
+    const { updated, graph } = await store.refreshFromTeam(v.bundle, brainPath)
+    return { refreshed: true, updated, graph }
   })
 }
