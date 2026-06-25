@@ -45,7 +45,7 @@ The single prioritized to-do. **1 = do next / most important; higher = later.**
   Pure core in `src/shared/team-bundle.ts` (+ extracted `shared/slug.ts`, `portableLessons`);
   `exportTeam`/`importTeam` in project-store (saveGraph last); IPC + top-bar Export/Import buttons.
   `AgentNodeData.memberId?` added for B2. Project settings NOT carried. Built via subagent-driven TDD
-  (89 tests green incl. fs round-trip + edge-remap; whole-branch review clean). **live smoke pending.**
+  (89 tests green incl. fs round-trip + edge-remap; whole-branch review clean). **live-verified.**
 - **Decisions:** Bedrock dropped (provider + Knowledge Bases). Multi-chart-within-a-project dropped.
 
 ---
