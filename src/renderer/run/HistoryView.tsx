@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { effortByTask } from '../../shared/effort'
+import { parseLessonBullet } from '../../shared/lessons'
 import type { RunRecord, RunStatus, RunSummary } from '../../shared/types'
 
 function statusPill(status: RunStatus): string {
@@ -148,7 +149,7 @@ function RunDetail({ record }: { record: RunRecord }) {
               {r.lessons.length > 0 && (
                 <ul>
                   {r.lessons.map((l, j) => (
-                    <li key={j}>{l}</li>
+                    <li key={j}>{parseLessonBullet(l).text}</li>
                   ))}
                 </ul>
               )}
