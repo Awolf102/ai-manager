@@ -510,7 +510,7 @@ export async function importTeam(bundle: TeamBundle): Promise<ProjectGraph> {
       memberId: m.memberId,
       position: m.position
     }
-    if (m.skills) node.skills = m.skills
+    if (m.skills && m.skills.length) node.skills = m.skills
     graph.nodes.push(node)
   }
   for (const e of plan.edges) {

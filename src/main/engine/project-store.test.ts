@@ -14,7 +14,8 @@ import {
   readMemory,
   exportTeam,
   importTeam,
-  mergeMemory
+  mergeMemory,
+  setEdges
 } from './project-store'
 
 async function tmpProject(): Promise<string> {
@@ -29,10 +30,12 @@ describe('team export/import round-trip', () => {
     await createAgent({ name: 'Dana', kind: 'worker' })
     const graph = await createAgent({ name: 'Quinn', kind: 'worker' })
     const dana = graph.nodes.find((n) => n.name === 'Dana')!
+    const quinn = graph.nodes.find((n) => n.name === 'Quinn')!
     await writeMemory(
       dana.id,
       '# Memory: Dana\n\n## Lessons\n- [portable] write tests first\n- [project] api key in config\n\n## Task log\n'
     )
+    await setEdges([{ id: 'e1', source: dana.id, target: quinn.id }])
 
     const bundle = await exportTeam()
     expect(bundle.kind).toBe('ai-manager-team')
@@ -48,6 +51,10 @@ describe('team export/import round-trip', () => {
     const mem = await readMemory(imported.id)
     expect(mem).toContain('- [portable] write tests first')
     expect(mem).not.toContain('api key in config')
+    const importedQuinn = after.nodes.find((n) => n.name === 'Quinn')!
+    expect(after.edges).toHaveLength(1)
+    expect(after.edges[0].source).toBe(imported.id)   // imported Dana
+    expect(after.edges[0].target).toBe(importedQuinn.id)
   })
 })
 
