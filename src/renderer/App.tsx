@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Clock, FolderOpen, Plus, Settings as SettingsIcon } from 'lucide-react'
+import { Clock, Download, FolderOpen, Plus, Settings as SettingsIcon, Upload } from 'lucide-react'
 import { useStore } from './store'
 import OrgChart from './canvas/OrgChart'
 import AgentConfigPanel from './panels/AgentConfigPanel'
@@ -78,6 +78,26 @@ export default function App() {
         </button>
         <button className="btn" title="Run history" onClick={() => openHistory()}>
           <Clock size={14} />
+        </button>
+        <button
+          className="btn"
+          title="Export team to a file"
+          onClick={async () => {
+            await window.api.exportTeam()
+          }}
+        >
+          <Upload size={14} />
+        </button>
+        <button
+          className="btn"
+          title="Import a team into this project"
+          onClick={async () => {
+            const r = await window.api.importTeam()
+            if (r.imported && r.graph) setGraph(r.graph)
+            else if (r.error) window.alert(r.error)
+          }}
+        >
+          <Download size={14} />
         </button>
         <button className="btn" title="Settings" onClick={() => setShowSettings(true)}>
           <SettingsIcon size={14} />
