@@ -82,6 +82,17 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="field">
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={s.autoSyncTeam}
+              onChange={(e) => void update({ autoSyncTeam: e.target.checked })}
+            />
+            Auto-sync team brain — pull lessons before a run, push after
+          </label>
+        </div>
+
+        <div className="field">
           <label>Autonomy (acting steps)</label>
           <select
             value={s.autonomy}
