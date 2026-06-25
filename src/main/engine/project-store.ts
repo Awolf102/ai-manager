@@ -18,6 +18,7 @@ import { DEFAULT_MODEL_BY_KIND, DEFAULT_SETTINGS } from '../../shared/types'
 import { iconForName } from '../../shared/icons'
 import { slugify, uniqueSlug } from '../../shared/slug'
 import { parseLessonBullet } from '../../shared/lessons'
+import { buildTeamBundle, planTeamImport, type TeamBundle } from '../../shared/team-bundle'
 
 const AIM_DIR = '.ai-manager'
 const GRAPH_FILE = 'graph.json'
@@ -465,6 +466,59 @@ export function mergeMemory(
   })
 
   return text.trimEnd() + '\n'
+}
+
+// ---------- portable team (export / import) ----------
+
+/** Snapshot the open project's team into a portable bundle (portable lessons only). */
+export async function exportTeam(): Promise<TeamBundle> {
+  const { graph } = requireCurrent()
+  const files: Record<string, { role: string; memory: string }> = {}
+  for (const n of graph.nodes) {
+    files[n.id] = { role: await readRole(n.id), memory: await readMemory(n.id) }
+  }
+  return buildTeamBundle({
+    name: graph.project.name,
+    exportedAt: new Date().toISOString(),
+    nodes: graph.nodes,
+    edges: graph.edges,
+    files
+  })
+}
+
+/** Add a bundle's team into the open project: new agents (fresh ids, uniquified
+ * slugs, seeded memory), remapped edges. Saves the graph LAST for atomicity. */
+export async function importTeam(bundle: TeamBundle): Promise<ProjectGraph> {
+  const { path, graph } = requireCurrent()
+  const plan = planTeamImport(bundle, graph.nodes.map((n) => n.slug))
+  const idByMember = new Map<string, string>()
+  for (const m of plan.members) {
+    const id = randomUUID()
+    idByMember.set(m.memberId, id)
+    const dir = aimPath(path, AGENTS_DIR, m.slug)
+    await fs.mkdir(dir, { recursive: true })
+    await fs.writeFile(join(dir, 'role.md'), m.role, 'utf8')
+    await fs.writeFile(join(dir, 'memory.md'), m.memory, 'utf8')
+    const node: AgentNodeData = {
+      id,
+      name: m.name,
+      slug: m.slug,
+      kind: m.kind,
+      icon: m.icon,
+      model: m.model,
+      permissionMode: m.permissionMode,
+      memberId: m.memberId,
+      position: m.position
+    }
+    if (m.skills) node.skills = m.skills
+    graph.nodes.push(node)
+  }
+  for (const e of plan.edges) {
+    const source = idByMember.get(e.source)
+    const target = idByMember.get(e.target)
+    if (source && target) graph.edges.push({ id: `${source}->${target}`, source, target })
+  }
+  return saveGraph()
 }
 
 // ---------- recent projects ----------
