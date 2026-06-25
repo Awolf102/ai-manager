@@ -20,6 +20,7 @@ import { slugify, uniqueSlug } from '../../shared/slug'
 import { parseLessonBullet } from '../../shared/lessons'
 import { buildTeamBundle, planTeamImport, validateTeamBundle, type TeamBundle } from '../../shared/team-bundle'
 import { mergeBrainPush, planBrainPull, mergeLessons } from '../../shared/team-brain'
+import type { DraftRosterAgent } from '../../shared/role-draft'
 
 const AIM_DIR = '.ai-manager'
 const GRAPH_FILE = 'graph.json'
@@ -318,6 +319,17 @@ export async function rolesOf(
     out.push({ id: node.id, name: node.name, kind: node.kind, role: await readRole(id) })
   }
   return out
+}
+
+/** Non-orchestrator agents (id/name/kind + current role) and the graph edges — for role drafting. */
+export async function rosterForDrafting(): Promise<{ agents: DraftRosterAgent[]; edges: GraphEdge[] }> {
+  const { graph } = requireCurrent()
+  const agents: DraftRosterAgent[] = []
+  for (const n of graph.nodes) {
+    if (n.kind === 'orchestrator') continue
+    agents.push({ id: n.id, name: n.name, kind: n.kind, role: await readRole(n.id) })
+  }
+  return { agents, edges: graph.edges }
 }
 
 /**

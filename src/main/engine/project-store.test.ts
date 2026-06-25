@@ -17,7 +17,9 @@ import {
   mergeMemory,
   setEdges,
   syncToTeam,
-  refreshFromTeam
+  refreshFromTeam,
+  writeRole,
+  rosterForDrafting
 } from './project-store'
 
 async function tmpProject(): Promise<string> {
@@ -120,5 +122,22 @@ describe('mergeMemory — tagged lessons', () => {
     const occurrences = (next.match(/verify renders return 200/g) || []).length
     expect(occurrences).toBe(1) // not duplicated; existing [portable] bullet wins
     expect(next).toContain('- [portable] verify renders return 200')
+  })
+})
+
+describe('rosterForDrafting', () => {
+  it('returns non-orchestrator agents with their roles, plus edges', async () => {
+    await openProject(await tmpProject())
+    await createAgent({ name: 'Boss', kind: 'orchestrator' })
+    const g = await createAgent({ name: 'Dana', kind: 'worker' })
+    const boss = g.nodes.find((n) => n.name === 'Boss')!
+    const dana = g.nodes.find((n) => n.name === 'Dana')!
+    await setEdges([{ id: 'e1', source: boss.id, target: dana.id }])
+    await writeRole(dana.id, '# Role: Dana\nA data specialist.')
+
+    const { agents, edges } = await rosterForDrafting()
+    expect(agents.map((a) => a.name)).toEqual(['Dana']) // orchestrator excluded
+    expect(agents[0].role).toContain('data specialist')
+    expect(edges).toHaveLength(1)
   })
 })
