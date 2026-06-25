@@ -215,4 +215,18 @@ describe('applySpawnedTeam', () => {
     expect(after.edges.some((e) => e.source === boss.id && e.target === lead.id)).toBe(true) // Boss → Lead
     expect(after.edges.some((e) => e.source === lead.id && e.target === apiDev.id)).toBe(true) // Lead → API Dev
   })
+
+  it('creates the agent but skips the edge when reportsTo is an unknown temp id', async () => {
+    await openProject(await tmpProject())
+    const g = await createAgent({ name: 'Boss', kind: 'orchestrator' })
+    const boss = g.nodes.find((n) => n.name === 'Boss')!
+    const after = await applySpawnedTeam(
+      [{ id: 'w1', name: 'Solo Dev', kind: 'worker', role: '# Role: Solo', reportsTo: 'ghost' }],
+      boss.id
+    )
+    expect(after.nodes).toHaveLength(2) // Boss + Solo Dev
+    const soloDev = after.nodes.find((n) => n.name === 'Solo Dev')!
+    expect(soloDev.kind).toBe('worker')
+    expect(after.edges.some((e) => e.target === soloDev.id)).toBe(false) // no edge to Solo Dev
+  })
 })

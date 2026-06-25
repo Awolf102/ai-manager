@@ -32,6 +32,8 @@ export default function TeamSpawnModal({
     try {
       setGraph(await window.api.applySpawnedTeam({ members: edited, orchestratorId }))
       onClose()
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Could not create the team.')
     } finally {
       setApplying(false)
     }
