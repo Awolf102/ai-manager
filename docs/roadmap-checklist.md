@@ -86,31 +86,25 @@ The single prioritized to-do. **1 = do next / most important; higher = later.**
   so an in-app webview can drop in later. Built via subagent-driven TDD (123 tests green; whole-branch opus
   review "Ready to merge: Yes"; merged to main `--no-ff`, commits `75ab8a8..8e68efa`, merge `eb7e77a`).
   **live smoke pending.**
+- **Two-tier review — domain managers as first-line QA.** `reviewNode` split into `domainReviewNode`
+  (tier 1, DEPTH — each leaf's immediate manager reviews its own subtree in parallel; orchestrator for
+  flat workers) + `integrationReviewNode` (tier 2, BREADTH — orchestrator checks the assembled result vs
+  plan+goal, SKIPPED for flat teams); `repair → domainReview` so a fix is re-verified by its manager,
+  bounded by the new `RunState.repairAttempts` (not `reviews.length`). Hierarchy-aware `reflectNode`:
+  managers + the orchestrator's integration pass reflect on their QA work via `qaReflectPrompt` (the
+  compounding-QA loop; `[portable]`/`[project]` scope reused). Topology helpers `parentOf`/`hasManagers`/
+  `reviewerIdsOf`. Manager role template gained review/test/reflect duties; `spawnTeamPrompt` flat-bias
+  softened toward domain managers for a cluster of related roles. **Flat (no-manager) teams behave
+  byte-for-byte as before** (regression-tested). Built via executing-plans TDD over the deterministic
+  `nodes.test.ts` seam (131 tests green; typecheck + build clean; merged to main `--no-ff`, commits
+  `f5079aa..36fe4f7`, merge `8c9fc3f`). Spec/plan under `docs/superpowers/`. **live smoke pending**
+  (no real two-tier team has run against Claude yet). **v2 (deferred):** manager escalates a mis-scoped
+  task back to the orchestrator to re-plan — shared with workflow-graph #1 phase 2.
 - **Decisions:** Bedrock dropped (provider + Knowledge Bases). Multi-chart-within-a-project dropped.
 
 ---
 
-## 1. Two-tier review — domain managers as QA specialists  ← NEXT active design (brainstorm + spec first)
-Make managers earn their keep at RUNTIME. **Today:** routing is hierarchical (a manager sub-assigns tasks to its
-children via `routeTasks`), but review/test/reflect are CENTRALIZED on the orchestrator — `reviewNode` runs one
-pass as `state.orchestratorId` over all tasks, `repairNode` re-runs the worker with the orchestrator's feedback,
-`reflectNode` writes memory for WORKERS only — and `spawnTeamPrompt` biases teams flat. Net: the orchestrator does
-all the checking and manager nodes have no teeth. **Idea (two changes):** (a) dynamic-spawn creates MORE domain
-managers — cluster several related roles (e.g. 3 software + 3 web) under a QA-capable specialist manager [small
-prompt/role tweak in `spawnTeamPrompt` + manager role template]; (b) make managers actually REVIEW + TEST + give
-feedback + REFLECT for their subtree [engine change: `reviewNode`/`repairNode`/`reflectNode` become per-manager].
-**Two-tier labor split:** managers = DEPTH (deep domain review + testing; specialists catch domain bugs and hand
-WELL-WRITTEN, LESS-BUGGY code UP; the manager owns testing so workers just write code; managers COMPOUND QA
-expertise via reflect→`lessonsDigest` and use recorded lessons for better feedback). Orchestrator = BREADTH (the
-broader review — mainly compares the integrated result against the PLAN + GOAL; lighter now that managers pre-filter
-domain bugs). **Watch:** each manager = another review pass (latency/tokens); a manager with 1 worker is overhead →
-keep the spawn threshold at "a cluster of several roles"; the manager-tester must ACTUALLY run the app/tests
-(render-verify lesson → acting mode + Bash). **v2 (defer):** manager ESCALATES a mis-scoped task back to the
-orchestrator to re-break-up (loops back to plan — control-flow change). Pairs with dynamic-spawn (creates the
-managers) + compounding-memory (they get better over time). Meatier than dynamic-spawn (touches the core run loop)
-→ own brainstorm + spec. Priority vs Stage 3 is adjustable.
-
-## 2. Workflow-graph canvas — edge ordering + goal-locked re-planning + lateral handoffs  ← later (big arc; brainstorm + spec)
+## 1. Workflow-graph canvas — edge ordering + goal-locked re-planning + lateral handoffs  ← NEXT (big arc; brainstorm + spec)
 Evolve the canvas from an ORG CHART (who reports to whom) into ALSO a WORKFLOW GRAPH (what flows where, in what
 order); the orchestrator stays the goal-owning hub. Today a `GraphEdge` means only "delegates to" and routing is a
 strict tree (`childrenOf`); Stage 4 `dependsOn` already sequences tasks in waves but planner-decided, not canvas-
@@ -120,14 +114,15 @@ editable. Three phases, cheapest→deepest: **(1) clickable edge ordering** — 
 GOAL NEVER TOUCHED; `graph.ts` has loops/checkpoints but node logic plans once today [this is ALSO the two-tier #1
 v2 escalation — build once]; **(3) lateral team handoffs** ("side flow lines", e.g. marketing↔compliance) — a CYCLE
 + non-parent-child edge the routing core currently forbids; needs TWO EDGE TYPES (solid reporting vs dashed
-flow/handoff), loop-termination bounds, orchestrator kept in the loop [re-architecture — do last]. #1 two-tier review
-is the natural first step in. Detail → memory `ai-manager-workflow-graph`.
+flow/handoff), loop-termination bounds, orchestrator kept in the loop [re-architecture — do last]. The
+now-shipped two-tier review was the first step in (its deferred v2 escalation = phase 2 here). Detail → memory
+`ai-manager-workflow-graph`.
 
-## 3. Stage 3 — resume usable + memory-approval gate (HITL)  ⏸ ON HOLD (user — until needed)
+## 2. Stage 3 — resume usable + memory-approval gate (HITL)  ⏸ ON HOLD (user — until needed)
 Runtime already supports resume/interrupts; not reachable from the app. Wire `resumeRun` to IPC,
 add a resume-on-launch banner, and `reflectNode` interrupt for a `requireMemoryApproval` setting.
 
-## 4. Local semantic-memory RAG  (lowest)
+## 3. Local semantic-memory RAG  (lowest)
 sqlite-vec/LanceDB once an agent's memory outgrows a single prompt. (Ephemeral memory-seeded spawn
 agents were folded into the now-shipped dynamic-spawn design.) The compounding-team foundation
 (a + b1 + b2a + b2b) exists.
