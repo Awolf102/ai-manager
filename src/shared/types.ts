@@ -237,6 +237,16 @@ export interface RunSummary {
   taskCount: number
 }
 
+/** How to launch + open the app the agents built. Produced by the detection
+ *  agent, edited in the preview, replayed by the server runtime. */
+export interface RunManifest {
+  type: 'web' | 'static' | 'cli' | 'library' | 'unknown'
+  startCommand: string
+  port?: number
+  path?: string
+  notes?: string
+}
+
 // ---- durable run state (checkpointing) ----
 
 export type RunPhase =
