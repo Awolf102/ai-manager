@@ -97,11 +97,32 @@ orchestrator to re-break-up (loops back to plan — control-flow change). Pairs 
 managers) + compounding-memory (they get better over time). Meatier than dynamic-spawn (touches the core run loop)
 → own brainstorm + spec. Priority vs Stage 3 is adjustable.
 
-## 2. Stage 3 — resume usable + memory-approval gate (HITL)  ⏸ ON HOLD (user — until needed)
+## 2. Workflow-graph canvas — edge ordering + goal-locked re-planning + lateral handoffs  ← later (big arc; brainstorm + spec)
+Evolve the canvas from an ORG CHART (who reports to whom) into ALSO a WORKFLOW GRAPH (what flows where, in what
+order); the orchestrator stays the goal-owning hub. Today a `GraphEdge` means only "delegates to" and routing is a
+strict tree (`childrenOf`); Stage 4 `dependsOn` already sequences tasks in waves but planner-decided, not canvas-
+editable. Three phases, cheapest→deepest: **(1) clickable edge ordering** — click a flow line to set order
+(click-once = first, click-twice = next); rides the wave/`dependsOn` machinery, doesn't break the tree [low risk];
+**(2) goal-locked mid-run re-planning** — a stage returns (e.g. research) → orchestrator rewrites the REMAINING plan,
+GOAL NEVER TOUCHED; `graph.ts` has loops/checkpoints but node logic plans once today [this is ALSO the two-tier #1
+v2 escalation — build once]; **(3) lateral team handoffs** ("side flow lines", e.g. marketing↔compliance) — a CYCLE
++ non-parent-child edge the routing core currently forbids; needs TWO EDGE TYPES (solid reporting vs dashed
+flow/handoff), loop-termination bounds, orchestrator kept in the loop [re-architecture — do last]. #1 two-tier review
+is the natural first step in. Detail → memory `ai-manager-workflow-graph`.
+
+## 3. "Run result" button — open the built app/localhost from the UI  (small; immediately useful — quick-win candidate)
+One-click LAUNCH + OPEN of the app the agents built (localhost), instead of dropping to a terminal. Elegant hook: the
+render-verify step ALREADY starts the app + hits its entry URL, so capture a structured run manifest
+(`{startCommand, url/port}`) during the run, then the button replays it (open the system browser, or an in-app
+Electron webview). Web-app-centric (fallback: open the folder / interactive PTY for CLIs); needs server-process
+lifecycle (start/stop, kill on close, port). Pairs with existing terminal paths; directly speeds the live-smoke loop.
+Detail → memory `ai-manager-run-result-button`.
+
+## 4. Stage 3 — resume usable + memory-approval gate (HITL)  ⏸ ON HOLD (user — until needed)
 Runtime already supports resume/interrupts; not reachable from the app. Wire `resumeRun` to IPC,
 add a resume-on-launch banner, and `reflectNode` interrupt for a `requireMemoryApproval` setting.
 
-## 3. Local semantic-memory RAG  (lowest)
+## 5. Local semantic-memory RAG  (lowest)
 sqlite-vec/LanceDB once an agent's memory outgrows a single prompt. (Ephemeral memory-seeded spawn
 agents were folded into the now-shipped dynamic-spawn design.) The compounding-team foundation
 (a + b1 + b2a + b2b) exists.
