@@ -113,6 +113,11 @@ export default function RunView() {
               </div>
             )
           })()}
+        {run.replans.map((r) => (
+          <div key={r.attempt} className="run-replan" title={r.reason}>
+            ⚡ Re-planned (#{r.attempt}): {r.reason}
+          </div>
+        ))}
         {chain.map(({ id, depth }) => {
           const status = run.nodeStatus[id] ?? 'idle'
           const tasks = run.nodeTasks[id]
