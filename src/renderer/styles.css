@@ -1351,3 +1351,7 @@ button {
   background: var(--accent-dim);
   color: var(--text);
 }
+.react-flow__edge.edge-handoff .react-flow__edge-path {
+  stroke: #d6a44c;
+  stroke-dasharray: 6 4;
+}

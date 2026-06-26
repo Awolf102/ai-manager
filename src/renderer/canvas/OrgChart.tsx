@@ -28,14 +28,19 @@ function toNodes(graph: ProjectGraph): AgentFlowNode[] {
 }
 
 function toEdges(graph: ProjectGraph): Edge[] {
-  return graph.edges.map((e) => ({
-    id: e.id,
-    source: e.source,
-    target: e.target,
-    animated: e.order == null,
-    label: e.order != null ? String(e.order) : undefined,
-    className: e.order != null ? 'edge-ordered' : undefined
-  }))
+  return graph.edges.map((e) => {
+    if (e.kind === 'handoff') {
+      return { id: e.id, source: e.source, target: e.target, animated: false, className: 'edge-handoff' }
+    }
+    return {
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      animated: e.order == null,
+      label: e.order != null ? String(e.order) : undefined,
+      className: e.order != null ? 'edge-ordered' : undefined
+    }
+  })
 }
 
 export default function OrgChart() {
@@ -59,7 +64,10 @@ export default function OrgChart() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodeSig])
 
-  const edgeSig = useMemo(() => graph.edges.map((e) => `${e.id}:${e.order ?? ''}`).join('|'), [graph.edges])
+  const edgeSig = useMemo(
+    () => graph.edges.map((e) => `${e.id}:${e.order ?? ''}:${e.kind ?? ''}`).join('|'),
+    [graph.edges]
+  )
   useEffect(() => {
     setEdges(toEdges(graph))
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -114,13 +122,27 @@ export default function OrgChart() {
     [graph.nodes]
   )
 
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null)
+
   const onEdgeClick = useCallback<EdgeMouseHandler<Edge>>(
     (_, edge) => {
-      if (!orderMode || !orchIds.has(edge.source)) return
-      void persistEdges(applyOrderClick(graph.edges, edge.id))
+      if (orderMode) {
+        if (orchIds.has(edge.source)) void persistEdges(applyOrderClick(graph.edges, edge.id))
+        return
+      }
+      setSelectedEdgeId(edge.id)
     },
     [orderMode, orchIds, graph.edges, persistEdges]
   )
+
+  const selectedEdge = graph.edges.find((e) => e.id === selectedEdgeId) ?? null
+  const convertSelected = useCallback(() => {
+    if (!selectedEdge) return
+    const nextKind = selectedEdge.kind === 'handoff' ? 'report' : 'handoff'
+    void persistEdges(
+      graph.edges.map((e) => (e.id === selectedEdge.id ? { ...e, kind: nextKind, order: undefined } : e))
+    )
+  }, [selectedEdge, graph.edges, persistEdges])
 
   return (
     <ReactFlow
@@ -135,11 +157,21 @@ export default function OrgChart() {
       onNodeDragStop={onNodeDragStop}
       onNodeClick={(_, n) => select(n.id)}
       onEdgeClick={onEdgeClick}
-      onPaneClick={() => select(null)}
+      onPaneClick={() => {
+        select(null)
+        setSelectedEdgeId(null)
+      }}
       fitView
       colorMode="dark"
       proOptions={{ hideAttribution: true }}
     >
+      {selectedEdge && !orderMode && (
+        <Panel position="top-left">
+          <button className="btn" onClick={convertSelected}>
+            {selectedEdge.kind === 'handoff' ? 'Make reporting' : 'Make handoff'}
+          </button>
+        </Panel>
+      )}
       <Panel position="top-right">
         <button
           className={`btn order-toggle ${orderMode ? 'active' : ''}`}
