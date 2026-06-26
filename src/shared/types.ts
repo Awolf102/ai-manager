@@ -324,6 +324,7 @@ export interface RunState {
   steps: Record<string, RunStepRecord>
   reviews: { attempt: number; tasks: TaskVerdict[] }[]
   reflections: { nodeId: string; win: string; loss: string; lessons: string[] }[]
+  repairAttempts: number
   final: string
   error?: string
   /** set when the run paused for human input (Stage 3) */

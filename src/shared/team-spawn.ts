@@ -20,7 +20,7 @@ ${existingList}
 
 Rules:
 - Make every specialty DISTINCT and COMPLEMENTARY.
-- Use managers only when the work genuinely splits into areas that each need several workers; otherwise keep it flat (workers reporting directly to you).
+- Create a domain manager when a distinct area of work (a cluster of several related roles or subsystems) would benefit from dedicated review, testing, and accumulated QA expertise — not only when there are many workers. A manager owns reviewing and testing its area, so group several related roles under one QA-capable manager. A manager with a single worker is pure overhead — keep that flat (the worker reports directly to you).
 - Each member's "reportsTo" is the "id" of another member you propose, or the literal "orchestrator" (you). A manager may have workers (or managers) reporting to it.
 - Each "role" is a complete role.md: a "# Role" title, "## Specialty", "## Responsibilities", "## How you work", "## Constraints".
 

@@ -11,6 +11,12 @@ describe('spawnTeamPrompt', () => {
     expect(p).toContain('"members"')
     expect(p).toContain('reportsTo')
   })
+
+  it('encourages a domain manager for a cluster of related roles (not only "several workers")', () => {
+    const p = spawnTeamPrompt('build a big app', 'Boss', [])
+    expect(p).toMatch(/cluster of (several )?related roles/i)
+    expect(p).toMatch(/review|QA|test/i) // the rationale mentions dedicated review/QA
+  })
 })
 
 describe('parseSpawnedTeam', () => {

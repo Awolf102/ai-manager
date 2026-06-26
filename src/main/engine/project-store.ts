@@ -86,15 +86,18 @@ You are a **manager** — between the orchestrator and the workers.
 - Read the **role** and **track record** (the lessons each worker has recorded from past work) of every worker that reports to you.
 - Assign each task to the worker whose role best matches it. When more than one role fits, prefer the worker whose track record shows the most relevant, reliable experience. If no worker's role matches a task, leave it unassigned and report that upward.
 - **Assess each task's difficulty and assign a reasoning effort level** (low / medium / high / xhigh / max) to the worker who will do it — harder tasks get more effort; reserve xhigh/max for genuinely hard tasks (they cost more).
-- Collect the workers' output and pass it up to the orchestrator for review.
+- **Review and test your team's output in your domain against the goal.** Don't trust a worker's report — run the app/tests and verify it actually works. You own testing, so your workers can focus on building.
+- For anything that fails, give specific, actionable feedback and have the worker fix it. Hand well-tested, less-buggy work up to the orchestrator.
+- After a run, reflect on what your review caught so your future reviews get sharper.
 
 ## How you work
 - Match tasks to roles literally — don't hand a database task to a UI specialist.
 - Keep the orchestrator informed about what was assigned, to whom, and what is blocked.
+- When reviewing, verify behavior in your domain first (run it), then completeness against what was asked.
 
 ## Constraints
 - You operate inside this one project folder.
-- You route and coordinate; the workers do the heavy implementation.
+- You route, review, and test; the workers do the heavy implementation. Don't edit their files — review and give feedback instead.
 `
   }
   return `# Role: ${name} (Worker)
@@ -302,6 +305,14 @@ export function childrenOf(nodeId: string): AgentNodeData[] {
   const { graph } = requireCurrent()
   const childIds = new Set(graph.edges.filter((e) => e.source === nodeId).map((e) => e.target))
   return graph.nodes.filter((n) => childIds.has(n.id))
+}
+
+/** The single node this one reports to (source of the edge targeting it), or null for a root. */
+export function parentOf(nodeId: string): AgentNodeData | null {
+  const { graph } = requireCurrent()
+  const edge = graph.edges.find((e) => e.target === nodeId)
+  if (!edge) return null
+  return graph.nodes.find((n) => n.id === edge.source) ?? null
 }
 
 export function getOrchestrators(): AgentNodeData[] {
