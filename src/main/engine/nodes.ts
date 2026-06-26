@@ -23,11 +23,13 @@ import type {
 } from '../../shared/types'
 import { EFFORT_LEVELS } from '../../shared/types'
 import { formatLessonBullet, lessonBullets, parseLessonBullet, type LessonScope } from '../../shared/lessons'
+import { deriveOrderDeps } from '../../shared/workflow-order'
 import { END, type CompiledGraph, type NodeIO, type NodeResult } from './graph'
 import {
   applyReflection,
   childrenOf,
   getAgent,
+  getEdges,
   getSettings,
   parentOf,
   readMemory,
@@ -133,6 +135,16 @@ async function routeNode(state: RunState, _io: NodeIO, eng: Eng): Promise<NodeRe
   const tasks = structuredClone(state.tasks)
   const steps = { ...state.steps }
   await routeTasks(eng, tasks, steps, state.orchestratorId, Object.keys(tasks), true)
+
+  // Top-level edge ordering → task deps (Phase 1). No-op when no edge carries an order.
+  const owned = Object.values(tasks).map((t) => ({ id: t.task.id, ownerId: t.ownerId }))
+  const orderDeps = deriveOrderDeps(getEdges(), state.orchestratorId, owned)
+  for (const [taskId, deps] of Object.entries(orderDeps)) {
+    const t = tasks[taskId]
+    if (!t) continue
+    t.dependsOn = [...new Set([...(t.dependsOn ?? []), ...deps])]
+  }
+
   return { patch: { tasks, steps, phase: 'executing' } }
 }
 

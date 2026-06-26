@@ -34,6 +34,7 @@ const h = vi.hoisted(() => {
       w2: mk('w2', 'worker')
     } as Record<string, ReturnType<typeof mk>>,
     children: { o: ['w1', 'w2'], w1: [], w2: [] } as Record<string, string[]>,
+    edges: [] as { source: string; target: string; order?: number }[],
     settings: {
       reviewMode: 'once',
       maxRepairAttempts: 1,
@@ -53,6 +54,7 @@ vi.mock('./project-store', () => ({
     const pid = Object.keys(h.children).find((p) => (h.children[p] ?? []).includes(id))
     return pid ? h.agents[pid] : null
   },
+  getEdges: () => h.edges,
   rolesOf: async (ids: string[]) =>
     ids.map((id) => ({ id, name: h.agents[id].name, kind: h.agents[id].kind, role: `role ${id}` })),
   readMemory: async (id: string) => h.memory[id] ?? '',
@@ -655,5 +657,76 @@ describe('two-tier review', () => {
     expect(out.status).toBe('completed')
     expect(out.reflections.map((r) => r.nodeId).sort()).toEqual(['w1', 'w2'])
     expect(calls.some((c) => c.kind === 'qaReflect')).toBe(false)
+  })
+})
+
+describe('top-level edge ordering', () => {
+  afterEach(() => {
+    h.children = { o: ['w1', 'w2'], w1: [], w2: [] }
+    h.edges = []
+  })
+
+  it('runs an earlier-ordered team before a later one (derived from edge order)', async () => {
+    h.children = { o: ['w1', 'w2'], w1: [], w2: [] }
+    h.edges = [
+      { source: 'o', target: 'w1', order: 1 },
+      { source: 'o', target: 'w2', order: 2 }
+    ]
+    const order: string[] = []
+    const runAgent: AgentRunner = async (opts) => {
+      const p = opts.prompt
+      if (p.includes('Produce a concise, ordered list'))
+        return {
+          text: '```json\n{"tasks":[{"id":"t1","title":"T1","description":"d"},{"id":"t2","title":"T2","description":"d"}]}\n```'
+        }
+      if (p.includes('You route planned tasks'))
+        return {
+          text: '```json\n{"assignments":[{"taskId":"t1","childId":"w1","effort":"high","reason":"r"},{"taskId":"t2","childId":"w2","effort":"high","reason":"r"}]}\n```'
+        }
+      if (p.includes('You have been assigned the following task')) {
+        // delay w1 so that WITHOUT ordering, w2 would finish first
+        if (opts.agentId === 'w1') await new Promise((r) => setTimeout(r, 15))
+        order.push(opts.agentId)
+        return { text: `worked ${opts.agentId}` }
+      }
+      if (p.includes('Judge each task'))
+        return {
+          text: '```json\n{"tasks":[{"taskId":"t1","verdict":"pass","feedback":""},{"taskId":"t2","verdict":"pass","feedback":""}]}\n```'
+        }
+      if (p.includes('Reflect on the work')) return { text: '```json\n{"win":"","loss":"","lessons":[]}\n```' }
+      if (p.includes('Write a clear final report')) return { text: 'DONE' }
+      return { text: '' }
+    }
+    const e = eng(runAgent)
+    const store = fakeStore()
+    const out = await runGraph(
+      buildOrchestratorGraph(e),
+      seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' }),
+      store,
+      makeIO(e.abort.signal, store)
+    )
+    expect(out.status).toBe('completed')
+    expect(out.tasks.t2.dependsOn).toEqual(['t1']) // order → dep
+    expect(order).toEqual(['w1', 'w2']) // earlier team executed first despite the delay
+  })
+
+  it('adds no deps when edges carry no order (today behavior)', async () => {
+    h.children = { o: ['w1', 'w2'], w1: [], w2: [] }
+    h.edges = [
+      { source: 'o', target: 'w1' },
+      { source: 'o', target: 'w2' }
+    ]
+    const { runAgent } = cannedAgent()
+    const e = eng(runAgent)
+    const store = fakeStore()
+    const out = await runGraph(
+      buildOrchestratorGraph(e),
+      seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' }),
+      store,
+      makeIO(e.abort.signal, store)
+    )
+    expect(out.status).toBe('completed')
+    expect(out.tasks.t1.dependsOn).toBeUndefined()
+    expect(out.tasks.t2.dependsOn).toBeUndefined()
   })
 })

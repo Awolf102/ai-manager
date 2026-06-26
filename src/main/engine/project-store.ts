@@ -393,6 +393,11 @@ export function parentOf(nodeId: string): AgentNodeData | null {
   return graph.nodes.find((n) => n.id === edge.source) ?? null
 }
 
+/** The project's raw edges (with any `order`), for run-time ordering. */
+export function getEdges(): GraphEdge[] {
+  return requireCurrent().graph.edges
+}
+
 export function getOrchestrators(): AgentNodeData[] {
   return requireCurrent().graph.nodes.filter((n) => n.kind === 'orchestrator')
 }
