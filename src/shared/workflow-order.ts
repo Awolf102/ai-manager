@@ -35,12 +35,13 @@ function subtreeOf(children: Map<string, string[]>, root: string): Set<string> {
  * is ordered, so callers add no deps and behavior is unchanged.
  */
 export function deriveOrderDeps(
-  edges: { source: string; target: string; order?: number }[],
+  edges: { source: string; target: string; order?: number; kind?: string }[],
   orchestratorId: string,
   tasks: { id: string; ownerId: string | null }[]
 ): Record<string, string[]> {
-  const children = childMapOf(edges)
-  const teams = edges
+  const reportEdges = edges.filter((e) => e.kind !== 'handoff')
+  const children = childMapOf(reportEdges)
+  const teams = reportEdges
     .filter((e) => e.source === orchestratorId && typeof e.order === 'number')
     .map((e) => ({ root: e.target, order: e.order as number }))
     .sort((a, b) => a.order - b.order)
@@ -67,12 +68,13 @@ export function deriveOrderDeps(
  * execution pauses for a re-plan (Phase 2).
  */
 export function deriveStages(
-  edges: { source: string; target: string; order?: number }[],
+  edges: { source: string; target: string; order?: number; kind?: string }[],
   orchestratorId: string,
   tasks: { id: string; ownerId: string | null }[]
 ): Record<string, number> {
-  const children = childMapOf(edges)
-  const teams = edges
+  const reportEdges = edges.filter((e) => e.kind !== 'handoff')
+  const children = childMapOf(reportEdges)
+  const teams = reportEdges
     .filter((e) => e.source === orchestratorId && typeof e.order === 'number')
     .map((e) => ({ order: e.order as number, nodes: subtreeOf(children, e.target) }))
 
