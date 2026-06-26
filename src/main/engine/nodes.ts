@@ -32,11 +32,13 @@ import {
   getAgent,
   getEdges,
   getSettings,
+  handoffPeersOf,
   parentOf,
   readMemory,
   rolesOf,
   updateAgent
 } from './project-store'
+import { parseHandoff } from '../../shared/handoff'
 
 export const MAX_PARALLEL = 3
 
@@ -230,7 +232,7 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
     setStatus(eng, steps, ownerId, 'working', titles)
     const effort = getSettings().adaptiveEffort ? maxEffort(group.map((t) => t.effort)) : undefined
     try {
-      const { text, sessionId } = await eng.runAgent({
+      const base: StreamAgentOptions = {
         wc: eng.wc,
         agentId: ownerId,
         prompt: workerPrompt(state.goal, group.map((t) => t.task)),
@@ -240,7 +242,12 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
         effort,
         resume: false,
         abort: eng.abort
-      })
+      }
+      const { text, sessionId } = await runWithHandoffs(
+        eng,
+        base,
+        consultFor(ownerId, state.goal, state.actingMode)
+      )
       if (sessionId) await updateAgent({ id: ownerId, sessionId })
       const out = text || '(no output)'
       for (const t of group) {
@@ -738,6 +745,94 @@ async function replanStep(
   const raw = Array.isArray(p.tasks) ? (p.tasks as Record<string, unknown>[]) : []
   const { tasks, deps } = parseTasksAndDeps(raw, 'r')
   return { replan: true, reason, tasks, deps }
+}
+
+/** Per-agent-run consult config; null = handoffs off / no peers (→ a plain single call). */
+interface Consult {
+  peers: { id: string; name: string }[]
+  max: number
+  asker: string
+  goal: string
+  actingMode: PermissionMode
+}
+
+/** Build a Consult for an agent, or null when handoffs are off or it has no peers. */
+function consultFor(agentId: string, goal: string, actingMode: PermissionMode): Consult | null {
+  const max = getSettings().maxHandoffs ?? 0
+  if (max <= 0) return null
+  const peers = handoffPeersOf(agentId).map((p) => ({ id: p.id, name: p.name }))
+  if (peers.length === 0) return null
+  return { peers, max, asker: agentId, goal, actingMode }
+}
+
+function handoffSection(peers: { id: string; name: string }[]): string {
+  const list = peers.map((p) => `- ${p.name} (id: ${p.id})`).join('\n')
+  return `\n\nYou may CONSULT these connected teammates for help while you work:
+${list}
+To consult one, reply with ONLY this block and nothing else:
+\`\`\`handoff
+{ "to": "<teammate name or id>", "ask": "<exactly what you need from them>" }
+\`\`\`
+You'll receive their answer and can then continue. Consult only when it genuinely helps; otherwise just finish normally.`
+}
+
+function peerConsultPrompt(askerName: string, goal: string, ask: string): string {
+  return `Your teammate ${askerName} is working toward this goal:
+${goal}
+
+They have asked for your help:
+${ask}
+
+Provide exactly what they need, concisely, using your expertise. You may read files and do focused work to answer, but keep it scoped to their request.`
+}
+
+function resumePrompt(peerName: string, answer: string): string {
+  return `Your teammate ${peerName} responded to your request:
+
+${answer}
+
+Continue your task using this. If you need another consult, emit another handoff block; otherwise finish and report what you did.`
+}
+
+/**
+ * Run an agent, letting it CONSULT connected peers (Phase 3). With no consult config
+ * (off / no peers) this is a single un-augmented runAgent call → byte-for-byte. The
+ * dispatched peer's answer is TERMINAL (never re-parsed) so there are no cycles.
+ */
+async function runWithHandoffs(
+  eng: Eng,
+  base: StreamAgentOptions,
+  consult: Consult | null
+): Promise<{ text: string; sessionId?: string }> {
+  if (!consult) return eng.runAgent(base)
+  let result = await eng.runAgent({ ...base, prompt: base.prompt + handoffSection(consult.peers) })
+  for (let n = 0; n < consult.max && !eng.abort.signal.aborted; n++) {
+    const req = parseHandoff(result.text, consult.peers)
+    if (!req) break
+    const peer = consult.peers.find((p) => p.id === req.peerId)!
+    eng.emit({ runId: eng.runId, type: 'status', nodeId: peer.id, status: 'working' })
+    eng.emit({ runId: eng.runId, type: 'handoff', askerId: consult.asker, peerId: peer.id, ask: req.ask })
+    let answer: string
+    try {
+      const r = await eng.runAgent({
+        wc: eng.wc,
+        agentId: peer.id,
+        prompt: peerConsultPrompt(getAgent(consult.asker).name, consult.goal, req.ask),
+        runId: eng.runId,
+        stepId: peer.id,
+        permissionMode: consult.actingMode,
+        resume: false,
+        abort: eng.abort
+      })
+      answer = r.text || '(no answer)'
+    } catch (err) {
+      answer = `ERROR: ${err instanceof Error ? err.message : String(err)}`
+    }
+    eng.emit({ runId: eng.runId, type: 'status', nodeId: peer.id, status: 'done' })
+    // resume the ASKER's session with the peer's answer (peer sessionId is NOT persisted)
+    result = await eng.runAgent({ ...base, prompt: resumePrompt(peer.name, answer), resume: true })
+  }
+  return result
 }
 
 /** Run an agent, parse a JSON block from its output, retrying once. */
