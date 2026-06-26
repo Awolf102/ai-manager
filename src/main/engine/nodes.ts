@@ -93,9 +93,10 @@ export function buildOrchestratorGraph(eng: Eng): CompiledGraph {
     edges: {
       plan: 'route',
       route: 'execute',
-      execute: 'review',
-      review: 'reflect',
-      repair: 'review',
+      execute: 'domainReview',
+      domainReview: 'integrationReview',
+      integrationReview: 'reflect',
+      repair: 'domainReview',
       reflect: 'synthesize',
       synthesize: END
     },
@@ -103,7 +104,8 @@ export function buildOrchestratorGraph(eng: Eng): CompiledGraph {
       plan: (s, io) => planNode(s, io, eng),
       route: (s, io) => routeNode(s, io, eng),
       execute: (s, io) => executeNode(s, io, eng),
-      review: (s, io) => reviewNode(s, io, eng),
+      domainReview: (s, io) => domainReviewNode(s, io, eng),
+      integrationReview: (s, io) => integrationReviewNode(s, io, eng),
       repair: (s, io) => repairNode(s, io, eng),
       reflect: (s, io) => reflectNode(s, io, eng),
       synthesize: (s, io) => synthNode(s, io, eng)
@@ -258,7 +260,13 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
   return { patch: { tasks, steps, phase: 'reviewing' } }
 }
 
-async function reviewNode(state: RunState, _io: NodeIO, eng: Eng): Promise<NodeResult> {
+/** The immediate manager that reviews a task (the owner's parent), or the orchestrator. */
+function reviewerOf(ownerId: string, orchestratorId: string): string {
+  return parentOf(ownerId)?.id ?? orchestratorId
+}
+
+// Tier 1 — depth: each leaf task's immediate manager reviews its own group (orchestrator for flat workers).
+async function domainReviewNode(state: RunState, _io: NodeIO, eng: Eng): Promise<NodeResult> {
   const settings = getSettings()
   const maxAttempts = maxAttemptsFor(settings)
   const doReview = maxAttempts > 0 || settings.reflection
@@ -267,43 +275,99 @@ async function reviewNode(state: RunState, _io: NodeIO, eng: Eng): Promise<NodeR
 
   // review tasks that are executed-but-not-yet-passed (initial run, or just-repaired)
   const toReview = owned.filter((t) => t.status === 'done')
-  if (toReview.length === 0) {
-    const steps = markWorkersDone(eng, state)
-    return { goto: 'reflect', patch: { steps, phase: 'reflecting' } }
+  if (toReview.length === 0) return { goto: 'integrationReview', patch: { phase: 'reviewing' } }
+
+  const tasks = structuredClone(state.tasks)
+  const steps = { ...state.steps }
+
+  // group tasks by their immediate manager (the reviewer)
+  const groups = new Map<string, TaskState[]>()
+  for (const t of toReview) {
+    const rid = reviewerOf(t.ownerId!, state.orchestratorId)
+    const list = groups.get(rid) ?? []
+    list.push(t)
+    groups.set(rid, list)
+  }
+
+  const recorded: TaskVerdict[] = []
+  await mapCapped([...groups.entries()], MAX_PARALLEL, async ([reviewerId, group]) => {
+    if (eng.abort.signal.aborted) return
+    setStatus(eng, steps, reviewerId, 'reviewing', group.map((t) => t.task.title))
+    const items = group.map((t) => ({
+      taskId: t.task.id,
+      title: t.task.title,
+      asked: t.task.description,
+      ownerName: getAgent(t.ownerId!).name,
+      output: t.output
+    }))
+    let verdicts: { taskId: string; verdict: 'pass' | 'fail'; feedback: string }[]
+    try {
+      verdicts = await reviewStep(eng, state.goal, state.actingMode, reviewerId, items)
+    } catch {
+      return // a reviewer failure leaves its group unreviewed (status stays 'done'); surfaced upward
+    }
+    for (const v of verdicts) {
+      const t = tasks[v.taskId]
+      if (!t) continue
+      t.verdict = { verdict: v.verdict, feedback: v.feedback }
+      t.status = v.verdict === 'pass' ? 'passed' : 'failed'
+      recorded.push({ taskId: v.taskId, nodeId: t.ownerId ?? null, verdict: v.verdict, feedback: v.feedback })
+    }
+    if (!eng.abort.signal.aborted) setStatus(eng, steps, reviewerId, 'done')
+  })
+
+  const reviewNo = state.reviews.length + 1
+  const reviews = [...state.reviews, { attempt: reviewNo, tasks: recorded }]
+  eng.emit({ runId: eng.runId, type: 'verdict', attempt: reviewNo, tasks: recorded })
+
+  const failed = Object.values(tasks).filter((t) => t.ownerId && t.status === 'failed')
+  if (failed.length > 0 && state.repairAttempts < maxAttempts && !eng.abort.signal.aborted) {
+    return { patch: { tasks, steps, reviews, phase: 'repairing' }, goto: 'repair' }
+  }
+  return { patch: { tasks, steps, reviews, phase: 'reviewing' }, goto: 'integrationReview' }
+}
+
+// Tier 2 — breadth: the orchestrator checks the assembled result vs the plan+goal. Skipped for flat teams.
+async function integrationReviewNode(state: RunState, _io: NodeIO, eng: Eng): Promise<NodeResult> {
+  const settings = getSettings()
+  const maxAttempts = maxAttemptsFor(settings)
+  const doReview = maxAttempts > 0 || settings.reflection
+  if (!doReview || !hasManagers(state) || ownedTasks(state).length === 0 || eng.abort.signal.aborted) {
+    return { goto: 'reflect', patch: { steps: markWorkersDone(eng, state), phase: 'reflecting' } }
   }
 
   const tasks = structuredClone(state.tasks)
   const steps = { ...state.steps }
   setStatus(eng, steps, state.orchestratorId, 'reviewing')
 
-  const items = toReview.map((t) => ({
+  const items = ownedTasks(state).map((t) => ({
     taskId: t.task.id,
     title: t.task.title,
     asked: t.task.description,
-    ownerName: t.ownerId ? getAgent(t.ownerId).name : 'unassigned',
+    ownerName: getAgent(t.ownerId!).name,
     output: t.output
   }))
-  const verdicts = await reviewStep(eng, state.goal, state.actingMode, state.orchestratorId, items)
+  let verdicts: { taskId: string; verdict: 'pass' | 'fail'; feedback: string }[]
+  try {
+    verdicts = await integrationReviewStep(eng, state.goal, state.actingMode, state.orchestratorId, state.plan, items)
+  } catch {
+    return { goto: 'reflect', patch: { steps: markWorkersDone(eng, state), phase: 'reflecting' } }
+  }
+
+  const recorded: TaskVerdict[] = []
   for (const v of verdicts) {
     const t = tasks[v.taskId]
     if (!t) continue
     t.verdict = { verdict: v.verdict, feedback: v.feedback }
     t.status = v.verdict === 'pass' ? 'passed' : 'failed'
+    recorded.push({ taskId: v.taskId, nodeId: t.ownerId ?? null, verdict: v.verdict, feedback: v.feedback })
   }
-
   const reviewNo = state.reviews.length + 1
-  const recorded: TaskVerdict[] = verdicts.map((v) => ({
-    taskId: v.taskId,
-    nodeId: tasks[v.taskId]?.ownerId ?? null,
-    verdict: v.verdict,
-    feedback: v.feedback
-  }))
   const reviews = [...state.reviews, { attempt: reviewNo, tasks: recorded }]
   eng.emit({ runId: eng.runId, type: 'verdict', attempt: reviewNo, tasks: recorded })
 
   const failed = Object.values(tasks).filter((t) => t.ownerId && t.status === 'failed')
-  const repairsDone = reviews.length - 1
-  if (failed.length > 0 && repairsDone < maxAttempts && !eng.abort.signal.aborted) {
+  if (failed.length > 0 && state.repairAttempts < maxAttempts && !eng.abort.signal.aborted) {
     return { patch: { tasks, steps, reviews, phase: 'repairing' }, goto: 'repair' }
   }
   for (const wid of workerIdsOf(tasks)) if (!eng.abort.signal.aborted) setStatus(eng, steps, wid, 'done')
@@ -346,7 +410,7 @@ async function repairNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeRe
   })
 
   await io.checkpoint({ ...state, tasks: structuredClone(tasks), steps: { ...steps }, phase: 'repairing' })
-  return { patch: { tasks, steps, phase: 'reviewing' }, goto: 'review' }
+  return { patch: { tasks, steps, phase: 'reviewing', repairAttempts: state.repairAttempts + 1 }, goto: 'domainReview' }
 }
 
 async function reflectNode(state: RunState, _io: NodeIO, eng: Eng): Promise<NodeResult> {
@@ -457,6 +521,34 @@ async function reviewStep(
     eng,
     orchestratorId,
     reviewPrompt(goal, items),
+    (v): v is { tasks: unknown[] } => Array.isArray((v as { tasks?: unknown })?.tasks),
+    { permissionMode: actingMode, disallowedTools: EDIT_TOOLS }
+  )
+  const byId = new Map<string, { verdict: 'pass' | 'fail'; feedback: string }>()
+  for (const t of parsed.tasks as Record<string, unknown>[]) {
+    const taskId = String(t.taskId ?? '')
+    const verdict = String(t.verdict ?? 'pass').toLowerCase() === 'fail' ? 'fail' : 'pass'
+    byId.set(taskId, { verdict, feedback: String(t.feedback ?? '') })
+  }
+  return items.map((it) => ({
+    taskId: it.taskId,
+    verdict: byId.get(it.taskId)?.verdict ?? 'pass',
+    feedback: byId.get(it.taskId)?.feedback ?? ''
+  }))
+}
+
+async function integrationReviewStep(
+  eng: Eng,
+  goal: string,
+  actingMode: PermissionMode,
+  orchestratorId: string,
+  plan: RunTask[],
+  items: { taskId: string; title: string; asked: string; ownerName: string; output: string }[]
+): Promise<{ taskId: string; verdict: 'pass' | 'fail'; feedback: string }[]> {
+  const parsed = await runStructured(
+    eng,
+    orchestratorId,
+    integrationReviewPrompt(goal, plan, items),
     (v): v is { tasks: unknown[] } => Array.isArray((v as { tasks?: unknown })?.tasks),
     { permissionMode: actingMode, disallowedTools: EDIT_TOOLS }
   )
@@ -824,6 +916,37 @@ If the work is a web app or anything that serves pages, do NOT trust unit tests 
 
 TASKS TO REVIEW:
 ${list}
+
+Reply with ONLY this JSON code block (no other text):
+\`\`\`json
+{ "tasks": [ { "taskId": "t1", "verdict": "pass", "feedback": "required when fail" } ] }
+\`\`\``
+}
+
+function integrationReviewPrompt(
+  goal: string,
+  plan: RunTask[],
+  items: { taskId: string; title: string; asked: string; ownerName: string; output: string }[]
+): string {
+  const planList = plan.map((t, i) => `${i + 1}. ${t.title} — ${t.description}`).join('\n')
+  const list = items
+    .map(
+      (it) =>
+        `- taskId: ${it.taskId}\n  title: ${it.title}\n  by: ${it.ownerName}\n  result: ${it.output.replace(/\s+/g, ' ').slice(0, 1200)}`
+    )
+    .join('\n')
+  return `You are doing the final INTEGRATION review of your team's assembled work. Your managers already reviewed each piece for domain correctness — your job is the BROADER check: do the pieces fit together, is anything missing or off-goal, does the integrated whole actually satisfy the plan and the goal? You may READ files and RUN the integrated app to verify — you just must not edit files.
+
+GOAL:
+${goal}
+
+THE PLAN:
+${planList}
+
+THE ASSEMBLED RESULT (per task):
+${list}
+
+Assess each task for whether it fits the integrated whole and serves the goal. Mark "pass" or "fail"; for any "fail" give specific, actionable feedback the worker can use. If the plan itself is missing something needed for the goal, note it in the feedback of the most related task (it will be surfaced; you cannot re-plan here).
 
 Reply with ONLY this JSON code block (no other text):
 \`\`\`json
