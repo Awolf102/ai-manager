@@ -159,23 +159,38 @@ The single prioritized to-do. **1 = do next / most important; higher = later.**
   pending** (eyeball: with `maxReplans>=1` + ordered research(1)→build(2), run pauses after research, banner shows the reason,
   build runs on the revised plan; `maxReplans=0` unchanged). **ESCALATION re-plan (two-tier v2) + lateral peer handoffs =
   Phase 3, still deferred.**
+- **Workflow-graph canvas — Phase 3: lateral peer handoffs (edge types + handoff runtime).** (Roadmap #1, Phase 3 of 3 —
+  COMPLETES the arc.) A new `GraphEdge.kind` ('report'|'handoff') the reporting tree IGNORES (`childrenOf`/`parentOf`/
+  `deriveOrderDeps`/`deriveStages` exclude handoff edges) + an engine-mediated CONSULT runtime: a worker (mid-task) OR a
+  reviewer (manager `domainReview` / orchestrator `integrationReview`) emits a ` ```handoff {to,ask} ``` ` block; the engine
+  runs the connected peer with the ask and RESUMES the asker's session with the answer so it continues with context. New pure
+  `shared/handoff.ts` (`parseHandoff`); `project-store.handoffPeersOf`; `nodes.ts` `runWithHandoffs`/`consultFor`/prompts wired
+  into `runGroup` (worker) + `runStructured` (review, consult on attempt 0 only). `maxHandoffs` setting (**default 0 = off =
+  byte-for-byte**); bounded per agent-run; the dispatched **peer's answer is terminal** (never re-parsed) → no recursion/
+  ping-pong. Single-agent dispatch (no subtree orchestration). Canvas: select an edge → **Make handoff** (dashed). Surfaced via
+  a `handoff` event → Run-view `↪ Handoff` line + History "Handoffs" section. Built via subagent-driven TDD (11 tasks + 2 fix
+  rounds; OPUS review of the core runtime + review-integration + the final whole-branch). **Final review caught a CRITICAL** —
+  the asker resumed a STALE on-disk session because `runWithHandoffs` never threaded its in-run `sessionId` before `resume:true`
+  (the fake test runner masked it); fixed by adding `StreamAgentOptions.resumeSessionId` and threading `result.sessionId` (also
+  closed a concurrent-`updateAgent` race) + a resume-honoring test. 209 tests green; typecheck+build clean; merged to main
+  `--no-ff`, commits `fb7e08a..580d558`, merge `c0d88a7`. Spec/plan under `docs/superpowers/` (2026-06-26). **live smoke
+  pending.** **The deferred two-tier-review v2 escalation (reactive manager kick-back → re-plan, reusing the Phase-2 `replan`
+  node from the review exit) is the only remaining workflow-graph follow-on.**
 - **Decisions:** Bedrock dropped (provider + Knowledge Bases). Multi-chart-within-a-project dropped.
 
 ---
 
-## 1. Workflow-graph canvas — Phase 3 (lateral team↔team handoffs)  ← NEXT (the re-architecture; brainstorm + spec)
-Evolve the canvas from an ORG CHART (who reports to whom) into ALSO a WORKFLOW GRAPH (what flows where, in what
-order); the orchestrator stays the goal-owning hub. **Phases 1 (clickable edge ordering) + 2 (goal-locked proactive
-mid-run re-planning) are SHIPPED** (see Done above). Remaining: **(3) lateral peer handoffs** — a non-orchestrator role
-(worker/manager), mid-task, reaches SIDEWAYS to another connected team which does the work and hands it back (e.g. a web
-dev asks the research team for UI ideas; marketing↔compliance). This is a CYCLE + a non-parent-child edge the routing
-core currently forbids (the cycle-break exists to prevent exactly this). Needs: TWO EDGE TYPES (solid = reporting/tree;
-dashed = flow/handoff/lateral — don't overload one line), a handoff runtime (a role pausing to invoke a peer and consume
-its output), loop-termination bounds (A↔B can't ping-pong forever), and the orchestrator kept in the loop. **Phase 2's
-`replan` node is the reusable foundation** (a node rewriting remaining work from what came back) — Phase 3 generalizes
-WHO can trigger it and WHICH edges carry it. Also folds in the deferred **two-tier-review v2 escalation** (a manager kicks
-a mis-scoped task back to be re-broken-up — reactive, vs Phase 2's proactive). Re-architecture — do deliberately. Detail
-→ memory `ai-manager-workflow-graph`.
+## ✅ Workflow-graph canvas arc (Phases 1–3) — COMPLETE
+Phases 1 (clickable edge ordering), 2 (goal-locked proactive mid-run re-planning), and 3 (lateral peer handoffs) all
+SHIPPED to main (see Done above). The canvas now expresses structure (reporting tree), order (Phase 1), in-flight
+re-planning (Phase 2), and lateral peer consults (Phase 3). Detail → memory `ai-manager-workflow-graph`.
+
+## 1. Two-tier-review v2 escalation (reactive manager kick-back → re-plan)  ← NEXT (small; reuses the replan node)
+The only remaining workflow-graph follow-on: a manager (or the orchestrator's integration review) escalates a mis-scoped
+task back to be RE-PLANNED rather than just repaired — REACTIVE (failure-driven), vs Phase 2's PROACTIVE between-stages
+re-plan. Reuses the Phase-2 `replan` node, triggered from the review exit instead of an execute-stage boundary (today an
+unfixable plan-level gap is surfaced in integration feedback, not re-planned). Bounded like `maxReplans`. Smaller than a
+phase — its own brainstorm + spec. Detail → memory `ai-manager-two-tier-review`, `ai-manager-workflow-graph`.
 
 ## 2. Stage 3 — resume usable + memory-approval gate (HITL)  ⏸ ON HOLD (user — until needed)
 Runtime already supports resume/interrupts; not reachable from the app. Wire `resumeRun` to IPC,
