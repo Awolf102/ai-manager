@@ -100,6 +100,21 @@ The single prioritized to-do. **1 = do next / most important; higher = later.**
   `f5079aa..36fe4f7`, merge `8c9fc3f`). Spec/plan under `docs/superpowers/`. **live smoke pending**
   (no real two-tier team has run against Claude yet). **v2 (deferred):** manager escalates a mis-scoped
   task back to the orchestrator to re-plan — shared with workflow-graph #1 phase 2.
+- **Project context files — upload images/files for the team.** (Out-of-band user request, not a numbered
+  roadmap item.) The user attaches images/files to a project as PERSISTENT reference context (each with an
+  optional note), available to EVERY agent. Files are copied into `.ai-manager/context/` and recorded in
+  `ProjectGraph.context` (`ContextFile[]`); a pure `shared/context-files.ts` (`isImageName`,
+  `uniqueContextName`, `buildContextBlock`) builds a system-prompt section that `composeAppend` injects
+  into every agent (the ONLY engine change — no `nodes.ts` edits); agents read the files with their
+  existing tools (the Read tool renders images) — NO SDK multimodal plumbing. project-store gains
+  `addContextFiles`/`updateContextFile`/`removeContextFile`/`contextThumbnail`/`getContextFiles`/`getGraph`;
+  `addContextFiles` returns `{ graph, skipped }` so the UI alerts on skipped (non-file/unreadable) sources.
+  IPC `context:add|update|remove|thumbnail` + a `webUtils.getPathForFile` preload bridge (Electron 42).
+  UI: a top-bar Context manager modal (`ContextModal.tsx`, thumbnails via data-URL ≤5MB, editable notes) +
+  count badge + window-wide canvas drag-and-drop. **A project with no context is byte-for-byte unchanged**
+  (`buildContextBlock([]) === ''`). Built via subagent-driven TDD (5 tasks; final opus whole-branch review
+  "Ready to merge"; 143 tests green; merged to main `--no-ff`, commits `2e3aad0..f24b460`, merge `6f63769`).
+  Spec/plan under `docs/superpowers/` (2026-06-26). **live smoke pending.**
 - **Decisions:** Bedrock dropped (provider + Knowledge Bases). Multi-chart-within-a-project dropped.
 
 ---
