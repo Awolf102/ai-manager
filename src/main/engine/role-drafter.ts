@@ -43,7 +43,15 @@ export async function draftRoles(
     last = text
     const parsed = parseDraftedRoles(text, knownIds, validIds)
     if (parsed && parsed.length > 0) {
-      return parsed.map((r) => ({ agentId: r.agentId, name: nameById.get(r.agentId) ?? r.agentId, role: r.role, skills: r.skills }))
+      return parsed.map((r) => {
+        const out: { agentId: string; name: string; role: string; skills?: string[] } = {
+          agentId: r.agentId,
+          name: nameById.get(r.agentId) ?? r.agentId,
+          role: r.role
+        }
+        if (r.skills) out.skills = r.skills
+        return out
+      })
     }
   }
   throw new Error(
