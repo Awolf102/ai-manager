@@ -45,7 +45,7 @@ export interface AgentNodeData {
   icon: string
   model: string
   permissionMode: PermissionMode
-  /** plugin-qualified skill ids this agent may use (see shared/skill-catalog) */
+  /** plugin-qualified skill ids this agent may use (see shared/skill-trust) */
   skills?: string[]
   /** last Claude Code session id captured from a headless run (for --resume) */
   sessionId?: string
