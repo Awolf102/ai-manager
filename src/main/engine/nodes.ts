@@ -24,6 +24,7 @@ import type {
 import { EFFORT_LEVELS } from '../../shared/types'
 import { formatLessonBullet, lessonBullets, parseLessonBullet, type LessonScope } from '../../shared/lessons'
 import { deriveOrderDeps, deriveStages } from '../../shared/workflow-order'
+import { mergeReplan, pendingStageBoundary } from '../../shared/replan'
 import { END, type CompiledGraph, type NodeIO, type NodeResult } from './graph'
 import {
   applyReflection,
@@ -98,6 +99,7 @@ export function buildOrchestratorGraph(eng: Eng): CompiledGraph {
       plan: 'route',
       route: 'execute',
       execute: 'domainReview',
+      replan: 'execute',
       domainReview: 'integrationReview',
       integrationReview: 'reflect',
       repair: 'domainReview',
@@ -108,6 +110,7 @@ export function buildOrchestratorGraph(eng: Eng): CompiledGraph {
       plan: (s, io) => planNode(s, io, eng),
       route: (s, io) => routeNode(s, io, eng),
       execute: (s, io) => executeNode(s, io, eng),
+      replan: (s, io) => replanNode(s, io, eng),
       domainReview: (s, io) => domainReviewNode(s, io, eng),
       integrationReview: (s, io) => integrationReviewNode(s, io, eng),
       repair: (s, io) => repairNode(s, io, eng),
@@ -265,6 +268,15 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
   while (!eng.abort.signal.aborted) {
     const pending = Object.values(tasks).filter((t) => t.status === 'pending' && t.ownerId)
     if (pending.length === 0) break
+    // Phase 2: when enabled, pause at an ordered-stage boundary so the orchestrator can
+    // re-plan the not-yet-run work before it runs. When off, this never fires → byte-for-byte.
+    const maxReplans = getSettings().maxReplans ?? 0
+    if (maxReplans > 0 && state.replanAttempts < maxReplans) {
+      const boundary = pendingStageBoundary(tasks, state.replanStageCursor)
+      if (boundary != null) {
+        return { patch: { tasks, steps, replanStageCursor: boundary, phase: 'replanning' }, goto: 'replan' }
+      }
+    }
     let ready = pending.filter((t) => depsSatisfied(t, tasks))
     // Cycle guard: if work remains but nothing is ready, a dependency cycle (or a
     // dep on an owned task that never executed) is blocking — run the rest anyway
@@ -435,6 +447,46 @@ async function repairNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeRe
   return { patch: { tasks, steps, phase: 'reviewing', repairAttempts: state.repairAttempts + 1 }, goto: 'domainReview' }
 }
 
+// Phase 2 — proactive re-plan: at an ordered-stage boundary the orchestrator may rewrite
+// the not-yet-run plan based on what came back. GOAL IS NEVER TOUCHED. No-op when off.
+async function replanNode(state: RunState, _io: NodeIO, eng: Eng): Promise<NodeResult> {
+  const maxReplans = getSettings().maxReplans ?? 0
+  if (maxReplans <= 0 || state.replanAttempts >= maxReplans || eng.abort.signal.aborted) {
+    return { goto: 'execute' }
+  }
+  const boundary = pendingStageBoundary(state.tasks, state.replanStageCursor) ?? state.replanStageCursor
+  const owned = ownedTasks(state)
+  const executed = owned.filter((t) => t.status !== 'pending')
+  const pending = owned.filter((t) => t.status === 'pending')
+
+  let decision: { replan: boolean; reason: string; tasks: RunTask[]; deps: Record<string, string[]> }
+  try {
+    decision = await replanStep(eng, state.goal, state.orchestratorId, executed, pending)
+  } catch {
+    return { goto: 'execute', patch: { replanStageCursor: boundary } } // a parse failure = decline
+  }
+  if (!decision.replan) {
+    return { goto: 'execute', patch: { replanStageCursor: boundary } }
+  }
+
+  const { plan, tasks } = mergeReplan(state.plan, structuredClone(state.tasks), decision)
+  const attempt = state.replanAttempts + 1
+  const replans = [...(state.replans ?? []), { attempt, reason: decision.reason }]
+  eng.emit({ runId: eng.runId, type: 'replan', attempt, reason: decision.reason, tasks: plan })
+  return {
+    patch: {
+      plan,
+      tasks,
+      replans,
+      replanAttempts: attempt,
+      repairAttempts: 0,
+      replanStageCursor: boundary,
+      phase: 'replanning'
+    },
+    goto: 'route'
+  }
+}
+
 async function reflectNode(state: RunState, _io: NodeIO, eng: Eng): Promise<NodeResult> {
   const settings = getSettings()
   const owned = ownedTasks(state)
@@ -501,6 +553,29 @@ async function synthNode(state: RunState, _io: NodeIO, eng: Eng): Promise<NodeRe
 
 // ---------- Claude steps (use the injected runAgent) ----------
 
+/** Parse a raw task array (from a plan or replan JSON) into RunTask[] + sanitized deps
+ *  (dedup, drop self-references and ids that aren't real tasks). idPrefix names auto-ids. */
+function parseTasksAndDeps(
+  raw: Record<string, unknown>[],
+  idPrefix: string
+): { tasks: RunTask[]; deps: Record<string, string[]> } {
+  const tasks: RunTask[] = raw.map((t, i) => ({
+    id: typeof t.id === 'string' && t.id ? t.id : `${idPrefix}${i + 1}`,
+    title: String(t.title ?? `Task ${i + 1}`),
+    description: String(t.description ?? t.title ?? '')
+  }))
+  const ids = new Set(tasks.map((t) => t.id))
+  const deps: Record<string, string[]> = {}
+  raw.forEach((t, i) => {
+    const id = tasks[i].id
+    const list = Array.isArray(t.dependsOn)
+      ? [...new Set(t.dependsOn.map((x) => String(x)))].filter((x) => x !== id && ids.has(x))
+      : []
+    if (list.length) deps[id] = list
+  })
+  return { tasks, deps }
+}
+
 async function planStep(
   eng: Eng,
   goal: string,
@@ -514,22 +589,7 @@ async function planStep(
     { permissionMode: 'default', disallowedTools: THINK_DISALLOW }
   )
   const raw = parsed.tasks as Record<string, unknown>[]
-  const tasks: RunTask[] = raw.map((t, i) => ({
-    id: typeof t.id === 'string' && t.id ? t.id : `t${i + 1}`,
-    title: String(t.title ?? `Task ${i + 1}`),
-    description: String(t.description ?? t.title ?? '')
-  }))
-  // Parse deps, dropping self-references and ids that aren't real tasks.
-  const ids = new Set(tasks.map((t) => t.id))
-  const deps: Record<string, string[]> = {}
-  raw.forEach((t, i) => {
-    const id = tasks[i].id
-    const list = Array.isArray(t.dependsOn)
-      ? [...new Set(t.dependsOn.map((x) => String(x)))].filter((x) => x !== id && ids.has(x))
-      : []
-    if (list.length) deps[id] = list
-  })
-  return { tasks, deps }
+  return parseTasksAndDeps(raw, 't')
 }
 
 /** A child node as the router sees it: identity, role text, and a lessons digest. */
@@ -655,6 +715,28 @@ async function synthesizeStep(
     abort: eng.abort
   })
   return text
+}
+
+async function replanStep(
+  eng: Eng,
+  goal: string,
+  orchestratorId: string,
+  executed: TaskState[],
+  pending: TaskState[]
+): Promise<{ replan: boolean; reason: string; tasks: RunTask[]; deps: Record<string, string[]> }> {
+  const parsed = await runStructured(
+    eng,
+    orchestratorId,
+    replanPrompt(goal, executed, pending),
+    (v): v is Record<string, unknown> => typeof v === 'object' && v !== null && 'replan' in v,
+    { permissionMode: 'default', disallowedTools: THINK_DISALLOW }
+  )
+  const p = parsed as { replan?: unknown; reason?: unknown; tasks?: unknown }
+  const reason = String(p.reason ?? '')
+  if (p.replan !== true) return { replan: false, reason, tasks: [], deps: {} }
+  const raw = Array.isArray(p.tasks) ? (p.tasks as Record<string, unknown>[]) : []
+  const { tasks, deps } = parseTasksAndDeps(raw, 'r')
+  return { replan: true, reason, tasks, deps }
 }
 
 /** Run an agent, parse a JSON block from its output, retrying once. */
@@ -940,6 +1022,37 @@ Here is what came back from the team:
 ${results}
 
 Write a clear final report: what was accomplished, how it maps to the goal, and anything still missing or needing follow-up. If a small, obviously-safe final integration is needed, you may do it.`
+}
+
+function replanPrompt(goal: string, executed: TaskState[], pending: TaskState[]): string {
+  const done = executed
+    .map((t) => `- ${t.task.title}: ${t.task.description}\n  result: ${t.output.replace(/\s+/g, ' ').slice(0, 1200)}`)
+    .join('\n')
+  const remaining = pending.map((t) => `- id: ${t.task.id} — ${t.task.title}: ${t.task.description}`).join('\n')
+  return `You are the lead for this project. The GOAL below is FIXED and must NOT change — never modify, reinterpret, or expand it.
+
+GOAL (immutable):
+${goal}
+
+An earlier stage of the plan has finished. Here is the COMPLETED work and what it produced:
+${done || '(nothing completed yet)'}
+
+Here is the REMAINING, not-yet-started plan:
+${remaining || '(nothing remaining)'}
+
+Based ONLY on what the completed work actually revealed, decide whether the remaining plan should change — for example its findings contradict an assumption the plan was built on, point to a materially better approach, or surface something the goal needs that the plan is missing. Re-plan ONLY if you are confident it will materially improve the outcome toward the goal; otherwise keep the plan as-is.
+
+Rules:
+- The completed work is DONE — never recreate or redo it. Its changes are already on the filesystem and the remaining tasks can build on them.
+- You may add, remove, revise, or split the REMAINING tasks only.
+- Do NOT change the goal.
+- You may READ files to inform the decision, but make no changes.
+
+Reply with ONLY this JSON code block (no other text):
+\`\`\`json
+{ "replan": true, "reason": "why, one sentence", "tasks": [ { "id": "t2", "title": "short title", "description": "what to do", "dependsOn": [] } ] }
+\`\`\`
+Set "replan" to false (and "tasks" to []) to keep the remaining plan unchanged.`
 }
 
 function reviewPrompt(

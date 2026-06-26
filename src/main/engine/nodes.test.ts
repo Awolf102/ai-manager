@@ -40,7 +40,8 @@ const h = vi.hoisted(() => {
       maxRepairAttempts: 1,
       reflection: true,
       autonomy: 'auto',
-      adaptiveEffort: true
+      adaptiveEffort: true,
+      maxReplans: 0
     },
     memory: {} as Record<string, string>,
     reflections: [] as { id: string }[]
@@ -761,5 +762,150 @@ describe('top-level edge ordering', () => {
     expect(out.status).toBe('completed')
     expect(out.tasks.t1.dependsOn).toBeUndefined()
     expect(out.tasks.t2.dependsOn).toBeUndefined()
+  })
+})
+
+describe('orchestrator node graph — proactive re-plan', () => {
+  // research = w1 (stage 1), build = w2 (stage 2), sequenced by canvas order.
+  const orderedEdges = [
+    { source: 'o', target: 'w1', order: 1 },
+    { source: 'o', target: 'w2', order: 2 }
+  ]
+
+  // A fake that assigns t1->w1, t2->w2 on every route, records work order, and runs the
+  // given replan decision when the orchestrator is asked to re-plan.
+  function fake(order: string[], replan: () => object) {
+    const runAgent: AgentRunner = async (opts) => {
+      const p = opts.prompt
+      if (p.includes('Produce a concise, ordered list'))
+        return {
+          text: '```json\n{"tasks":[{"id":"t1","title":"Research","description":"research db"},{"id":"t2","title":"Build","description":"use postgres"}]}\n```'
+        }
+      if (p.includes('You route planned tasks')) {
+        const taskIds = [...p.matchAll(/- id: (t\d+) —/g)].map((mm) => mm[1])
+        const map: Record<string, string> = { t1: 'w1', t2: 'w2' }
+        const assignments = taskIds.map((tid) => ({ taskId: tid, childId: map[tid] ?? 'w1', effort: 'high', reason: 'r' }))
+        return { text: '```json\n' + JSON.stringify({ assignments }) + '\n```' }
+      }
+      if (p.includes('Based ONLY on what the completed work actually revealed')) {
+        order.push('replan')
+        return { text: '```json\n' + JSON.stringify(replan()) + '\n```' }
+      }
+      if (p.includes('You have been assigned the following task')) {
+        order.push(opts.agentId)
+        return { text: `worked ${opts.agentId}` }
+      }
+      if (p.includes('Judge each task'))
+        return {
+          text: '```json\n{"tasks":[{"taskId":"t1","verdict":"pass","feedback":""},{"taskId":"t2","verdict":"pass","feedback":""}]}\n```'
+        }
+      if (p.includes('Reflect on the work')) return { text: '```json\n{"win":"","loss":"","lessons":[]}\n```' }
+      if (p.includes('Write a clear final report')) return { text: 'DONE' }
+      return { text: '' }
+    }
+    return runAgent
+  }
+
+  function run(runAgent: AgentRunner, events: unknown[]) {
+    const e = eng(runAgent)
+    ;(e as { emit: (ev: unknown) => void }).emit = (ev) => events.push(ev)
+    const store = fakeStore()
+    return runGraph(
+      buildOrchestratorGraph(e),
+      seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' }),
+      store,
+      makeIO(e.abort.signal, store)
+    )
+  }
+
+  it('does not pause or re-plan when maxReplans is 0 (byte-for-byte)', async () => {
+    h.edges = orderedEdges
+    h.settings.maxReplans = 0
+    try {
+      const order: string[] = []
+      const events: unknown[] = []
+      const out = await run(fake(order, () => ({ replan: false })), events)
+      expect(out.status).toBe('completed')
+      expect(order).toEqual(['w1', 'w2']) // sequenced, but NO replan pause
+      expect(out.replanAttempts).toBe(0)
+      expect((events as { type: string }[]).some((ev) => ev.type === 'replan')).toBe(false)
+    } finally {
+      h.edges = []
+      h.settings.maxReplans = 0
+    }
+  })
+
+  it('pauses at the stage boundary and rewrites the not-yet-run plan', async () => {
+    h.edges = orderedEdges
+    h.settings.maxReplans = 1
+    try {
+      const order: string[] = []
+      const events: unknown[] = []
+      const replanPrompts: string[] = []
+      const runAgent: AgentRunner = async (opts) => {
+        if (opts.prompt.includes('Based ONLY on what the completed work actually revealed'))
+          replanPrompts.push(opts.prompt)
+        return fake(order, () => ({
+          replan: true,
+          reason: 'research shows supabase is better',
+          tasks: [{ id: 't2', title: 'Build', description: 'use supabase', dependsOn: [] }]
+        }))(opts)
+      }
+      const out = await run(runAgent, events)
+      expect(out.status).toBe('completed')
+      expect(order).toEqual(['w1', 'replan', 'w2']) // research -> re-plan -> build
+      expect(replanPrompts[0]).toContain('worked w1') // re-plan saw the research output
+      expect(out.tasks.t2.task.description).toBe('use supabase') // build re-planned
+      expect(out.replanAttempts).toBe(1)
+      expect(out.replans).toEqual([{ attempt: 1, reason: 'research shows supabase is better' }])
+      const replanEvents = (events as { type: string; tasks: { id: string }[] }[]).filter((ev) => ev.type === 'replan')
+      expect(replanEvents).toHaveLength(1)
+      expect(replanEvents[0].tasks.map((t) => t.id)).toEqual(['t1', 't2']) // full new plan
+    } finally {
+      h.edges = []
+      h.settings.maxReplans = 0
+    }
+  })
+
+  it('declines: asks once, then resumes the original plan unchanged', async () => {
+    h.edges = orderedEdges
+    h.settings.maxReplans = 1
+    try {
+      const order: string[] = []
+      const events: unknown[] = []
+      const out = await run(fake(order, () => ({ replan: false, reason: 'plan still holds', tasks: [] })), events)
+      expect(out.status).toBe('completed')
+      expect(order).toEqual(['w1', 'replan', 'w2']) // paused + asked, then ran the original build
+      expect(out.tasks.t2.task.description).toBe('use postgres') // unchanged
+      expect(out.replanAttempts).toBe(0)
+      expect(out.replans ?? []).toEqual([])
+      expect((events as { type: string }[]).some((ev) => ev.type === 'replan')).toBe(false)
+    } finally {
+      h.edges = []
+      h.settings.maxReplans = 0
+    }
+  })
+
+  it('offers each boundary at most once (does not re-ask after resuming)', async () => {
+    h.edges = orderedEdges
+    h.settings.maxReplans = 2 // budget for 2, but there is only one boundary
+    try {
+      const order: string[] = []
+      const events: unknown[] = []
+      const out = await run(
+        fake(order, () => ({
+          replan: true,
+          reason: 'always re-plan',
+          tasks: [{ id: 't2', title: 'Build', description: 'use supabase', dependsOn: [] }]
+        })),
+        events
+      )
+      expect(out.status).toBe('completed')
+      expect(out.replanAttempts).toBe(1) // NOT 2 — the boundary is offered once (cursor)
+      expect(order.filter((o) => o === 'replan')).toHaveLength(1)
+    } finally {
+      h.edges = []
+      h.settings.maxReplans = 0
+    }
   })
 })
