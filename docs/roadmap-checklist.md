@@ -132,16 +132,27 @@ The single prioritized to-do. **1 = do next / most important; higher = later.**
   subagent-driven TDD (6 tasks + 5 review fixes; final opus review "Ready to merge: Yes"; 156 tests green;
   merged `--no-ff`, commits `4ab4bb1..f0b161a`, merge `280b9fa`). Spec/plan under `docs/superpowers/` (2026-06-26).
   **live smoke pending.** Note: `plugin-catalog-cache.json` is an internal/undocumented CC file (parsed tolerantly).
+- **Workflow-graph canvas — Phase 1: clickable edge ordering.** (Roadmap #1, Phase 1 of 3.) The user stamps an
+  execution order onto the canvas's top-level flow lines (the orchestrator's direct-child edges) and the engine runs
+  those teams in that order — by DERIVING the order onto the existing Stage-4 `dependsOn` waves (`executeNode`
+  untouched). New `GraphEdge.order?` + pure `shared/workflow-order.ts` (`deriveOrderDeps(edges,orchestratorId,tasks)`
+  run-time: every task under team ordered k depends on all tasks under teams <k, subtree-gated; `applyOrderClick`
+  UI: stamp-next / clear+re-pack). `project-store.getEdges()`; `routeNode` merges the derived deps after routing.
+  `OrgChart` gets an "Order" mode toggle (React Flow `<Panel>`) + click-in-sequence; ordered edges render solid +
+  numbered, unordered stay animated (= parallel); `edgeSig` includes `order` so re-stamps re-render. **No ordering
+  set = byte-for-byte today** (`deriveOrderDeps → {}`); sequencing gates on EXECUTED (not reviewed); top-level only.
+  Built via subagent-driven TDD (3 tasks, NO fix rounds — clean; final opus review "Ready to merge: Yes"; 168 tests
+  green; merged `--no-ff`, commits `e70b5bd..df2346b`, merge `26467f2`). Spec/plan under `docs/superpowers/`
+  (2026-06-26). **live smoke pending** (eyeball: ordered edge not "stuck selected" after a stamp; badge re-renders on
+  re-stamp/clear). Phases 2 (goal-locked re-plan) + 3 (lateral handoffs) remain — still #1.
 - **Decisions:** Bedrock dropped (provider + Knowledge Bases). Multi-chart-within-a-project dropped.
 
 ---
 
-## 1. Workflow-graph canvas — edge ordering + goal-locked re-planning + lateral handoffs  ← NEXT (big arc; brainstorm + spec)
+## 1. Workflow-graph canvas — Phases 2 & 3 (goal-locked re-planning, then lateral handoffs)  ← NEXT (big arc; brainstorm + spec each)
 Evolve the canvas from an ORG CHART (who reports to whom) into ALSO a WORKFLOW GRAPH (what flows where, in what
-order); the orchestrator stays the goal-owning hub. Today a `GraphEdge` means only "delegates to" and routing is a
-strict tree (`childrenOf`); Stage 4 `dependsOn` already sequences tasks in waves but planner-decided, not canvas-
-editable. Three phases, cheapest→deepest: **(1) clickable edge ordering** — click a flow line to set order
-(click-once = first, click-twice = next); rides the wave/`dependsOn` machinery, doesn't break the tree [low risk];
+order); the orchestrator stays the goal-owning hub. **Phase 1 (clickable edge ordering) is SHIPPED** (see Done above
+— `GraphEdge.order` + `deriveOrderDeps` → `dependsOn` waves + canvas Order mode). Remaining phases, cheapest→deepest:
 **(2) goal-locked mid-run re-planning** — a stage returns (e.g. research) → orchestrator rewrites the REMAINING plan,
 GOAL NEVER TOUCHED; `graph.ts` has loops/checkpoints but node logic plans once today [this is ALSO the two-tier #1
 v2 escalation — build once]; **(3) lateral team handoffs** ("side flow lines", e.g. marketing↔compliance) — a CYCLE
