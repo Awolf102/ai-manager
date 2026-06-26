@@ -27,9 +27,13 @@ export function parseHandoff(
   return { peerId: peer.id, ask }
 }
 
-/** The last ```handoff fenced JSON object that has a `to` or `ask` field, or null. */
+/**
+ * The last (reading forward) ```handoff fenced JSON object that has a `to` or
+ * `ask` field, or null. The closing fence must be on its own line so a ``` that
+ * appears inside the JSON value does not end the block early.
+ */
 function extractHandoffObject(text: string): { to?: unknown; ask?: unknown } | null {
-  const blocks = [...text.matchAll(/```handoff\s*([\s\S]*?)```/gi)].map((m) => m[1])
+  const blocks = [...text.matchAll(/```handoff[^\n]*\r?\n([\s\S]*?)\r?\n```/g)].map((m) => m[1])
   for (let i = blocks.length - 1; i >= 0; i--) {
     const parsed = tryParseObject(blocks[i])
     if (parsed && ('to' in parsed || 'ask' in parsed)) return parsed

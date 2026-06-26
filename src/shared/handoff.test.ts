@@ -29,6 +29,10 @@ describe('parseHandoff', () => {
     expect(parseHandoff('```handoff\n{"to":"research","ask":""}\n```', peers)).toBeNull()
   })
 
+  it('returns null when ask is only whitespace', () => {
+    expect(parseHandoff('```handoff\n{"to":"research","ask":"   "}\n```', peers)).toBeNull()
+  })
+
   it('returns null when the target is not a reachable peer', () => {
     expect(parseHandoff('```handoff\n{"to":"nobody","ask":"x"}\n```', peers)).toBeNull()
   })
