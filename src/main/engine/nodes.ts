@@ -23,7 +23,7 @@ import type {
 } from '../../shared/types'
 import { EFFORT_LEVELS } from '../../shared/types'
 import { formatLessonBullet, lessonBullets, parseLessonBullet, type LessonScope } from '../../shared/lessons'
-import { deriveOrderDeps } from '../../shared/workflow-order'
+import { deriveOrderDeps, deriveStages } from '../../shared/workflow-order'
 import { END, type CompiledGraph, type NodeIO, type NodeResult } from './graph'
 import {
   applyReflection,
@@ -136,15 +136,23 @@ async function planNode(state: RunState, _io: NodeIO, eng: Eng): Promise<NodeRes
 async function routeNode(state: RunState, _io: NodeIO, eng: Eng): Promise<NodeResult> {
   const tasks = structuredClone(state.tasks)
   const steps = { ...state.steps }
-  await routeTasks(eng, tasks, steps, state.orchestratorId, Object.keys(tasks), true)
+  // Route only un-owned tasks: the first pass routes everything; a re-plan pass routes
+  // just the new/revised tasks, leaving frozen (already-owned) work in place.
+  const toRoute = Object.keys(tasks).filter((id) => tasks[id].ownerId === null)
+  await routeTasks(eng, tasks, steps, state.orchestratorId, toRoute, true)
 
-  // Top-level edge ordering → task deps (Phase 1). No-op when no edge carries an order.
+  // Top-level edge ordering → task deps + per-task stage (Phase 1 + Phase 2). No-ops when
+  // no edge carries an order.
   const owned = Object.values(tasks).map((t) => ({ id: t.task.id, ownerId: t.ownerId }))
   const orderDeps = deriveOrderDeps(getEdges(), state.orchestratorId, owned)
   for (const [taskId, deps] of Object.entries(orderDeps)) {
     const t = tasks[taskId]
     if (!t) continue
     t.dependsOn = [...new Set([...(t.dependsOn ?? []), ...deps])]
+  }
+  const stages = deriveStages(getEdges(), state.orchestratorId, owned)
+  for (const [taskId, stage] of Object.entries(stages)) {
+    if (tasks[taskId]) tasks[taskId].stage = stage
   }
 
   return { patch: { tasks, steps, phase: 'executing' } }

@@ -406,6 +406,31 @@ describe('orchestrator node graph — end to end', () => {
       h.settings.adaptiveEffort = true
     }
   })
+
+  it('stamps each task with its ordered stage and sequences by canvas order', async () => {
+    h.edges = [
+      { source: 'o', target: 'w1', order: 1 },
+      { source: 'o', target: 'w2', order: 2 }
+    ]
+    try {
+      const { runAgent } = cannedAgent()
+      const e = eng(runAgent)
+      const store = fakeStore()
+      const out = await runGraph(
+        buildOrchestratorGraph(e),
+        seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' }),
+        store,
+        makeIO(e.abort.signal, store)
+      )
+      expect(out.status).toBe('completed')
+      expect(out.tasks.t1.stage).toBe(1)
+      expect(out.tasks.t2.stage).toBe(2)
+      // Phase-1 ordering still derives the dependency (t2 after t1)
+      expect(out.tasks.t2.dependsOn).toContain('t1')
+    } finally {
+      h.edges = []
+    }
+  })
 })
 
 describe('orchestrator node graph — manager layer', () => {
