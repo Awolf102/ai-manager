@@ -29,6 +29,7 @@ export interface RunState {
   assignments: Record<string, Assignment[]>
   verdict: Record<string, TaskVerdict>
   reviewAttempt: number
+  replans: { attempt: number; reason: string }[]
   memoryUpdated: Record<string, number>
   final: string
   error?: string
@@ -46,6 +47,7 @@ const emptyRun: RunState = {
   assignments: {},
   verdict: {},
   reviewAttempt: 0,
+  replans: [],
   memoryUpdated: {},
   final: '',
   error: undefined,
@@ -176,6 +178,10 @@ export const useStore = create<AppState>((set, get) => ({
           run.reviewAttempt = e.attempt
           return { run }
         }
+        case 'replan':
+          run.plan = e.tasks
+          run.replans = [...run.replans, { attempt: e.attempt, reason: e.reason }]
+          return { run }
         case 'reflection':
           run.memoryUpdated = { ...run.memoryUpdated, [e.nodeId]: e.lessons.length }
           return { run }
