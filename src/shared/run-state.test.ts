@@ -68,4 +68,12 @@ describe('toRunRecord', () => {
     const withReplans = toRunRecord(mkState({ replans: [{ attempt: 1, reason: 'research changed the plan' }] }))
     expect(withReplans.replans).toEqual([{ attempt: 1, reason: 'research changed the plan' }])
   })
+
+  it('projects handoffs when present and omits them when absent', () => {
+    expect(toRunRecord(mkState()).handoffs).toBeUndefined()
+    const withHandoffs = toRunRecord(
+      mkState({ handoffs: [{ askerId: 'w1', peerId: 'w2', ask: 'UI ideas' }] })
+    )
+    expect(withHandoffs.handoffs).toEqual([{ askerId: 'w1', peerId: 'w2', ask: 'UI ideas' }])
+  })
 })
