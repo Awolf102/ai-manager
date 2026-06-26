@@ -366,6 +366,7 @@ async function domainReviewNode(state: RunState, _io: NodeIO, eng: Eng): Promise
   const failed = Object.values(tasks).filter((t) => t.ownerId && t.status === 'failed')
   const maxReplans = getSettings().maxReplans ?? 0
   const misScoped = failed.filter((t) => t.verdict?.disposition === 'replan')
+  // any replan-flagged failure escalates the WHOLE not-passed set (escalateNode re-derives the failed tasks)
   if (maxReplans > 0 && misScoped.length > 0 && state.replanAttempts < maxReplans && !eng.abort.signal.aborted) {
     return { patch: { tasks, steps, reviews, phase: 'replanning' }, goto: 'escalate' }
   }
@@ -417,6 +418,7 @@ async function integrationReviewNode(state: RunState, _io: NodeIO, eng: Eng): Pr
   const failed = Object.values(tasks).filter((t) => t.ownerId && t.status === 'failed')
   const maxReplans = getSettings().maxReplans ?? 0
   const misScoped = failed.filter((t) => t.verdict?.disposition === 'replan')
+  // any replan-flagged failure escalates the WHOLE not-passed set (escalateNode re-derives the failed tasks)
   if (maxReplans > 0 && misScoped.length > 0 && state.replanAttempts < maxReplans && !eng.abort.signal.aborted) {
     return { patch: { tasks, steps, reviews, phase: 'replanning' }, goto: 'escalate' }
   }
