@@ -304,6 +304,14 @@ export function childrenOf(nodeId: string): AgentNodeData[] {
   return graph.nodes.filter((n) => childIds.has(n.id))
 }
 
+/** The single node this one reports to (source of the edge targeting it), or null for a root. */
+export function parentOf(nodeId: string): AgentNodeData | null {
+  const { graph } = requireCurrent()
+  const edge = graph.edges.find((e) => e.target === nodeId)
+  if (!edge) return null
+  return graph.nodes.find((n) => n.id === edge.source) ?? null
+}
+
 export function getOrchestrators(): AgentNodeData[] {
   return requireCurrent().graph.nodes.filter((n) => n.kind === 'orchestrator')
 }

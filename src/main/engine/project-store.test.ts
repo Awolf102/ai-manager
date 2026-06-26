@@ -25,7 +25,8 @@ import {
   autoPullFromTeam,
   autoPushToTeam,
   updateSettings,
-  applySpawnedTeam
+  applySpawnedTeam,
+  parentOf
 } from './project-store'
 
 async function tmpProject(): Promise<string> {
@@ -145,6 +146,28 @@ describe('rosterForDrafting', () => {
     expect(agents.map((a) => a.name)).toEqual(['Dana']) // orchestrator excluded
     expect(agents[0].role).toContain('data specialist')
     expect(edges).toHaveLength(1)
+  })
+})
+
+describe('parentOf', () => {
+  it('returns the single reporting parent, or null for a root', async () => {
+    await openProject(await tmpProject())
+    await createAgent({ name: 'Orchestrator', kind: 'orchestrator' })
+    await createAgent({ name: 'Manager', kind: 'manager' })
+    const g = await createAgent({ name: 'Worker', kind: 'worker' })
+
+    const o = g.nodes.find((n) => n.kind === 'orchestrator')!
+    const m = g.nodes.find((n) => n.kind === 'manager')!
+    const w = g.nodes.find((n) => n.kind === 'worker')!
+
+    await setEdges([
+      { id: 'e1', source: o.id, target: m.id },
+      { id: 'e2', source: m.id, target: w.id }
+    ])
+
+    expect(parentOf(w.id)?.id).toBe(m.id)
+    expect(parentOf(m.id)?.id).toBe(o.id)
+    expect(parentOf(o.id)).toBeNull()
   })
 })
 
