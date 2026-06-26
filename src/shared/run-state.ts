@@ -24,6 +24,7 @@ export function toRunRecord(s: RunState): RunRecord {
     reviews: s.reviews,
     reflections: s.reflections,
     final: s.final,
-    ...(s.error !== undefined ? { error: s.error } : {})
+    ...(s.error !== undefined ? { error: s.error } : {}),
+    ...(s.replans !== undefined ? { replans: s.replans } : {})
   }
 }

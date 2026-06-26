@@ -18,6 +18,8 @@ function mkState(over: Partial<RunState> = {}): RunState {
     steps: {},
     reviews: [],
     reflections: [],
+    replanAttempts: 0,
+    replanStageCursor: 0,
     final: 'all done',
     ...over
   }
@@ -59,5 +61,11 @@ describe('toRunRecord', () => {
   it('survives a JSON round-trip', () => {
     const rec = toRunRecord(mkState())
     expect(JSON.parse(JSON.stringify(rec))).toEqual(rec)
+  })
+
+  it('projects replans when present and omits them when absent', () => {
+    expect(toRunRecord(mkState()).replans).toBeUndefined()
+    const withReplans = toRunRecord(mkState({ replans: [{ attempt: 1, reason: 'research changed the plan' }] }))
+    expect(withReplans.replans).toEqual([{ attempt: 1, reason: 'research changed the plan' }])
   })
 })
