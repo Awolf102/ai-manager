@@ -80,6 +80,16 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   autoSyncTeam: false
 }
 
+/** A user-attached reference file (image/doc) for the project, available to every agent. */
+export interface ContextFile {
+  id: string // randomUUID — React key + update/remove handle
+  fileName: string // name AS STORED under .ai-manager/context/ (collision-uniquified)
+  note: string // optional user note ('' when none)
+  addedAt: string // ISO timestamp
+  bytes: number // file size, for display
+  isImage: boolean // precomputed from the extension
+}
+
 export interface ProjectGraph {
   project: ProjectMeta
   nodes: AgentNodeData[]
@@ -87,6 +97,8 @@ export interface ProjectGraph {
   settings: ProjectSettings
   /** the team brain this project syncs portable lessons with (B2 living team) */
   linkedTeam?: { teamId: string; path: string }
+  /** user-attached reference files (images/docs) for this project, given to every agent */
+  context?: ContextFile[]
 }
 
 // ---- IPC payloads ----
@@ -400,7 +412,11 @@ export const IPC = {
   openPath: 'app:openPath',
   serverLog: 'server:log',
   serverStatus: 'server:status',
-  serverReady: 'server:ready'
+  serverReady: 'server:ready',
+  addContext: 'context:add',
+  updateContext: 'context:update',
+  removeContext: 'context:remove',
+  contextThumbnail: 'context:thumbnail'
 } as const
 
 /** The typed API the preload bridge exposes on window.api. */
@@ -456,6 +472,11 @@ export interface RendererApi {
   launchServer: (input: { startCommand: string; port?: number; path?: string }) => Promise<{ serverId: string }>
   stopServer: (serverId: string) => void
   openProjectPath: () => void
+  addContext: (paths?: string[]) => Promise<{ graph: ProjectGraph; skipped: string[] }>
+  updateContext: (id: string, note: string) => Promise<ProjectGraph>
+  removeContext: (id: string) => Promise<ProjectGraph>
+  contextThumbnail: (id: string) => Promise<string | null>
+  getPathForFile: (file: File) => string
   onServerLog: (cb: (e: ServerLogEvent) => void) => () => void
   onServerStatus: (cb: (e: ServerStatusEvent) => void) => () => void
   onServerReady: (cb: (e: ServerReadyEvent) => void) => () => void

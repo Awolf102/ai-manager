@@ -237,4 +237,23 @@ export function registerIpc(): void {
   ipcMain.on(IPC.openPath, () => {
     void shell.openPath(store.getCurrentProjectPath())
   })
+
+  // ---- project context files ----
+  ipcMain.handle(IPC.addContext, async (_e, paths?: string[]) => {
+    let sources = paths
+    if (!sources || sources.length === 0) {
+      const r = await dialog.showOpenDialog({
+        title: 'Add context files',
+        properties: ['openFile', 'multiSelections']
+      })
+      if (r.canceled || r.filePaths.length === 0) return { graph: store.getGraph(), skipped: [] }
+      sources = r.filePaths
+    }
+    return store.addContextFiles(sources)
+  })
+  ipcMain.handle(IPC.updateContext, (_e, id: string, note: string) =>
+    store.updateContextFile(id, { note })
+  )
+  ipcMain.handle(IPC.removeContext, (_e, id: string) => store.removeContextFile(id))
+  ipcMain.handle(IPC.contextThumbnail, (_e, id: string) => store.contextThumbnail(id))
 }

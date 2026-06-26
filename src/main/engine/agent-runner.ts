@@ -6,9 +6,10 @@ import type { WebContents } from 'electron'
 // Type-only import: erased at compile time, so it does NOT trigger a runtime
 // require of this ESM-only package (we load it via dynamic import below).
 import type { Options, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
-import type { AgentStreamEvent, Effort, PermissionMode, RunHeadlessInput } from '../../shared/types'
+import type { AgentStreamEvent, ContextFile, Effort, PermissionMode, RunHeadlessInput } from '../../shared/types'
 import { IPC } from '../../shared/types'
 import { skillOptionsFor } from '../../shared/skill-catalog'
+import { buildContextBlock } from '../../shared/context-files'
 import { buildAgentContext, updateAgent } from './project-store'
 
 /** Resolve a catalog plugin id to its installed local path under ~/.claude/plugins. */
@@ -19,13 +20,15 @@ function resolvePluginPath(pluginId: string): string {
     : join(base, 'knowledge-work-plugins', pluginId)
 }
 
-/** Role + persistent memory, appended onto Claude Code's preset system prompt. */
-function composeAppend(role: string, memory: string): string {
+/** Role + persistent memory + the user's project context, appended onto Claude Code's preset system prompt. */
+function composeAppend(role: string, memory: string, context: ContextFile[]): string {
+  const block = buildContextBlock(context)
   return [
     role.trim(),
     '',
     '## Your memory (persistent brain — read and apply these lessons)',
-    memory.trim() || '(empty)'
+    memory.trim() || '(empty)',
+    ...(block ? ['', block] : [])
   ].join('\n')
 }
 
@@ -61,7 +64,7 @@ export async function streamAgent(
   opts: StreamAgentOptions
 ): Promise<{ text: string; sessionId?: string }> {
   const { wc, agentId, prompt, runId, stepId } = opts
-  const { agent, projectPath, role, memory } = await buildAgentContext(agentId)
+  const { agent, projectPath, role, memory, context } = await buildAgentContext(agentId)
   const abort = opts.abort ?? new AbortController()
   const send = (
     kind: AgentStreamEvent['kind'],
@@ -81,7 +84,7 @@ export async function streamAgent(
     const options: Options = {
       cwd: projectPath,
       model: agent.model,
-      systemPrompt: { type: 'preset', preset: 'claude_code', append: composeAppend(role, memory) },
+      systemPrompt: { type: 'preset', preset: 'claude_code', append: composeAppend(role, memory, context) },
       permissionMode: opts.permissionMode ?? agent.permissionMode,
       settingSources: ['project'],
       abortController: abort

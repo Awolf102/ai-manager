@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { IPC } from '../shared/types'
 import type {
   AgentStreamEvent,
@@ -57,6 +57,11 @@ const api: RendererApi = {
   launchServer: (input) => ipcRenderer.invoke(IPC.launchServer, input),
   stopServer: (serverId) => ipcRenderer.send(IPC.stopServer, serverId),
   openProjectPath: () => ipcRenderer.send(IPC.openPath),
+  addContext: (paths) => ipcRenderer.invoke(IPC.addContext, paths),
+  updateContext: (id, note) => ipcRenderer.invoke(IPC.updateContext, id, note),
+  removeContext: (id) => ipcRenderer.invoke(IPC.removeContext, id),
+  contextThumbnail: (id) => ipcRenderer.invoke(IPC.contextThumbnail, id),
+  getPathForFile: (file) => webUtils.getPathForFile(file),
   onServerLog: (cb) => sub<ServerLogEvent>(IPC.serverLog, cb),
   onServerStatus: (cb) => sub<ServerStatusEvent>(IPC.serverStatus, cb),
   onServerReady: (cb) => sub<ServerReadyEvent>(IPC.serverReady, cb)
