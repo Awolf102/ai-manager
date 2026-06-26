@@ -1,16 +1,19 @@
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ReactFlow,
   Background,
   Controls,
+  Panel,
   useNodesState,
   useEdgesState,
   type Connection,
   type Edge,
+  type EdgeMouseHandler,
   type NodeTypes
 } from '@xyflow/react'
 import AgentNode, { type AgentFlowNode } from './AgentNode'
 import { useStore } from '../store'
+import { applyOrderClick } from '../../shared/workflow-order'
 import type { GraphEdge, ProjectGraph } from '../../shared/types'
 
 const nodeTypes: NodeTypes = { agent: AgentNode }
@@ -29,7 +32,9 @@ function toEdges(graph: ProjectGraph): Edge[] {
     id: e.id,
     source: e.source,
     target: e.target,
-    animated: true
+    animated: e.order == null,
+    label: e.order != null ? String(e.order) : undefined,
+    className: e.order != null ? 'edge-ordered' : undefined
   }))
 }
 
@@ -54,7 +59,7 @@ export default function OrgChart() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodeSig])
 
-  const edgeSig = useMemo(() => graph.edges.map((e) => e.id).join('|'), [graph.edges])
+  const edgeSig = useMemo(() => graph.edges.map((e) => `${e.id}:${e.order ?? ''}`).join('|'), [graph.edges])
   useEffect(() => {
     setEdges(toEdges(graph))
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -103,6 +108,20 @@ export default function OrgChart() {
     void window.api.setNodePositions(positions)
   }, [nodes, patchPositions])
 
+  const [orderMode, setOrderMode] = useState(false)
+  const orchIds = useMemo(
+    () => new Set(graph.nodes.filter((n) => n.kind === 'orchestrator').map((n) => n.id)),
+    [graph.nodes]
+  )
+
+  const onEdgeClick = useCallback<EdgeMouseHandler<Edge>>(
+    (_, edge) => {
+      if (!orderMode || !orchIds.has(edge.source)) return
+      void persistEdges(applyOrderClick(graph.edges, edge.id))
+    },
+    [orderMode, orchIds, graph.edges, persistEdges]
+  )
+
   return (
     <ReactFlow
       nodes={nodes}
@@ -115,11 +134,21 @@ export default function OrgChart() {
       onNodesDelete={onNodesDelete}
       onNodeDragStop={onNodeDragStop}
       onNodeClick={(_, n) => select(n.id)}
+      onEdgeClick={onEdgeClick}
       onPaneClick={() => select(null)}
       fitView
       colorMode="dark"
       proOptions={{ hideAttribution: true }}
     >
+      <Panel position="top-right">
+        <button
+          className={`btn order-toggle ${orderMode ? 'active' : ''}`}
+          onClick={() => setOrderMode((v) => !v)}
+          title="Click top-level flow lines in the order their teams should run"
+        >
+          {orderMode ? 'Ordering — click edges in run order' : 'Order'}
+        </button>
+      </Panel>
       <Background gap={22} color="#1d2230" />
       <Controls showInteractive={false} />
     </ReactFlow>
