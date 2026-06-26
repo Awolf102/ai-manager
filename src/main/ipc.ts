@@ -246,7 +246,7 @@ export function registerIpc(): void {
         title: 'Add context files',
         properties: ['openFile', 'multiSelections']
       })
-      if (r.canceled || r.filePaths.length === 0) return store.getGraph()
+      if (r.canceled || r.filePaths.length === 0) return { graph: store.getGraph(), skipped: [] }
       sources = r.filePaths
     }
     return store.addContextFiles(sources)

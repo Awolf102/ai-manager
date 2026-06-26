@@ -36,7 +36,9 @@ export default function ContextModal({ onClose }: { onClose: () => void }) {
   const files = graph?.context ?? []
 
   const add = async (): Promise<void> => {
-    setGraph(await window.api.addContext())
+    const r = await window.api.addContext()
+    setGraph(r.graph)
+    if (r.skipped.length) window.alert(`Skipped (not a readable file): ${r.skipped.join(', ')}`)
   }
   const remove = async (id: string): Promise<void> => {
     setGraph(await window.api.removeContext(id))

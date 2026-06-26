@@ -311,19 +311,20 @@ export async function buildAgentContext(agentId: string): Promise<{
 
 /** The user's attached reference files for this project. */
 export function getContextFiles(): ContextFile[] {
-  return requireCurrent().graph.context ?? []
+  return [...(requireCurrent().graph.context ?? [])]
 }
 
 /** Copy each source path into .ai-manager/context/ and record it (note ''). Unreadable paths are skipped. */
-export async function addContextFiles(sourcePaths: string[]): Promise<ProjectGraph> {
+export async function addContextFiles(sourcePaths: string[]): Promise<{ graph: ProjectGraph; skipped: string[] }> {
   const { path, graph } = requireCurrent()
   const dir = aimPath(path, CONTEXT_DIR)
   await fs.mkdir(dir, { recursive: true })
   graph.context = graph.context ?? []
+  const skipped: string[] = []
   for (const src of sourcePaths) {
     try {
       const stat = await fs.stat(src)
-      if (!stat.isFile()) continue
+      if (!stat.isFile()) { skipped.push(basename(src)); continue }
       const fileName = uniqueContextName(graph.context.map((c) => c.fileName), basename(src))
       await fs.copyFile(src, join(dir, fileName))
       graph.context.push({
@@ -335,10 +336,10 @@ export async function addContextFiles(sourcePaths: string[]): Promise<ProjectGra
         isImage: isImageName(fileName)
       })
     } catch {
-      // skip unreadable / missing source; the rest still add
+      skipped.push(basename(src))
     }
   }
-  return saveGraph()
+  return { graph: await saveGraph(), skipped }
 }
 
 /** Edit an attached file's note. */

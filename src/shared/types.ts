@@ -472,7 +472,7 @@ export interface RendererApi {
   launchServer: (input: { startCommand: string; port?: number; path?: string }) => Promise<{ serverId: string }>
   stopServer: (serverId: string) => void
   openProjectPath: () => void
-  addContext: (paths?: string[]) => Promise<ProjectGraph>
+  addContext: (paths?: string[]) => Promise<{ graph: ProjectGraph; skipped: string[] }>
   updateContext: (id: string, note: string) => Promise<ProjectGraph>
   removeContext: (id: string) => Promise<ProjectGraph>
   contextThumbnail: (id: string) => Promise<string | null>

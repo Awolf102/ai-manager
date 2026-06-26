@@ -272,7 +272,7 @@ describe('context files', () => {
     await fs.writeFile(join(srcDirB, 'mockup.png'), 'BBBB', 'utf8')
 
     await addContextFiles([join(srcDirA, 'mockup.png')])
-    const graph = await addContextFiles([join(srcDirB, 'mockup.png')])
+    const { graph } = await addContextFiles([join(srcDirB, 'mockup.png')])
 
     expect(graph.context).toHaveLength(2)
     const names = graph.context!.map((c) => c.fileName).sort()
@@ -290,7 +290,7 @@ describe('context files', () => {
     await fs.mkdir(srcDir, { recursive: true })
     await fs.writeFile(join(srcDir, 'spec.md'), '# spec', 'utf8')
 
-    const added = await addContextFiles([join(srcDir, 'spec.md')])
+    const { graph: added } = await addContextFiles([join(srcDir, 'spec.md')])
     const id = added.context![0].id
 
     const noted = await updateContextFile(id, { note: 'the API the backend must follow' })
@@ -309,12 +309,26 @@ describe('context files', () => {
     await fs.writeFile(join(srcDir, 'pic.png'), 'PNGDATA', 'utf8')
     await fs.writeFile(join(srcDir, 'notes.txt'), 'text', 'utf8')
 
-    const g = await addContextFiles([join(srcDir, 'pic.png'), join(srcDir, 'notes.txt')])
+    const { graph: g } = await addContextFiles([join(srcDir, 'pic.png'), join(srcDir, 'notes.txt')])
     const pic = g.context!.find((c) => c.fileName === 'pic.png')!
     const txt = g.context!.find((c) => c.fileName === 'notes.txt')!
 
     const thumb = await contextThumbnail(pic.id)
     expect(thumb?.startsWith('data:image/png;base64,')).toBe(true)
     expect(await contextThumbnail(txt.id)).toBeNull()
+  })
+
+  it('skips an unreadable/non-file source, reports it, and still adds the rest', async () => {
+    const proj = await tmpProject()
+    await openProject(proj)
+    const srcDir = join(tmpdir(), `ctx-${Math.random().toString(36).slice(2)}`)
+    await fs.mkdir(srcDir, { recursive: true })
+    await fs.writeFile(join(srcDir, 'good.md'), 'ok', 'utf8')
+    const aDir = join(srcDir, 'a-directory')
+    await fs.mkdir(aDir, { recursive: true })
+    const { graph, skipped } = await addContextFiles([join(srcDir, 'good.md'), aDir, join(srcDir, 'missing.png')])
+    expect(graph.context).toHaveLength(1)
+    expect(graph.context![0].fileName).toBe('good.md')
+    expect(skipped.sort()).toEqual(['a-directory', 'missing.png'])
   })
 })

@@ -83,7 +83,9 @@ export default function App() {
       .map((f) => window.api.getPathForFile(f))
       .filter((p) => p) // drop non-file items (text/url) whose path is ''
     if (paths.length === 0) return
-    setGraph(await window.api.addContext(paths))
+    const r = await window.api.addContext(paths)
+    setGraph(r.graph)
+    if (r.skipped.length) window.alert(`Skipped (not a readable file): ${r.skipped.join(', ')}`)
   }
 
   return (
