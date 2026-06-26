@@ -12,9 +12,12 @@ const h = vi.hoisted(() => ({
 
 vi.mock('./project-store', () => ({
   rosterForDrafting: async () => h.roster,
-  getAgent: (id: string) => ({ id, name: 'Boss' })
+  getAgent: (id: string) => ({ id, name: 'Boss' }),
+  getSettings: () => ({ skillInstallThreshold: 100000 })
 }))
 vi.mock('./agent-runner', () => ({ streamAgent: async () => ({ text: '' }) }))
+vi.mock('./skill-discovery', () => ({ discoverSkills: async () => [] }))
+vi.mock('../../shared/skill-trust', () => ({ offeredSkills: () => [] }))
 
 import { draftRoles, type AgentRunner } from './role-drafter'
 
@@ -32,8 +35,8 @@ describe('draftRoles', () => {
       text: '```json\n{"roles":[{"agentId":"w1","role":"# Role: Dana\\nA"},{"agentId":"w2","role":"# Role: Quinn\\nB"}]}\n```'
     })
     expect(await draftRoles(opts(), runAgent)).toEqual([
-      { agentId: 'w1', name: 'Dana', role: '# Role: Dana\nA' },
-      { agentId: 'w2', name: 'Quinn', role: '# Role: Quinn\nB' }
+      { agentId: 'w1', name: 'Dana', role: '# Role: Dana\nA', skills: undefined },
+      { agentId: 'w2', name: 'Quinn', role: '# Role: Quinn\nB', skills: undefined }
     ])
   })
 

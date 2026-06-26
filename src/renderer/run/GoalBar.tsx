@@ -14,7 +14,7 @@ export default function GoalBar() {
   const beginRun = useStore((s) => s.beginRun)
   const [goal, setGoal] = useState('')
   const [drafting, setDrafting] = useState(false)
-  const [drafts, setDrafts] = useState<{ agentId: string; name: string; role: string }[] | null>(null)
+  const [drafts, setDrafts] = useState<{ agentId: string; name: string; role: string; skills?: string[] }[] | null>(null)
   const [spawning, setSpawning] = useState(false)
   const [spawned, setSpawned] = useState<SpawnedMember[] | null>(null)
   const [detecting, setDetecting] = useState(false)

@@ -479,7 +479,7 @@ export interface RendererApi {
   refreshFromTeam: () => Promise<{ refreshed: boolean; graph?: ProjectGraph; updated?: number; error?: string }>
   draftRoles: (input: { goal: string; orchestratorId: string }) => Promise<{
     ok: boolean
-    drafts?: { agentId: string; name: string; role: string }[]
+    drafts?: { agentId: string; name: string; role: string; skills?: string[] }[]
     error?: string
   }>
   spawnTeam: (input: { goal: string; orchestratorId: string }) => Promise<{
