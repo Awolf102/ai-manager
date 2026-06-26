@@ -82,6 +82,23 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="field">
+          <label>Max mid-run re-plans (0 = off)</label>
+          <input
+            type="number"
+            min={0}
+            max={3}
+            value={s.maxReplans}
+            onChange={(e) =>
+              void update({ maxReplans: Math.max(0, Math.min(3, Number(e.target.value) || 0)) })
+            }
+          />
+          <div className="radio-desc" style={{ marginTop: 4 }}>
+            When you set an execution order on the canvas, the orchestrator may rewrite the
+            not-yet-run plan between stages based on what earlier stages found. The goal never changes.
+          </div>
+        </div>
+
+        <div className="field">
           <label className="check">
             <input
               type="checkbox"

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { deriveOrderDeps, applyOrderClick } from './workflow-order'
+import { deriveOrderDeps, applyOrderClick, deriveStages } from './workflow-order'
 
 // Helpers
 const T = (id: string, ownerId: string | null) => ({ id, ownerId })
@@ -72,5 +72,53 @@ describe('applyOrderClick', () => {
   it('returns edges unchanged for an unknown id', () => {
     const edges = [mk('a', 1)]
     expect(applyOrderClick(edges, 'ghost')).toBe(edges)
+  })
+})
+
+describe('deriveStages', () => {
+  it('assigns each task its top-level team order (flat teams)', () => {
+    const edges = [
+      { source: 'o', target: 'w1', order: 1 },
+      { source: 'o', target: 'w2', order: 2 }
+    ]
+    const tasks = [
+      { id: 't1', ownerId: 'w1' },
+      { id: 't2', ownerId: 'w2' }
+    ]
+    expect(deriveStages(edges, 'o', tasks)).toEqual({ t1: 1, t2: 2 })
+  })
+
+  it("gives every task under a nested ordered team that team's stage", () => {
+    const edges = [
+      { source: 'o', target: 'm', order: 1 },
+      { source: 'm', target: 'w1' },
+      { source: 'm', target: 'w2' }
+    ]
+    const tasks = [
+      { id: 't1', ownerId: 'w1' },
+      { id: 't2', ownerId: 'w2' }
+    ]
+    expect(deriveStages(edges, 'o', tasks)).toEqual({ t1: 1, t2: 1 })
+  })
+
+  it('assigns stage 0 to unordered teams and unowned tasks', () => {
+    const edges = [{ source: 'o', target: 'w1' }] // no order anywhere
+    const tasks = [
+      { id: 't1', ownerId: 'w1' },
+      { id: 't2', ownerId: null }
+    ]
+    expect(deriveStages(edges, 'o', tasks)).toEqual({ t1: 0, t2: 0 })
+  })
+
+  it('mixes ordered and unordered teams', () => {
+    const edges = [
+      { source: 'o', target: 'w1', order: 1 },
+      { source: 'o', target: 'w2' } // unordered
+    ]
+    const tasks = [
+      { id: 't1', ownerId: 'w1' },
+      { id: 't2', ownerId: 'w2' }
+    ]
+    expect(deriveStages(edges, 'o', tasks)).toEqual({ t1: 1, t2: 0 })
   })
 })

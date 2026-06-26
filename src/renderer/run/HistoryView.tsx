@@ -123,6 +123,19 @@ function RunDetail({ record }: { record: RunRecord }) {
         </ul>
       </div>
 
+      {(record.replans ?? []).length > 0 && (
+        <div className="hist-section">
+          <h4>Re-plans ({record.replans!.length})</h4>
+          <ul>
+            {record.replans!.map((r) => (
+              <li key={r.attempt}>
+                <b>#{r.attempt}</b>: {r.reason}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="hist-section">
         <h4>Agents</h4>
         {record.steps.map((s) => (
