@@ -344,7 +344,8 @@ export interface TaskState {
   attempts: number
   /** latest worker output for the task */
   output: string
-  verdict?: { verdict: 'pass' | 'fail'; feedback: string }
+  /** review outcome; `disposition` (fail only) = 'repair' (buggy, re-run) | 'replan' (mis-scoped, re-break-up). Default 'repair'. */
+  verdict?: { verdict: 'pass' | 'fail'; feedback: string; disposition?: 'repair' | 'replan' }
   /** reasoning effort assigned by the routing manager (maps to the SDK `effort`) */
   effort?: Effort
   /** task ids that must finish first (Stage 4 — unused in Stage 1) */
