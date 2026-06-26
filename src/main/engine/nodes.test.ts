@@ -7,6 +7,8 @@ import {
   lessonsDigest,
   depsSatisfied,
   normalizeLessonInput,
+  hasManagers,
+  reviewerIdsOf,
   type Eng,
   type AgentRunner
 } from './nodes'
@@ -47,6 +49,10 @@ const h = vi.hoisted(() => {
 vi.mock('./project-store', () => ({
   getAgent: (id: string) => h.agents[id],
   childrenOf: (id: string) => (h.children[id] ?? []).map((c) => h.agents[c]),
+  parentOf: (id: string) => {
+    const pid = Object.keys(h.children).find((p) => (h.children[p] ?? []).includes(id))
+    return pid ? h.agents[pid] : null
+  },
   rolesOf: async (ids: string[]) =>
     ids.map((id) => ({ id, name: h.agents[id].name, kind: h.agents[id].kind, role: `role ${id}` })),
   readMemory: async (id: string) => h.memory[id] ?? '',
@@ -529,5 +535,33 @@ describe('depsSatisfied', () => {
   it('does not wait on a dependency that will never run (unowned) or is unknown', () => {
     const tasks = { t1: mk('t1', null, 'pending'), t2: mk('t2', 'w2', 'pending', ['t1', 'ghost']) }
     expect(depsSatisfied(tasks.t2, tasks)).toBe(true)
+  })
+})
+
+describe('hasManagers / reviewerIdsOf', () => {
+  const stateWith = (tasks: Record<string, { ownerId: string | null }>): RunState => ({
+    ...seedRunState({ runId: 'r', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' }),
+    tasks: Object.fromEntries(
+      Object.entries(tasks).map(([id, t]) => [
+        id,
+        { task: { id, title: id, description: '' }, ownerId: t.ownerId, status: 'done', attempts: 1, output: '' }
+      ])
+    ) as RunState['tasks']
+  })
+
+  it('flat team: no managers, no reviewers', () => {
+    h.children = { o: ['w1', 'w2'], w1: [], w2: [] }
+    const s = stateWith({ t1: { ownerId: 'w1' }, t2: { ownerId: 'w2' } })
+    expect(hasManagers(s)).toBe(false)
+    expect(reviewerIdsOf(s).sort()).toEqual([])
+    h.children = { o: ['w1', 'w2'], w1: [], w2: [] }
+  })
+
+  it('two-tier: the manager parent + the orchestrator are reviewers', () => {
+    h.children = { o: ['m'], m: ['w1', 'w2'], w1: [], w2: [] }
+    const s = stateWith({ t1: { ownerId: 'w1' }, t2: { ownerId: 'w2' } })
+    expect(hasManagers(s)).toBe(true)
+    expect(reviewerIdsOf(s).sort()).toEqual(['m', 'o'])
+    h.children = { o: ['w1', 'w2'], w1: [], w2: [] }
   })
 })

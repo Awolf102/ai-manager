@@ -29,6 +29,7 @@ import {
   childrenOf,
   getAgent,
   getSettings,
+  parentOf,
   readMemory,
   rolesOf,
   updateAgent
@@ -558,6 +559,26 @@ function maxAttemptsFor(settings: { reviewMode: string; maxRepairAttempts: numbe
 
 function ownedTasks(state: RunState): TaskState[] {
   return Object.values(state.tasks).filter((t) => t.ownerId)
+}
+
+/** True when at least one owned task's immediate parent is a manager (the team is two-tier). */
+export function hasManagers(state: RunState): boolean {
+  return ownedTasks(state).some((t) => parentOf(t.ownerId!)?.kind === 'manager')
+}
+
+/**
+ * The nodes that performed a review this run, for reflection: the manager parents of owned
+ * tasks, plus the orchestrator when the integration pass ran (i.e. when managers exist).
+ * Empty for flat teams — so flat teams keep worker-only reflection.
+ */
+export function reviewerIdsOf(state: RunState): string[] {
+  const ids = new Set<string>()
+  for (const t of ownedTasks(state)) {
+    const p = parentOf(t.ownerId!)
+    if (p && p.kind === 'manager') ids.add(p.id)
+  }
+  if (hasManagers(state)) ids.add(state.orchestratorId)
+  return [...ids]
 }
 
 /**
