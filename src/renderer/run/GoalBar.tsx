@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Network, Play, Sparkles, Square, Target } from 'lucide-react'
+import { Network, Play, Rocket, Sparkles, Square, Target } from 'lucide-react'
 import { useStore } from '../store'
 import RoleDraftModal from '../RoleDraftModal'
 import TeamSpawnModal from '../TeamSpawnModal'
-import type { SpawnedMember } from '../../shared/types'
+import RunResultModal from './RunResultModal'
+import type { RunManifest, SpawnedMember } from '../../shared/types'
 
 export default function GoalBar() {
   const graph = useStore((s) => s.graph)
@@ -16,6 +17,8 @@ export default function GoalBar() {
   const [drafts, setDrafts] = useState<{ agentId: string; name: string; role: string }[] | null>(null)
   const [spawning, setSpawning] = useState(false)
   const [spawned, setSpawned] = useState<SpawnedMember[] | null>(null)
+  const [detecting, setDetecting] = useState(false)
+  const [manifest, setManifest] = useState<RunManifest | null>(null)
 
   const orchestrators = graph?.nodes.filter((n) => n.kind === 'orchestrator') ?? []
   const selectedOrch = orchestrators.find((o) => o.id === selectedId)
@@ -24,6 +27,7 @@ export default function GoalBar() {
   const hasSpecialists = (graph?.nodes.some((n) => n.kind !== 'orchestrator')) ?? false
   const canDraft = !!target && !!goal.trim() && hasSpecialists && !running && !drafting
   const canBuild = !!target && !!goal.trim() && !running && !spawning
+  const canRunResult = !!target && !running && !detecting
 
   const buildTeam = async (): Promise<void> => {
     if (!target || !goal.trim() || running || spawning) return
@@ -34,6 +38,18 @@ export default function GoalBar() {
       else window.alert(r.error ?? 'Could not build a team.')
     } finally {
       setSpawning(false)
+    }
+  }
+
+  const runResult = async (): Promise<void> => {
+    if (!target || running || detecting) return
+    setDetecting(true)
+    try {
+      const r = await window.api.detectManifest({ goal: goal.trim(), orchestratorId: target.id })
+      if (r.ok && r.manifest) setManifest(r.manifest)
+      else window.alert(r.error ?? 'Could not detect how to run the result.')
+    } finally {
+      setDetecting(false)
     }
   }
 
@@ -99,6 +115,14 @@ export default function GoalBar() {
       >
         <Network size={14} /> {spawning ? 'Building…' : 'Build team'}
       </button>
+      <button
+        className="btn"
+        onClick={() => void runResult()}
+        disabled={!canRunResult}
+        title="Launch the app your team built and open it in the browser"
+      >
+        <Rocket size={14} /> {detecting ? 'Detecting…' : 'Run result'}
+      </button>
       {running ? (
         <button className="btn danger" onClick={stop}>
           <Square size={13} /> Stop
@@ -112,6 +136,7 @@ export default function GoalBar() {
       {spawned && target && (
         <TeamSpawnModal members={spawned} orchestratorId={target.id} onClose={() => setSpawned(null)} />
       )}
+      {manifest && <RunResultModal manifest={manifest} onClose={() => setManifest(null)} />}
     </div>
   )
 }
