@@ -73,7 +73,9 @@ export default function App() {
   const onDragOver = (e: React.DragEvent): void => {
     if (hasFiles(e)) e.preventDefault()
   }
-  const onDragLeave = (): void => setDragDepth((d) => Math.max(0, d - 1))
+  const onDragLeave = (e: React.DragEvent): void => {
+    if (hasFiles(e)) setDragDepth((d) => Math.max(0, d - 1))
+  }
   const onDrop = async (e: React.DragEvent): Promise<void> => {
     e.preventDefault()
     setDragDepth(0)
