@@ -454,7 +454,8 @@ async function replanNode(state: RunState, _io: NodeIO, eng: Eng): Promise<NodeR
   if (maxReplans <= 0 || state.replanAttempts >= maxReplans || eng.abort.signal.aborted) {
     return { goto: 'execute' }
   }
-  const boundary = pendingStageBoundary(state.tasks, state.replanStageCursor) ?? state.replanStageCursor
+  // executeNode already advanced replanStageCursor to this boundary before routing here.
+  const boundary = state.replanStageCursor
   const owned = ownedTasks(state)
   const executed = owned.filter((t) => t.status !== 'pending')
   const pending = owned.filter((t) => t.status === 'pending')
