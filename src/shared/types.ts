@@ -247,6 +247,20 @@ export interface RunManifest {
   notes?: string
 }
 
+export type ServerStatus = 'starting' | 'running' | 'exited' | 'error'
+export interface ServerLogEvent {
+  serverId: string
+  data: string
+}
+export interface ServerStatusEvent {
+  serverId: string
+  status: ServerStatus
+}
+export interface ServerReadyEvent {
+  serverId: string
+  url: string
+}
+
 // ---- durable run state (checkpointing) ----
 
 export type RunPhase =
@@ -378,7 +392,14 @@ export const IPC = {
   refreshTeam: 'team:refreshFrom',
   draftRoles: 'roles:draft',
   spawnTeam: 'team:spawn',
-  applySpawn: 'team:applySpawn'
+  applySpawn: 'team:applySpawn',
+  detectManifest: 'manifest:detect',
+  launchServer: 'server:launch',
+  stopServer: 'server:stop',
+  openPath: 'app:openPath',
+  serverLog: 'server:log',
+  serverStatus: 'server:status',
+  serverReady: 'server:ready'
 } as const
 
 /** The typed API the preload bridge exposes on window.api. */
