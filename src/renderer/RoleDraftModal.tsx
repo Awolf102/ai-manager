@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-type Draft = { agentId: string; name: string; role: string }
+type Draft = { agentId: string; name: string; role: string; skills?: string[] }
 
 export default function RoleDraftModal({ drafts, onClose }: { drafts: Draft[]; onClose: () => void }) {
   const [edited, setEdited] = useState<Draft[]>(drafts)
@@ -9,7 +9,10 @@ export default function RoleDraftModal({ drafts, onClose }: { drafts: Draft[]; o
   const apply = async (): Promise<void> => {
     setApplying(true)
     try {
-      for (const d of edited) await window.api.writeRole(d.agentId, d.role)
+      for (const d of edited) {
+        await window.api.writeRole(d.agentId, d.role)
+        if (d.skills && d.skills.length) await window.api.updateAgent({ id: d.agentId, skills: d.skills })
+      }
       onClose()
     } finally {
       setApplying(false)
@@ -31,6 +34,9 @@ export default function RoleDraftModal({ drafts, onClose }: { drafts: Draft[]; o
                   setEdited((prev) => prev.map((x, j) => (j === i ? { ...x, role: e.target.value } : x)))
                 }
               />
+              {d.skills && d.skills.length > 0 && (
+                <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>skills: {d.skills.join(', ')}</div>
+              )}
             </div>
           ))}
         </div>

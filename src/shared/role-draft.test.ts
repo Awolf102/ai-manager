@@ -35,3 +35,24 @@ describe('parseDraftedRoles', () => {
     expect(parseDraftedRoles('```json\n{"nope":1}\n```', ['w1'])).toBeNull()
   })
 })
+
+describe('draftRolesPrompt (with offered skills)', () => {
+  it('offers skills when provided', () => {
+    const p = draftRolesPrompt('g', [{ id: 'a', name: 'A', kind: 'worker', role: 'r' }], [], [{ id: 'data:airflow', description: 'pipelines' }])
+    expect(p).toContain('data:airflow')
+  })
+})
+
+describe('parseDraftedRoles (with skill validation)', () => {
+  it('reads optional per-role skills, validates + caps', () => {
+    const text = '```json\n' + JSON.stringify({
+      roles: [{ agentId: 'a', role: '# Role', skills: ['data:airflow', 'ghost:x', 'eng:a', 'eng:b', 'eng:c', 'eng:d'] }]
+    }) + '\n```'
+    const out = parseDraftedRoles(text, ['a'], ['data:airflow', 'eng:a', 'eng:b', 'eng:c', 'eng:d'])!
+    expect(out[0].skills).toEqual(['data:airflow', 'eng:a', 'eng:b', 'eng:c', 'eng:d']) // ghost dropped, capped 5
+  })
+  it('omits skills when none valid', () => {
+    const text = '```json\n{"roles":[{"agentId":"a","role":"# R"}]}\n```'
+    expect(parseDraftedRoles(text, ['a'], ['data:airflow'])![0].skills).toBeUndefined()
+  })
+})

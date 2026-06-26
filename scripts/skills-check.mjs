@@ -1,66 +1,47 @@
 #!/usr/bin/env node
-// Sanity-check that the per-agent skill plugins are installed where the app
-// expects, and list the skills each one offers.
+// Sanity-check which TRUSTED skill plugins the app will discover.
 //   npm run skills:check
-//
-// This is a filesystem check only — it confirms the runner's plugin paths
-// resolve to real installed plugins. It does NOT prove the SDK loads them at
-// runtime; only running the app does that.
+// Reads ~/.claude/plugins metadata the same way main/engine/skill-discovery.ts does.
+// Filesystem/metadata check only — live loading is proven only by running the app.
 
-import { readdirSync, readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
-// Mirrors resolvePluginPath() in src/main/engine/agent-runner.ts
-const base = join(homedir(), '.claude', 'plugins', 'marketplaces')
-const PLUGINS = [
-  { id: 'engineering', path: join(base, 'knowledge-work-plugins', 'engineering') },
-  { id: 'data', path: join(base, 'knowledge-work-plugins', 'data') },
-  { id: 'design', path: join(base, 'knowledge-work-plugins', 'design') },
-  {
-    id: 'frontend-design',
-    path: join(base, 'claude-plugins-official', 'plugins', 'frontend-design')
-  }
-]
-
-function skillNames(skillsDir) {
-  return readdirSync(skillsDir, { withFileTypes: true })
-    .filter((d) => d.isDirectory())
-    .map((d) => {
-      try {
-        const m = readFileSync(join(skillsDir, d.name, 'SKILL.md'), 'utf8').match(/^name:\s*(.+)$/m)
-        return m ? m[1].trim() : d.name
-      } catch {
-        return d.name
-      }
-    })
-}
-
-console.log('\n  Per-agent skills — plugin availability check\n')
-let missing = 0
-for (const p of PLUGINS) {
-  const skillsDir = join(p.path, 'skills')
-  if (!existsSync(skillsDir)) {
-    missing++
-    console.log(`  ✗ ${p.id}  — MISSING`)
-    console.log(`      expected at: ${p.path}`)
-    continue
-  }
-  let names = []
+const dir = join(homedir(), '.claude', 'plugins')
+const read = (f) => {
   try {
-    names = skillNames(skillsDir)
+    return JSON.parse(readFileSync(join(dir, f), 'utf8'))
   } catch {
-    // leave names empty
+    return null
   }
-  console.log(`  ✓ ${p.id}  (${names.length} skills)`)
-  console.log(`      ${names.map((n) => `${p.id}:${n}`).join(', ')}`)
 }
+const THRESHOLD = 100000 // mirrors the DEFAULT skillInstallThreshold; a user's Settings value may differ
+const markets = read('known_marketplaces.json') ?? {}
+const cache = read('plugin-catalog-cache.json')
+const plugins = cache?.catalog?.plugins ?? {}
 
-console.log('')
-if (missing > 0) {
-  console.log(`  ${missing} plugin(s) missing. For the Anthropic ones, add the marketplace:`)
-  console.log('    claude plugin marketplace add anthropics/knowledge-work-plugins\n')
-} else {
-  console.log('  All skill plugins present. (Live loading is only proven by running the app.)\n')
+const trusted = (author, repo, installs) =>
+  String(author ?? '').toLowerCase() === 'anthropic' ||
+  String(repo ?? '').toLowerCase().startsWith('anthropics/') ||
+  (installs ?? 0) >= THRESHOLD
+
+console.log('\n  Trusted skill plugins the app will discover\n')
+let n = 0
+for (const [key, e] of Object.entries(plugins)) {
+  const at = key.lastIndexOf('@')
+  const id = key.slice(0, at)
+  const marketplace = key.slice(at + 1)
+  const repo = markets[marketplace]?.source?.repo
+  const author = e.marketplace_entry?.author?.name
+  const installs = e.unique_installs ?? 0
+  if (!trusted(author, repo, installs)) continue
+  const loc = markets[marketplace]?.installLocation
+  const onDisk = loc && (existsSync(join(loc, id, 'skills')) || existsSync(join(loc, 'plugins', id, 'skills')))
+  const skills = (e.components?.skills ?? []).map((s) => s.name)
+  if (!skills.length) continue
+  n++
+  console.log(`  ${onDisk ? '✓' : '·'} ${id}  (${author || marketplace}, ${installs} installs, ${skills.length} skills)${onDisk ? '' : '  [not on disk]'}`)
 }
-console.log('  The catalog the app offers per agent: src/shared/skill-catalog.ts\n')
+if (n === 0) console.log('  (none — add a marketplace: claude plugin marketplace add anthropics/knowledge-work-plugins)')
+console.log('')

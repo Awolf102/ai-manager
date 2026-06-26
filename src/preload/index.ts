@@ -62,6 +62,7 @@ const api: RendererApi = {
   removeContext: (id) => ipcRenderer.invoke(IPC.removeContext, id),
   contextThumbnail: (id) => ipcRenderer.invoke(IPC.contextThumbnail, id),
   getPathForFile: (file) => webUtils.getPathForFile(file),
+  listSkills: () => ipcRenderer.invoke(IPC.listSkills),
   onServerLog: (cb) => sub<ServerLogEvent>(IPC.serverLog, cb),
   onServerStatus: (cb) => sub<ServerStatusEvent>(IPC.serverStatus, cb),
   onServerReady: (cb) => sub<ServerReadyEvent>(IPC.serverReady, cb)

@@ -4,8 +4,10 @@
 import type { WebContents } from 'electron'
 import type { StreamAgentOptions } from './agent-runner'
 import { streamAgent } from './agent-runner'
-import { getAgent, rosterForDrafting } from './project-store'
+import { getAgent, rosterForDrafting, getSettings } from './project-store'
 import { draftRolesPrompt, parseDraftedRoles } from '../../shared/role-draft'
+import { offeredSkills } from '../../shared/skill-trust'
+import { discoverSkills } from './skill-discovery'
 
 const THINK_DISALLOW = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash', 'WebFetch', 'WebSearch']
 const STRICT_REMINDER =
@@ -16,12 +18,15 @@ export type AgentRunner = (opts: StreamAgentOptions) => Promise<{ text: string; 
 export async function draftRoles(
   opts: { goal: string; orchestratorId: string; wc: WebContents; abort: AbortController; runId: string },
   runAgent: AgentRunner = streamAgent
-): Promise<{ agentId: string; name: string; role: string }[]> {
+): Promise<{ agentId: string; name: string; role: string; skills?: string[] }[]> {
   const { agents, edges } = await rosterForDrafting()
   if (agents.length === 0) return []
   const knownIds = agents.map((a) => a.id)
   const nameById = new Map(agents.map((a) => [a.id, a.name]))
-  const base = draftRolesPrompt(opts.goal, agents, edges)
+  const discovered = await discoverSkills(getSettings().skillInstallThreshold ?? 100000)
+  const offered = offeredSkills(discovered, 40)
+  const validIds = discovered.flatMap((p) => p.skills.map((s) => s.id))
+  const base = draftRolesPrompt(opts.goal, agents, edges, offered)
   let last = ''
   for (let attempt = 0; attempt < 2; attempt++) {
     const { text } = await runAgent({
@@ -36,9 +41,17 @@ export async function draftRoles(
       header: false
     })
     last = text
-    const parsed = parseDraftedRoles(text, knownIds)
+    const parsed = parseDraftedRoles(text, knownIds, validIds)
     if (parsed && parsed.length > 0) {
-      return parsed.map((r) => ({ agentId: r.agentId, name: nameById.get(r.agentId) ?? r.agentId, role: r.role }))
+      return parsed.map((r) => {
+        const out: { agentId: string; name: string; role: string; skills?: string[] } = {
+          agentId: r.agentId,
+          name: nameById.get(r.agentId) ?? r.agentId,
+          role: r.role
+        }
+        if (r.skills) out.skills = r.skills
+        return out
+      })
     }
   }
   throw new Error(

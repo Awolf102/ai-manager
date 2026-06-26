@@ -5,8 +5,10 @@ import type { WebContents } from 'electron'
 import type { SpawnedMember } from '../../shared/types'
 import type { StreamAgentOptions } from './agent-runner'
 import { streamAgent } from './agent-runner'
-import { getAgent, rosterForDrafting } from './project-store'
+import { getAgent, rosterForDrafting, getSettings } from './project-store'
 import { spawnTeamPrompt, parseSpawnedTeam } from '../../shared/team-spawn'
+import { offeredSkills } from '../../shared/skill-trust'
+import { discoverSkills } from './skill-discovery'
 
 const THINK_DISALLOW = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash', 'WebFetch', 'WebSearch']
 const STRICT_REMINDER =
@@ -19,7 +21,10 @@ export async function spawnTeam(
   runAgent: AgentRunner = streamAgent
 ): Promise<SpawnedMember[]> {
   const { agents } = await rosterForDrafting()
-  const base = spawnTeamPrompt(opts.goal, getAgent(opts.orchestratorId).name, agents)
+  const discovered = await discoverSkills(getSettings().skillInstallThreshold ?? 100000)
+  const offered = offeredSkills(discovered, 40)
+  const validIds = discovered.flatMap((p) => p.skills.map((s) => s.id))
+  const base = spawnTeamPrompt(opts.goal, getAgent(opts.orchestratorId).name, agents, offered)
   let last = ''
   for (let attempt = 0; attempt < 2; attempt++) {
     const { text } = await runAgent({
@@ -34,7 +39,7 @@ export async function spawnTeam(
       header: false
     })
     last = text
-    const members = parseSpawnedTeam(text)
+    const members = parseSpawnedTeam(text, validIds)
     if (members && members.length > 0) return members
   }
   throw new Error(`${getAgent(opts.orchestratorId).name} did not return a valid team. Last output:\n${last.slice(0, 400)}`)

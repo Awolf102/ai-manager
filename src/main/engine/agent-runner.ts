@@ -1,24 +1,14 @@
 import { randomUUID } from 'node:crypto'
-import { existsSync } from 'node:fs'
-import { homedir } from 'node:os'
-import { join } from 'node:path'
 import type { WebContents } from 'electron'
 // Type-only import: erased at compile time, so it does NOT trigger a runtime
 // require of this ESM-only package (we load it via dynamic import below).
 import type { Options, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { AgentStreamEvent, ContextFile, Effort, PermissionMode, RunHeadlessInput } from '../../shared/types'
 import { IPC } from '../../shared/types'
-import { skillOptionsFor } from '../../shared/skill-catalog'
+import { skillOptionsFor } from '../../shared/skill-trust'
+import { discoverSkills } from './skill-discovery'
 import { buildContextBlock } from '../../shared/context-files'
-import { buildAgentContext, updateAgent } from './project-store'
-
-/** Resolve a catalog plugin id to its installed local path under ~/.claude/plugins. */
-function resolvePluginPath(pluginId: string): string {
-  const base = join(homedir(), '.claude', 'plugins', 'marketplaces')
-  return pluginId === 'frontend-design'
-    ? join(base, 'claude-plugins-official', 'plugins', 'frontend-design')
-    : join(base, 'knowledge-work-plugins', pluginId)
-}
+import { buildAgentContext, getSettings, updateAgent } from './project-store'
 
 /** Role + persistent memory + the user's project context, appended onto Claude Code's preset system prompt. */
 function composeAppend(role: string, memory: string, context: ContextFile[]): string {
@@ -34,6 +24,17 @@ function composeAppend(role: string, memory: string, context: ContextFile[]): st
 
 function emit(wc: WebContents, e: AgentStreamEvent): void {
   if (!wc.isDestroyed()) wc.send(IPC.agentStream, e)
+}
+
+let discoveryCache: { at: number; plugins: import('../../shared/types').DiscoveredPlugin[] } | null = null
+
+/** Discover trusted installed skills, cached briefly so a run doesn't re-read the catalog per agent step. */
+async function discoveredPlugins(): Promise<import('../../shared/types').DiscoveredPlugin[]> {
+  const now = Date.now()
+  if (discoveryCache && now - discoveryCache.at < 30_000) return discoveryCache.plugins
+  const plugins = await discoverSkills(getSettings().skillInstallThreshold ?? 100000)
+  discoveryCache = { at: now, plugins }
+  return plugins
 }
 
 export interface StreamAgentOptions {
@@ -96,18 +97,11 @@ export async function streamAgent(
 
     // Per-agent skills: load each assigned skill's plugin (MCP servers skipped —
     // we want the skill guidance, not the warehouse connectors) and filter to the
-    // assigned ids. Plugins whose local path is missing are dropped so a removed
-    // marketplace can't break a run.
-    const skillOpts = skillOptionsFor(agent.skills, resolvePluginPath)
+    // assigned ids. Discovered paths are already verified to exist on disk.
+    const skillOpts = skillOptionsFor(agent.skills, await discoveredPlugins())
     if (skillOpts) {
-      const plugins = skillOpts.plugins.filter((p) => existsSync(p.path))
-      if (plugins.length > 0) {
-        const loaded = new Set(plugins.map((p) => p.path))
-        options.plugins = plugins
-        options.skills = skillOpts.skills.filter((s) =>
-          loaded.has(resolvePluginPath(s.slice(0, s.indexOf(':'))))
-        )
-      }
+      options.plugins = skillOpts.plugins
+      options.skills = skillOpts.skills
     }
 
     if (opts.effort) options.effort = opts.effort

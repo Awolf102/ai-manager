@@ -23,6 +23,7 @@ import { draftRoles } from './engine/role-drafter'
 import { spawnTeam } from './engine/team-spawner'
 import { detectManifest } from './engine/manifest-detector'
 import * as serverMgr from './engine/server-manager'
+import { discoverSkills } from './engine/skill-discovery'
 
 export function registerIpc(): void {
   // ---- project ----
@@ -256,4 +257,7 @@ export function registerIpc(): void {
   )
   ipcMain.handle(IPC.removeContext, (_e, id: string) => store.removeContextFile(id))
   ipcMain.handle(IPC.contextThumbnail, (_e, id: string) => store.contextThumbnail(id))
+
+  // ---- skills ----
+  ipcMain.handle(IPC.listSkills, () => discoverSkills(store.getSettings().skillInstallThreshold ?? 100000))
 }

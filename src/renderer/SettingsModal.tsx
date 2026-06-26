@@ -93,6 +93,22 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="field">
+          <label>Trusted-skill install threshold</label>
+          <input
+            type="number"
+            min={0}
+            step={1000}
+            value={s.skillInstallThreshold}
+            onChange={(e) =>
+              void update({ skillInstallThreshold: Math.max(0, Number(e.target.value) || 0) })
+            }
+          />
+          <div className="radio-desc" style={{ marginTop: 4 }}>
+            Non-Anthropic plugins are offered to agents only at/above this many installs. Anthropic plugins are always trusted.
+          </div>
+        </div>
+
+        <div className="field">
           <label>Autonomy (acting steps)</label>
           <select
             value={s.autonomy}

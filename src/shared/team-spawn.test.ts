@@ -17,6 +17,12 @@ describe('spawnTeamPrompt', () => {
     expect(p).toMatch(/cluster of (several )?related roles/i)
     expect(p).toMatch(/review|QA|test/i) // the rationale mentions dedicated review/QA
   })
+
+  it('offers the provided skills and asks for per-member skills', () => {
+    const p = spawnTeamPrompt('build it', 'Boss', [], [{ id: 'data:airflow', description: 'pipelines' }])
+    expect(p).toContain('data:airflow')
+    expect(p).toMatch(/skills/i)
+  })
 })
 
 describe('parseSpawnedTeam', () => {
@@ -54,5 +60,22 @@ describe('parseSpawnedTeam', () => {
   it('returns null when there are no usable members', () => {
     expect(parseSpawnedTeam('no json')).toBeNull()
     expect(parseSpawnedTeam('```json\n{"members":[]}\n```')).toBeNull()
+  })
+
+  it('keeps only offered skill ids, caps at 5, drops unknown', () => {
+    const valid = ['data:airflow', 'data:sql-queries', 'eng:a', 'eng:b', 'eng:c', 'eng:d']
+    const text = '```json\n' + JSON.stringify({
+      members: [{
+        id: 'm1', name: 'Dev', kind: 'worker', role: '# Role', reportsTo: 'orchestrator',
+        skills: ['data:airflow', 'ghost:x', 'data:sql-queries', 'eng:a', 'eng:b', 'eng:c', 'eng:d']
+      }]
+    }) + '\n```'
+    const out = parseSpawnedTeam(text, valid)!
+    expect(out[0].skills).toEqual(['data:airflow', 'data:sql-queries', 'eng:a', 'eng:b', 'eng:c']) // ghost dropped, capped to 5
+  })
+
+  it('omits skills when none are valid / none provided', () => {
+    const text = '```json\n{"members":[{"id":"m1","name":"D","kind":"worker","role":"# R","reportsTo":"orchestrator"}]}\n```'
+    expect(parseSpawnedTeam(text, ['data:airflow'])![0].skills).toBeUndefined()
   })
 })

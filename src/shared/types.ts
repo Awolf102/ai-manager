@@ -13,6 +13,26 @@ export interface SpawnedMember {
   kind: 'manager' | 'worker'
   role: string
   reportsTo: string
+  skills?: string[]
+}
+
+/** A skill offered by a trusted installed plugin (discovered from ~/.claude/plugins). */
+export interface DiscoveredSkill {
+  id: string // plugin-qualified id passed to the SDK `skills` option, e.g. 'data:airflow'
+  name: string
+  description: string
+}
+
+/** A trusted installed plugin and its skills, resolved to an on-disk path. */
+export interface DiscoveredPlugin {
+  id: string // plugin name (the `skills` prefix)
+  marketplace: string // marketplace name it came from
+  marketplaceRepo: string // the marketplace's GitHub repo (e.g. 'anthropics/...')
+  author: string // publisher (marketplace_entry.author.name), '' if unknown
+  uniqueInstalls: number // 0 if unknown
+  trusted: boolean // always true for surfaced plugins (kept for clarity)
+  path: string // on-disk plugin dir containing skills/
+  skills: DiscoveredSkill[]
 }
 
 export interface AgentNodeData {
@@ -25,7 +45,7 @@ export interface AgentNodeData {
   icon: string
   model: string
   permissionMode: PermissionMode
-  /** plugin-qualified skill ids this agent may use (see shared/skill-catalog) */
+  /** plugin-qualified skill ids this agent may use (see shared/skill-trust) */
   skills?: string[]
   /** last Claude Code session id captured from a headless run (for --resume) */
   sessionId?: string
@@ -69,6 +89,8 @@ export interface ProjectSettings {
   adaptiveEffort: boolean
   /** auto pull the linked team brain before a run + push after (B2b) */
   autoSyncTeam: boolean
+  /** install-count floor for trusting a non-Anthropic plugin's skills */
+  skillInstallThreshold: number
 }
 
 export const DEFAULT_SETTINGS: ProjectSettings = {
@@ -77,7 +99,8 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   reflection: true,
   autonomy: 'auto',
   adaptiveEffort: true,
-  autoSyncTeam: false
+  autoSyncTeam: false,
+  skillInstallThreshold: 100000
 }
 
 /** A user-attached reference file (image/doc) for the project, available to every agent. */
@@ -416,7 +439,8 @@ export const IPC = {
   addContext: 'context:add',
   updateContext: 'context:update',
   removeContext: 'context:remove',
-  contextThumbnail: 'context:thumbnail'
+  contextThumbnail: 'context:thumbnail',
+  listSkills: 'skills:list'
 } as const
 
 /** The typed API the preload bridge exposes on window.api. */
@@ -455,7 +479,7 @@ export interface RendererApi {
   refreshFromTeam: () => Promise<{ refreshed: boolean; graph?: ProjectGraph; updated?: number; error?: string }>
   draftRoles: (input: { goal: string; orchestratorId: string }) => Promise<{
     ok: boolean
-    drafts?: { agentId: string; name: string; role: string }[]
+    drafts?: { agentId: string; name: string; role: string; skills?: string[] }[]
     error?: string
   }>
   spawnTeam: (input: { goal: string; orchestratorId: string }) => Promise<{
@@ -477,6 +501,7 @@ export interface RendererApi {
   removeContext: (id: string) => Promise<ProjectGraph>
   contextThumbnail: (id: string) => Promise<string | null>
   getPathForFile: (file: File) => string
+  listSkills: () => Promise<DiscoveredPlugin[]>
   onServerLog: (cb: (e: ServerLogEvent) => void) => () => void
   onServerStatus: (cb: (e: ServerStatusEvent) => void) => () => void
   onServerReady: (cb: (e: ServerReadyEvent) => void) => () => void
