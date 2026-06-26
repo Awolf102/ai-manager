@@ -73,6 +73,19 @@ The single prioritized to-do. **1 = do next / most important; higher = later.**
   The named follow-on to role-drafting (which authored roles for a team you placed; this also creates the
   nodes + topology). Built via subagent-driven TDD (115 tests green; whole-branch review clean; merged to
   main `--no-ff`). **LIVE-VERIFIED 2026-06-25** (user confirmed Build-team propose → editable preview → Apply works end to end).
+- **"Run result" button — one-click launch+open of the built app.** A **Run result** button (GoalBar,
+  lucide `Rocket`) → a read-only detection agent (mirrors `role-drafter`/`team-spawner`: `default`+
+  THINK_DISALLOW, retry-once, `runAgent` seam) inspects the project + last run report and emits an editable
+  `RunManifest` (`{type,startCommand,port,path,notes}`) → a preview modal (editable command/port/path) →
+  Launch spawns the server via `child_process` (`shell:true`+`detached:true`, process-group kill), streams
+  its logs into the modal, polls the TCP port until ready, then opens the system browser; non-web types →
+  Open-project-folder. New pure `shared/run-manifest.ts` (`detectManifestPrompt`+`parseManifest`) +
+  `engine/manifest-detector.ts` (seam-tested) + `engine/server-manager.ts` (mirrors `pty-manager`,
+  killed on quit + project switch) + IPC `manifest:detect`/`server:launch`/`server:stop`/`app:openPath`
+  + 3 server events + `RunResultModal.tsx`. System browser now; the `server:ready` event carries the URL
+  so an in-app webview can drop in later. Built via subagent-driven TDD (123 tests green; whole-branch opus
+  review "Ready to merge: Yes"; merged to main `--no-ff`, commits `75ab8a8..8e68efa`, merge `eb7e77a`).
+  **live smoke pending.**
 - **Decisions:** Bedrock dropped (provider + Knowledge Bases). Multi-chart-within-a-project dropped.
 
 ---
@@ -110,19 +123,11 @@ v2 escalation — build once]; **(3) lateral team handoffs** ("side flow lines",
 flow/handoff), loop-termination bounds, orchestrator kept in the loop [re-architecture — do last]. #1 two-tier review
 is the natural first step in. Detail → memory `ai-manager-workflow-graph`.
 
-## 3. "Run result" button — open the built app/localhost from the UI  (small; immediately useful — quick-win candidate)
-One-click LAUNCH + OPEN of the app the agents built (localhost), instead of dropping to a terminal. Elegant hook: the
-render-verify step ALREADY starts the app + hits its entry URL, so capture a structured run manifest
-(`{startCommand, url/port}`) during the run, then the button replays it (open the system browser, or an in-app
-Electron webview). Web-app-centric (fallback: open the folder / interactive PTY for CLIs); needs server-process
-lifecycle (start/stop, kill on close, port). Pairs with existing terminal paths; directly speeds the live-smoke loop.
-Detail → memory `ai-manager-run-result-button`.
-
-## 4. Stage 3 — resume usable + memory-approval gate (HITL)  ⏸ ON HOLD (user — until needed)
+## 3. Stage 3 — resume usable + memory-approval gate (HITL)  ⏸ ON HOLD (user — until needed)
 Runtime already supports resume/interrupts; not reachable from the app. Wire `resumeRun` to IPC,
 add a resume-on-launch banner, and `reflectNode` interrupt for a `requireMemoryApproval` setting.
 
-## 5. Local semantic-memory RAG  (lowest)
+## 4. Local semantic-memory RAG  (lowest)
 sqlite-vec/LanceDB once an agent's memory outgrows a single prompt. (Ephemeral memory-seeded spawn
 agents were folded into the now-shipped dynamic-spawn design.) The compounding-team foundation
 (a + b1 + b2a + b2b) exists.
