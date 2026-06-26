@@ -10,6 +10,11 @@ export default function AgentConfigPanel() {
   const setGraph = useStore((s) => s.setGraph)
   const select = useStore((s) => s.select)
 
+  const [catalog, setCatalog] = useState<DiscoveredPlugin[] | null>(null)
+  useEffect(() => {
+    void window.api.listSkills().then(setCatalog)
+  }, [])
+
   const agent = graph?.nodes.find((n) => n.id === selectedId)
   if (!agent) return null
 
@@ -28,11 +33,6 @@ export default function AgentConfigPanel() {
     else next.add(id)
     void update({ skills: [...next] })
   }
-
-  const [catalog, setCatalog] = useState<DiscoveredPlugin[]>([])
-  useEffect(() => {
-    void window.api.listSkills().then(setCatalog)
-  }, [])
 
   return (
     <div className="panel-section">
@@ -77,12 +77,12 @@ export default function AgentConfigPanel() {
       <div className="field">
         <label>Skills{assigned.size > 0 ? ` (${assigned.size})` : ''}</label>
         <div className="skills-picker">
-          {catalog.length === 0 && (
+          {catalog !== null && catalog.length === 0 && (
             <div className="muted" style={{ fontSize: 12 }}>
               No trusted skills found. Install plugins via Claude Code (`claude plugin marketplace add …`).
             </div>
           )}
-          {catalog.map((plugin) => (
+          {(catalog ?? []).map((plugin) => (
             <details key={plugin.id} className="skill-group">
               <summary>
                 {plugin.id}{' '}
