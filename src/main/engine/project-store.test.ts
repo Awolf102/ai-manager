@@ -26,7 +26,12 @@ import {
   autoPushToTeam,
   updateSettings,
   applySpawnedTeam,
-  parentOf
+  parentOf,
+  getContextFiles,
+  addContextFiles,
+  updateContextFile,
+  removeContextFile,
+  contextThumbnail
 } from './project-store'
 
 async function tmpProject(): Promise<string> {
@@ -251,5 +256,65 @@ describe('applySpawnedTeam', () => {
     const soloDev = after.nodes.find((n) => n.name === 'Solo Dev')!
     expect(soloDev.kind).toBe('worker')
     expect(after.edges.some((e) => e.target === soloDev.id)).toBe(false) // no edge to Solo Dev
+  })
+})
+
+describe('context files', () => {
+  it('copies a file into .ai-manager/context, records it, and uniquifies a name collision', async () => {
+    const proj = await tmpProject()
+    await openProject(proj)
+    // two sources with the SAME basename in different dirs
+    const srcDirA = join(tmpdir(), `ctx-a-${Math.random().toString(36).slice(2)}`)
+    const srcDirB = join(tmpdir(), `ctx-b-${Math.random().toString(36).slice(2)}`)
+    await fs.mkdir(srcDirA, { recursive: true })
+    await fs.mkdir(srcDirB, { recursive: true })
+    await fs.writeFile(join(srcDirA, 'mockup.png'), 'AAAA', 'utf8')
+    await fs.writeFile(join(srcDirB, 'mockup.png'), 'BBBB', 'utf8')
+
+    await addContextFiles([join(srcDirA, 'mockup.png')])
+    const graph = await addContextFiles([join(srcDirB, 'mockup.png')])
+
+    expect(graph.context).toHaveLength(2)
+    const names = graph.context!.map((c) => c.fileName).sort()
+    expect(names).toEqual(['mockup-2.png', 'mockup.png'])
+    expect(graph.context!.every((c) => c.isImage)).toBe(true)
+    // both copies exist on disk under .ai-manager/context/
+    expect(await fs.readFile(join(proj, '.ai-manager', 'context', 'mockup.png'), 'utf8')).toBe('AAAA')
+    expect(await fs.readFile(join(proj, '.ai-manager', 'context', 'mockup-2.png'), 'utf8')).toBe('BBBB')
+  })
+
+  it('updates a note and removes a file (deleting the copy)', async () => {
+    const proj = await tmpProject()
+    await openProject(proj)
+    const srcDir = join(tmpdir(), `ctx-${Math.random().toString(36).slice(2)}`)
+    await fs.mkdir(srcDir, { recursive: true })
+    await fs.writeFile(join(srcDir, 'spec.md'), '# spec', 'utf8')
+
+    const added = await addContextFiles([join(srcDir, 'spec.md')])
+    const id = added.context![0].id
+
+    const noted = await updateContextFile(id, { note: 'the API the backend must follow' })
+    expect(noted.context![0].note).toBe('the API the backend must follow')
+
+    const removed = await removeContextFile(id)
+    expect(removed.context).toHaveLength(0)
+    await expect(fs.readFile(join(proj, '.ai-manager', 'context', 'spec.md'), 'utf8')).rejects.toThrow()
+  })
+
+  it('returns a data-URL thumbnail for an image, null for a non-image', async () => {
+    const proj = await tmpProject()
+    await openProject(proj)
+    const srcDir = join(tmpdir(), `ctx-${Math.random().toString(36).slice(2)}`)
+    await fs.mkdir(srcDir, { recursive: true })
+    await fs.writeFile(join(srcDir, 'pic.png'), 'PNGDATA', 'utf8')
+    await fs.writeFile(join(srcDir, 'notes.txt'), 'text', 'utf8')
+
+    const g = await addContextFiles([join(srcDir, 'pic.png'), join(srcDir, 'notes.txt')])
+    const pic = g.context!.find((c) => c.fileName === 'pic.png')!
+    const txt = g.context!.find((c) => c.fileName === 'notes.txt')!
+
+    const thumb = await contextThumbnail(pic.id)
+    expect(thumb?.startsWith('data:image/png;base64,')).toBe(true)
+    expect(await contextThumbnail(txt.id)).toBeNull()
   })
 })

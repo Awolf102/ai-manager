@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto'
 import type {
   AgentKind,
   AgentNodeData,
+  ContextFile,
   CreateAgentInput,
   GraphEdge,
   ProjectGraph,
@@ -18,6 +19,7 @@ import type {
 import { DEFAULT_MODEL_BY_KIND, DEFAULT_SETTINGS } from '../../shared/types'
 import { iconForName } from '../../shared/icons'
 import { slugify, uniqueSlug } from '../../shared/slug'
+import { isImageName, uniqueContextName } from '../../shared/context-files'
 import { parseLessonBullet } from '../../shared/lessons'
 import { buildTeamBundle, planTeamImport, validateTeamBundle, type TeamBundle } from '../../shared/team-bundle'
 import { mergeBrainPush, planBrainPull, mergeLessons } from '../../shared/team-brain'
@@ -26,6 +28,7 @@ import type { DraftRosterAgent } from '../../shared/role-draft'
 const AIM_DIR = '.ai-manager'
 const GRAPH_FILE = 'graph.json'
 const AGENTS_DIR = 'agents'
+const CONTEXT_DIR = 'context'
 
 let current: { path: string; graph: ProjectGraph } | null = null
 
@@ -42,6 +45,10 @@ function requireCurrent(): { path: string; graph: ProjectGraph } {
 
 export function getCurrentProjectPath(): string {
   return requireCurrent().path
+}
+
+export function getGraph(): ProjectGraph {
+  return requireCurrent().graph
 }
 
 export function getAgent(agentId: string): AgentNodeData {
@@ -170,6 +177,7 @@ export async function openProject(projectPath: string): Promise<ProjectGraph> {
   }
   // apply settings defaults for graphs created before this field existed
   graph.settings = { ...DEFAULT_SETTINGS, ...(graph.settings ?? {}) }
+  graph.context = graph.context ?? []
   current = { path: projectPath, graph }
   await saveGraph()
   await addRecent(graph.project)
@@ -292,10 +300,79 @@ export async function buildAgentContext(agentId: string): Promise<{
   projectPath: string
   role: string
   memory: string
+  context: ContextFile[]
 }> {
   const agent = getAgent(agentId)
   const [role, memory] = await Promise.all([readRole(agentId), readMemory(agentId)])
-  return { agent, projectPath: getCurrentProjectPath(), role, memory }
+  return { agent, projectPath: getCurrentProjectPath(), role, memory, context: getContextFiles() }
+}
+
+// ---------- context files ----------
+
+/** The user's attached reference files for this project. */
+export function getContextFiles(): ContextFile[] {
+  return requireCurrent().graph.context ?? []
+}
+
+/** Copy each source path into .ai-manager/context/ and record it (note ''). Unreadable paths are skipped. */
+export async function addContextFiles(sourcePaths: string[]): Promise<ProjectGraph> {
+  const { path, graph } = requireCurrent()
+  const dir = aimPath(path, CONTEXT_DIR)
+  await fs.mkdir(dir, { recursive: true })
+  graph.context = graph.context ?? []
+  for (const src of sourcePaths) {
+    try {
+      const stat = await fs.stat(src)
+      if (!stat.isFile()) continue
+      const fileName = uniqueContextName(graph.context.map((c) => c.fileName), basename(src))
+      await fs.copyFile(src, join(dir, fileName))
+      graph.context.push({
+        id: randomUUID(),
+        fileName,
+        note: '',
+        addedAt: new Date().toISOString(),
+        bytes: stat.size,
+        isImage: isImageName(fileName)
+      })
+    } catch {
+      // skip unreadable / missing source; the rest still add
+    }
+  }
+  return saveGraph()
+}
+
+/** Edit an attached file's note. */
+export async function updateContextFile(id: string, patch: { note?: string }): Promise<ProjectGraph> {
+  const { graph } = requireCurrent()
+  const entry = (graph.context ?? []).find((c) => c.id === id)
+  if (entry && patch.note !== undefined) entry.note = patch.note
+  return saveGraph()
+}
+
+/** Remove an attached file: delete the copy (tolerate a missing file) and drop the entry. */
+export async function removeContextFile(id: string): Promise<ProjectGraph> {
+  const { path, graph } = requireCurrent()
+  const entry = (graph.context ?? []).find((c) => c.id === id)
+  if (entry) {
+    await fs.rm(aimPath(path, CONTEXT_DIR, entry.fileName), { force: true })
+    graph.context = (graph.context ?? []).filter((c) => c.id !== id)
+  }
+  return saveGraph()
+}
+
+/** A base64 data-URL thumbnail for an image entry under the size cap, else null. */
+export async function contextThumbnail(id: string): Promise<string | null> {
+  const { path, graph } = requireCurrent()
+  const entry = (graph.context ?? []).find((c) => c.id === id)
+  if (!entry || !entry.isImage || entry.bytes > 5_000_000) return null
+  try {
+    const buf = await fs.readFile(aimPath(path, CONTEXT_DIR, entry.fileName))
+    const ext = entry.fileName.slice(entry.fileName.lastIndexOf('.') + 1).toLowerCase()
+    const mime = ext === 'svg' ? 'image/svg+xml' : ext === 'jpg' ? 'image/jpeg' : `image/${ext}`
+    return `data:${mime};base64,${buf.toString('base64')}`
+  } catch {
+    return null
+  }
 }
 
 // ---------- orchestration helpers ----------
