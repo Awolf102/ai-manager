@@ -88,7 +88,7 @@ describe('deriveStages', () => {
     expect(deriveStages(edges, 'o', tasks)).toEqual({ t1: 1, t2: 2 })
   })
 
-  it('gives every task under a nested ordered team that team’s stage', () => {
+  it("gives every task under a nested ordered team that team's stage", () => {
     const edges = [
       { source: 'o', target: 'm', order: 1 },
       { source: 'm', target: 'w1' },

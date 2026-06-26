@@ -75,7 +75,6 @@ export function deriveStages(
   const teams = edges
     .filter((e) => e.source === orchestratorId && typeof e.order === 'number')
     .map((e) => ({ order: e.order as number, nodes: subtreeOf(children, e.target) }))
-    .sort((a, b) => a.order - b.order)
 
   const out: Record<string, number> = {}
   for (const x of tasks) {
