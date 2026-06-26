@@ -36,7 +36,7 @@ async function projectDigest(projectPath: string): Promise<string> {
 
 async function lastRunReport(): Promise<string> {
   try {
-    const runs = await listRuns()
+    const runs = await listRuns() // listRuns() returns runs newest-first, so runs[0] is the most recent
     if (runs.length === 0) return ''
     const rec = await loadRun(runs[0].file)
     return rec?.final ?? ''
