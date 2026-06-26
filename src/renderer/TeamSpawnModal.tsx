@@ -63,6 +63,11 @@ export default function TeamSpawnModal({
                   setEdited((prev) => prev.map((x, j) => (j === i ? { ...x, role: e.target.value } : x)))
                 }
               />
+              {m.skills && m.skills.length > 0 && (
+                <div className="spawn-skills muted" style={{ fontSize: 11, marginTop: 4 }}>
+                  skills: {m.skills.join(', ')}
+                </div>
+              )}
             </div>
           ))}
         </div>

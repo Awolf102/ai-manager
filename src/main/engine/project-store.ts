@@ -756,7 +756,7 @@ export async function applySpawnedTeam(
     await fs.mkdir(dir, { recursive: true })
     await fs.writeFile(join(dir, 'role.md'), m.role, 'utf8')
     await fs.writeFile(join(dir, 'memory.md'), memoryTemplate(m.name), 'utf8')
-    graph.nodes.push({
+    const node: AgentNodeData = {
       id,
       name: m.name,
       slug,
@@ -765,7 +765,9 @@ export async function applySpawnedTeam(
       model: DEFAULT_MODEL_BY_KIND[m.kind],
       permissionMode: 'acceptEdits',
       position: { x: base.x + col * 220, y: base.y + d * 150 }
-    })
+    }
+    if (m.skills && m.skills.length) node.skills = m.skills
+    graph.nodes.push(node)
   }
   for (const m of members) {
     const childId = idByTemp.get(m.id)!
