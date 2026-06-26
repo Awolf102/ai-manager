@@ -59,6 +59,8 @@ export interface GraphEdge {
   /** "delegates to": source delegates work to target */
   source: string
   target: string
+  /** 1..N execution sequence; consumed only on edges whose source is the run's orchestrator */
+  order?: number
 }
 
 export interface ProjectMeta {

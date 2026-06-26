@@ -1,0 +1,76 @@
+import { describe, it, expect } from 'vitest'
+import { deriveOrderDeps, applyOrderClick } from './workflow-order'
+
+// Helpers
+const T = (id: string, ownerId: string | null) => ({ id, ownerId })
+const E = (source: string, target: string, order?: number) => ({ source, target, order })
+
+describe('deriveOrderDeps', () => {
+  it('returns {} when no edges carry an order', () => {
+    const edges = [E('o', 'w1'), E('o', 'w2')]
+    expect(deriveOrderDeps(edges, 'o', [T('t1', 'w1'), T('t2', 'w2')])).toEqual({})
+  })
+
+  it('makes a later team depend on every earlier team task (two teams)', () => {
+    const edges = [E('o', 'w1', 1), E('o', 'w2', 2)]
+    const out = deriveOrderDeps(edges, 'o', [T('t1', 'w1'), T('t2', 'w2')])
+    expect(out).toEqual({ t2: ['t1'] })
+  })
+
+  it('chains three teams: team 3 depends on teams 1 and 2', () => {
+    const edges = [E('o', 'wa', 1), E('o', 'wb', 2), E('o', 'wc', 3)]
+    const out = deriveOrderDeps(edges, 'o', [T('a', 'wa'), T('b', 'wb'), T('c', 'wc')])
+    expect(out.b).toEqual(['a'])
+    expect(out.c?.sort()).toEqual(['a', 'b'])
+    expect(out.a).toBeUndefined()
+  })
+
+  it('gates a whole subtree: a manager+workers team ahead of a second team', () => {
+    // team1 root = m (manager); m -> w1, w2 ; team2 root = w3
+    const edges = [E('o', 'm', 1), E('m', 'w1'), E('m', 'w2'), E('o', 'w3', 2)]
+    const tasks = [T('t1', 'w1'), T('t2', 'w2'), T('t3', 'w3')]
+    const out = deriveOrderDeps(edges, 'o', tasks)
+    expect(out.t3?.sort()).toEqual(['t1', 't2']) // team2 waits for ALL of team1's subtree
+    expect(out.t1).toBeUndefined()
+    expect(out.t2).toBeUndefined()
+  })
+
+  it('an empty earlier team adds no deps to the later team', () => {
+    const edges = [E('o', 'w1', 1), E('o', 'w2', 2)]
+    const out = deriveOrderDeps(edges, 'o', [T('t2', 'w2')]) // team1 (w1) owns no tasks
+    expect(out).toEqual({}) // nothing earlier to wait on
+  })
+
+  it('ignores unordered sibling teams (they stay parallel)', () => {
+    const edges = [E('o', 'w1', 1), E('o', 'w2'), E('o', 'w3', 2)]
+    const out = deriveOrderDeps(edges, 'o', [T('t1', 'w1'), T('t2', 'w2'), T('t3', 'w3')])
+    expect(out.t3).toEqual(['t1']) // only ordered teams chain
+    expect(out.t2).toBeUndefined() // unordered team unaffected
+  })
+})
+
+describe('applyOrderClick', () => {
+  const mk = (id: string, order?: number) => ({ id, order })
+
+  it('assigns the next number to an unordered edge', () => {
+    const out = applyOrderClick([mk('a', 1), mk('b'), mk('c', 2)], 'b')
+    expect(out.find((e) => e.id === 'b')!.order).toBe(3)
+  })
+
+  it('assigns 1 to the first ordered edge', () => {
+    const out = applyOrderClick([mk('a'), mk('b')], 'a')
+    expect(out.find((e) => e.id === 'a')!.order).toBe(1)
+  })
+
+  it('clears an order and re-packs the higher ones', () => {
+    const out = applyOrderClick([mk('a', 1), mk('b', 2), mk('c', 3)], 'b')
+    expect(out.find((e) => e.id === 'b')!.order).toBeUndefined()
+    expect(out.find((e) => e.id === 'a')!.order).toBe(1) // unchanged (below cleared)
+    expect(out.find((e) => e.id === 'c')!.order).toBe(2) // re-packed down
+  })
+
+  it('returns edges unchanged for an unknown id', () => {
+    const edges = [mk('a', 1)]
+    expect(applyOrderClick(edges, 'ghost')).toBe(edges)
+  })
+})
