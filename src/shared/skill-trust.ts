@@ -76,6 +76,12 @@ export function skillOptionsFor(
 
 /** A condensed, capped list of skills (id + description) to offer the orchestrator in spawn/draft prompts. */
 export function offeredSkills(discovered: DiscoveredPlugin[], cap: number): { id: string; description: string }[] {
-  const all = discovered.flatMap((p) => p.skills.map((s) => ({ id: s.id, description: s.description })))
+  const ranked = [...discovered].sort((a, b) => {
+    const aA = a.author.trim().toLowerCase() === 'anthropic' ? 1 : 0
+    const bA = b.author.trim().toLowerCase() === 'anthropic' ? 1 : 0
+    if (aA !== bA) return bA - aA // Anthropic plugins first
+    return b.uniqueInstalls - a.uniqueInstalls // then highest installs
+  })
+  const all = ranked.flatMap((p) => p.skills.map((s) => ({ id: s.id, description: s.description })))
   return all.slice(0, cap)
 }

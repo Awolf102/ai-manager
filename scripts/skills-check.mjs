@@ -16,7 +16,7 @@ const read = (f) => {
     return null
   }
 }
-const THRESHOLD = 100000
+const THRESHOLD = 100000 // mirrors the DEFAULT skillInstallThreshold; a user's Settings value may differ
 const markets = read('known_marketplaces.json') ?? {}
 const cache = read('plugin-catalog-cache.json')
 const plugins = cache?.catalog?.plugins ?? {}

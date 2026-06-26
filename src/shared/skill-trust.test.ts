@@ -105,9 +105,14 @@ describe('offeredSkills', () => {
     id, marketplace: 'm', marketplaceRepo: 'r', author: 'a', uniqueInstalls: installs, trusted: true,
     path: '/p', skills: [{ id: `${id}:s`, name: 's', description: 'd' }]
   })
-  it('flattens skills and caps the count', () => {
+  it('flattens skills ranked by Anthropic-then-installs, and caps the count', () => {
     const out = offeredSkills([mk('a', 1), mk('b', 2), mk('c', 3)], 2)
     expect(out.length).toBe(2)
-    expect(out[0]).toEqual({ id: 'a:s', description: 'd' })
+    expect(out.map((o) => o.id)).toEqual(['c:s', 'b:s']) // highest installs first
+  })
+  it('ranks Anthropic-authored plugins ahead of higher-install non-Anthropic ones', () => {
+    const anthro = { ...mk('z', 1), author: 'Anthropic' }
+    const out = offeredSkills([mk('a', 500000), anthro], 2)
+    expect(out.map((o) => o.id)).toEqual(['z:s', 'a:s']) // Anthropic first despite far fewer installs
   })
 })

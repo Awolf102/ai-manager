@@ -51,4 +51,30 @@ describe('discoverSkills', () => {
   it('returns [] when the plugins root does not exist', async () => {
     expect(await discoverSkills(100000, join(tmpdir(), 'aim-nope-' + Math.random()))).toEqual([])
   })
+
+  it('falls back to on-disk scan and returns only anthropics/* marketplace plugins when no cache present', async () => {
+    const root = join(tmpdir(), `aim-skills-nocache-${Math.random().toString(36).slice(2)}`)
+    // anthropics/* marketplace: one plugin with a skill on disk
+    const anthropicDir = join(root, 'marketplaces', 'official')
+    await fs.mkdir(join(anthropicDir, 'trusted-plugin', 'skills', 'my-skill'), { recursive: true })
+    await fs.writeFile(join(anthropicDir, 'trusted-plugin', 'skills', 'my-skill', 'SKILL.md'), '---\nname: my-skill\n---\n', 'utf8')
+    // non-anthropics marketplace: one plugin with a skill on disk — should NOT be returned
+    const thirdPartyDir = join(root, 'marketplaces', 'third-party')
+    await fs.mkdir(join(thirdPartyDir, 'untrusted-plugin', 'skills', 'other-skill'), { recursive: true })
+    await fs.writeFile(join(thirdPartyDir, 'untrusted-plugin', 'skills', 'other-skill', 'SKILL.md'), '---\nname: other-skill\n---\n', 'utf8')
+    // known_marketplaces.json listing both marketplaces
+    await fs.writeFile(join(root, 'known_marketplaces.json'), JSON.stringify({
+      'official': { source: { repo: 'anthropics/official' }, installLocation: anthropicDir },
+      'third-party': { source: { repo: 'someone/plugins' }, installLocation: thirdPartyDir }
+    }), 'utf8')
+    // NO plugin-catalog-cache.json → forces fallback scan
+    const out = await discoverSkills(100000, root)
+    const ids = out.map((p) => p.id)
+    expect(ids).toContain('trusted-plugin')
+    expect(ids).not.toContain('untrusted-plugin')
+    const plugin = out.find((p) => p.id === 'trusted-plugin')!
+    expect(plugin.author).toBe('Anthropic')
+    expect(plugin.uniqueInstalls).toBe(0)
+    expect(plugin.skills.map((s) => s.id)).toContain('trusted-plugin:my-skill')
+  })
 })
