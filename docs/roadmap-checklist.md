@@ -176,27 +176,32 @@ The single prioritized to-do. **1 = do next / most important; higher = later.**
   `--no-ff`, commits `fb7e08a..580d558`, merge `c0d88a7`. Spec/plan under `docs/superpowers/` (2026-06-26). **live smoke
   pending.** **The deferred two-tier-review v2 escalation (reactive manager kick-back → re-plan, reusing the Phase-2 `replan`
   node from the review exit) is the only remaining workflow-graph follow-on.**
+- **Two-tier-review v2 — escalation re-planning.** (The deferred two-tier v2, after the workflow-graph arc.) Reviewers
+  classify each failure `repair` (buggy) vs `replan` (mis-scoped); any `replan` flag (with re-plan budget) ESCALATES at the
+  review exit — the orchestrator re-breaks-up the not-passed tasks (passed frozen) via a new `escalate` node, reusing Phase-2's
+  re-plan machinery: generalized `mergeReplan(…, replaceIds?)` (default pending → Phase 2 untouched) + a shared
+  `applyReplanDecision` helper (also folded into `replanNode`) + the existing `replan` event for surfacing. `TaskState.verdict.
+  disposition`; gated review prompts (`allowReplan`). **Unified under `maxReplans`** (default 0 = off = byte-for-byte; the
+  disposition isn't even asked when off); bounded by the shared `replanAttempts`; goal locked. **No renderer/Settings changes.**
+  Built via subagent-driven TDD (3 tasks; opus review of the engine task + the final whole-branch "Ready to merge: Yes" — all 5
+  invariants verified); 214 tests green; typecheck+build clean; merged to main `--no-ff`, commits `9ed09f5..1793f14`, merge
+  `5f2a58a`. Spec/plan under `docs/superpowers/` (2026-06-26). **live smoke = the user's big-project run.** **The workflow-graph
+  arc + its v2 follow-on are now fully complete.**
 - **Decisions:** Bedrock dropped (provider + Knowledge Bases). Multi-chart-within-a-project dropped.
 
 ---
 
-## ✅ Workflow-graph canvas arc (Phases 1–3) — COMPLETE
-Phases 1 (clickable edge ordering), 2 (goal-locked proactive mid-run re-planning), and 3 (lateral peer handoffs) all
-SHIPPED to main (see Done above). The canvas now expresses structure (reporting tree), order (Phase 1), in-flight
-re-planning (Phase 2), and lateral peer consults (Phase 3). Detail → memory `ai-manager-workflow-graph`.
+## ✅ Workflow-graph canvas arc (Phases 1–3 + two-tier v2 escalation) — COMPLETE
+Phases 1 (clickable edge ordering), 2 (goal-locked proactive mid-run re-planning), 3 (lateral peer handoffs), AND the
+two-tier-review v2 escalation (reactive mis-scoped re-plan) all SHIPPED to main (see Done above). The canvas now expresses
+structure (reporting tree), order (Phase 1), in-flight re-planning (Phase 2 proactive + v2 reactive), and lateral peer
+consults (Phase 3). Detail → memory `ai-manager-workflow-graph`, `ai-manager-two-tier-review`.
 
-## 1. Two-tier-review v2 escalation (reactive manager kick-back → re-plan)  ← NEXT (small; reuses the replan node)
-The only remaining workflow-graph follow-on: a manager (or the orchestrator's integration review) escalates a mis-scoped
-task back to be RE-PLANNED rather than just repaired — REACTIVE (failure-driven), vs Phase 2's PROACTIVE between-stages
-re-plan. Reuses the Phase-2 `replan` node, triggered from the review exit instead of an execute-stage boundary (today an
-unfixable plan-level gap is surfaced in integration feedback, not re-planned). Bounded like `maxReplans`. Smaller than a
-phase — its own brainstorm + spec. Detail → memory `ai-manager-two-tier-review`, `ai-manager-workflow-graph`.
-
-## 2. Stage 3 — resume usable + memory-approval gate (HITL)  ⏸ ON HOLD (user — until needed)
+## 1. Stage 3 — resume usable + memory-approval gate (HITL)  ⏸ ON HOLD (user — until needed)
 Runtime already supports resume/interrupts; not reachable from the app. Wire `resumeRun` to IPC,
 add a resume-on-launch banner, and `reflectNode` interrupt for a `requireMemoryApproval` setting.
 
-## 3. Local semantic-memory RAG  (lowest)
+## 2. Local semantic-memory RAG  (lowest)
 sqlite-vec/LanceDB once an agent's memory outgrows a single prompt. (Ephemeral memory-seeded spawn
 agents were folded into the now-shipped dynamic-spawn design.) The compounding-team foundation
 (a + b1 + b2a + b2b) exists.
