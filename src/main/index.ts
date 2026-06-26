@@ -2,6 +2,7 @@ import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'node:path'
 import { ensureLoginPath } from './engine/env'
 import { killAllPtys } from './engine/pty-manager'
+import { killAllServers } from './engine/server-manager'
 import { registerIpc } from './ipc'
 
 function createWindow(): void {
@@ -45,9 +46,11 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   killAllPtys()
+  killAllServers()
   if (process.platform !== 'darwin') app.quit()
 })
 
 app.on('before-quit', () => {
   killAllPtys()
+  killAllServers()
 })

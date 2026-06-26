@@ -1,4 +1,4 @@
-import { dialog, ipcMain } from 'electron'
+import { dialog, ipcMain, shell } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { promises as fs } from 'node:fs'
 import { randomUUID } from 'node:crypto'
@@ -21,6 +21,8 @@ import * as orchestrator from './engine/orchestrator'
 import { checkAuth } from './engine/auth'
 import { draftRoles } from './engine/role-drafter'
 import { spawnTeam } from './engine/team-spawner'
+import { detectManifest } from './engine/manifest-detector'
+import * as serverMgr from './engine/server-manager'
 
 export function registerIpc(): void {
   // ---- project ----
@@ -30,9 +32,13 @@ export function registerIpc(): void {
       properties: ['openDirectory', 'createDirectory']
     })
     if (r.canceled || r.filePaths.length === 0) return null
+    serverMgr.killAllServers()
     return store.openProject(r.filePaths[0])
   })
-  ipcMain.handle(IPC.openProject, (_e, path: string) => store.openProject(path))
+  ipcMain.handle(IPC.openProject, (_e, path: string) => {
+    serverMgr.killAllServers()
+    return store.openProject(path)
+  })
   ipcMain.handle(IPC.getRecentProjects, () => store.getRecentProjects())
 
   // ---- graph / agents ----
@@ -203,4 +209,32 @@ export function registerIpc(): void {
     (_e, input: { members: SpawnedMember[]; orchestratorId: string }) =>
       store.applySpawnedTeam(input.members, input.orchestratorId)
   )
+
+  // ---- run result (launch the built app) ----
+  ipcMain.handle(
+    IPC.detectManifest,
+    async (e: IpcMainInvokeEvent, input: { goal: string; orchestratorId: string }) => {
+      try {
+        const manifest = await detectManifest({
+          goal: input.goal,
+          orchestratorId: input.orchestratorId,
+          wc: e.sender,
+          abort: new AbortController(),
+          runId: 'detect-manifest'
+        })
+        return { ok: true, manifest }
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) }
+      }
+    }
+  )
+  ipcMain.handle(
+    IPC.launchServer,
+    (e: IpcMainInvokeEvent, input: { startCommand: string; port?: number; path?: string }) =>
+      serverMgr.launchServer(e.sender, input)
+  )
+  ipcMain.on(IPC.stopServer, (_e, serverId: string) => serverMgr.stopServer(serverId))
+  ipcMain.on(IPC.openPath, () => {
+    void shell.openPath(store.getCurrentProjectPath())
+  })
 }

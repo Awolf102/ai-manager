@@ -72,7 +72,7 @@ The single prioritized to-do. **1 = do next / most important; higher = later.**
   roles + reporting edges, non-destructive) + IPC `team:spawn`/`team:applySpawn` + `TeamSpawnModal`.
   The named follow-on to role-drafting (which authored roles for a team you placed; this also creates the
   nodes + topology). Built via subagent-driven TDD (115 tests green; whole-branch review clean; merged to
-  main `--no-ff`). **live smoke pending.**
+  main `--no-ff`). **LIVE-VERIFIED 2026-06-25** (user confirmed Build-team propose → editable preview → Apply works end to end).
 - **Decisions:** Bedrock dropped (provider + Knowledge Bases). Multi-chart-within-a-project dropped.
 
 ---

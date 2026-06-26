@@ -237,6 +237,30 @@ export interface RunSummary {
   taskCount: number
 }
 
+/** How to launch + open the app the agents built. Produced by the detection
+ *  agent, edited in the preview, replayed by the server runtime. */
+export interface RunManifest {
+  type: 'web' | 'static' | 'cli' | 'library' | 'unknown'
+  startCommand: string
+  port?: number
+  path?: string
+  notes?: string
+}
+
+export type ServerStatus = 'starting' | 'running' | 'exited' | 'error'
+export interface ServerLogEvent {
+  serverId: string
+  data: string
+}
+export interface ServerStatusEvent {
+  serverId: string
+  status: ServerStatus
+}
+export interface ServerReadyEvent {
+  serverId: string
+  url: string
+}
+
 // ---- durable run state (checkpointing) ----
 
 export type RunPhase =
@@ -368,7 +392,14 @@ export const IPC = {
   refreshTeam: 'team:refreshFrom',
   draftRoles: 'roles:draft',
   spawnTeam: 'team:spawn',
-  applySpawn: 'team:applySpawn'
+  applySpawn: 'team:applySpawn',
+  detectManifest: 'manifest:detect',
+  launchServer: 'server:launch',
+  stopServer: 'server:stop',
+  openPath: 'app:openPath',
+  serverLog: 'server:log',
+  serverStatus: 'server:status',
+  serverReady: 'server:ready'
 } as const
 
 /** The typed API the preload bridge exposes on window.api. */
@@ -415,5 +446,16 @@ export interface RendererApi {
     members?: SpawnedMember[]
     error?: string
   }>
-  applySpawnedTeam: (input: { members: SpawnedMember[]; orchestratorId: string }) => Promise<ProjectGraph>
+  applySpawnedTeam: (input: { members: SpawnedMember[]; orchestratorId: string }) => Promise<ProjectGraph>,
+  detectManifest: (input: { goal: string; orchestratorId: string }) => Promise<{
+    ok: boolean
+    manifest?: RunManifest
+    error?: string
+  }>
+  launchServer: (input: { startCommand: string; port?: number; path?: string }) => Promise<{ serverId: string }>
+  stopServer: (serverId: string) => void
+  openProjectPath: () => void
+  onServerLog: (cb: (e: ServerLogEvent) => void) => () => void
+  onServerStatus: (cb: (e: ServerStatusEvent) => void) => () => void
+  onServerReady: (cb: (e: ServerReadyEvent) => void) => () => void
 }
