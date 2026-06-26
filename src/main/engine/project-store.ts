@@ -378,19 +378,30 @@ export async function contextThumbnail(id: string): Promise<string | null> {
 
 // ---------- orchestration helpers ----------
 
-/** Agents this node delegates to (edges where this node is the source). */
+/** Agents this node delegates to via the reporting tree (handoff edges excluded). */
 export function childrenOf(nodeId: string): AgentNodeData[] {
   const { graph } = requireCurrent()
-  const childIds = new Set(graph.edges.filter((e) => e.source === nodeId).map((e) => e.target))
+  const childIds = new Set(
+    graph.edges.filter((e) => e.source === nodeId && e.kind !== 'handoff').map((e) => e.target)
+  )
   return graph.nodes.filter((n) => childIds.has(n.id))
 }
 
-/** The single node this one reports to (source of the edge targeting it), or null for a root. */
+/** The single node this one reports to (reporting edge only), or null for a root. */
 export function parentOf(nodeId: string): AgentNodeData | null {
   const { graph } = requireCurrent()
-  const edge = graph.edges.find((e) => e.target === nodeId)
+  const edge = graph.edges.find((e) => e.target === nodeId && e.kind !== 'handoff')
   if (!edge) return null
   return graph.nodes.find((n) => n.id === edge.source) ?? null
+}
+
+/** Peers this node may CONSULT via outgoing handoff edges (Phase 3). */
+export function handoffPeersOf(nodeId: string): AgentNodeData[] {
+  const { graph } = requireCurrent()
+  const ids = new Set(
+    graph.edges.filter((e) => e.source === nodeId && e.kind === 'handoff').map((e) => e.target)
+  )
+  return graph.nodes.filter((n) => ids.has(n.id))
 }
 
 /** The project's raw edges (with any `order`), for run-time ordering. */
