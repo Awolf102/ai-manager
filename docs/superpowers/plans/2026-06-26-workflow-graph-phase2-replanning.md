@@ -960,6 +960,38 @@ async function replanNode(state: RunState, _io: NodeIO, eng: Eng): Promise<NodeR
   }
 }
 ```
+Extract the shared task+deps parser and refactor `planStep` to use it (pre-flight decision: DRY). Add this helper near the other Claude steps (e.g. just before `planStep`):
+```ts
+/** Parse a raw task array (from a plan or replan JSON) into RunTask[] + sanitized deps
+ *  (dedup, drop self-references and ids that aren't real tasks). idPrefix names auto-ids. */
+function parseTasksAndDeps(
+  raw: Record<string, unknown>[],
+  idPrefix: string
+): { tasks: RunTask[]; deps: Record<string, string[]> } {
+  const tasks: RunTask[] = raw.map((t, i) => ({
+    id: typeof t.id === 'string' && t.id ? t.id : `${idPrefix}${i + 1}`,
+    title: String(t.title ?? `Task ${i + 1}`),
+    description: String(t.description ?? t.title ?? '')
+  }))
+  const ids = new Set(tasks.map((t) => t.id))
+  const deps: Record<string, string[]> = {}
+  raw.forEach((t, i) => {
+    const id = tasks[i].id
+    const list = Array.isArray(t.dependsOn)
+      ? [...new Set(t.dependsOn.map((x) => String(x)))].filter((x) => x !== id && ids.has(x))
+      : []
+    if (list.length) deps[id] = list
+  })
+  return { tasks, deps }
+}
+```
+Then replace the body of `planStep` after its `runStructured(...)` call (the inline `raw`→`tasks`/`deps` block) with:
+```ts
+  const raw = parsed.tasks as Record<string, unknown>[]
+  return parseTasksAndDeps(raw, 't')
+```
+(`planStep`'s existing behavior is unchanged — the auto-id prefix stays `t` — so the existing plan/`dependsOn` tests still pass.)
+
 Add `replanStep` near the other Claude steps (e.g. after `synthesizeStep`):
 ```ts
 async function replanStep(
@@ -980,20 +1012,7 @@ async function replanStep(
   const reason = String(p.reason ?? '')
   if (p.replan !== true) return { replan: false, reason, tasks: [], deps: {} }
   const raw = Array.isArray(p.tasks) ? (p.tasks as Record<string, unknown>[]) : []
-  const tasks: RunTask[] = raw.map((t, i) => ({
-    id: typeof t.id === 'string' && t.id ? t.id : `r${i + 1}`,
-    title: String(t.title ?? `Task ${i + 1}`),
-    description: String(t.description ?? t.title ?? '')
-  }))
-  const ids = new Set(tasks.map((t) => t.id))
-  const deps: Record<string, string[]> = {}
-  raw.forEach((t, i) => {
-    const id = tasks[i].id
-    const list = Array.isArray(t.dependsOn)
-      ? [...new Set(t.dependsOn.map((x) => String(x)))].filter((x) => x !== id && ids.has(x))
-      : []
-    if (list.length) deps[id] = list
-  })
+  const { tasks, deps } = parseTasksAndDeps(raw, 'r')
   return { replan: true, reason, tasks, deps }
 }
 ```
