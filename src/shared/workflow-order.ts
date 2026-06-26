@@ -2,6 +2,31 @@
 // unit-tested in plain Node. `deriveOrderDeps` runs at route time (order → task deps);
 // `applyOrderClick` runs in the canvas (stamp/clear + re-pack).
 
+function childMapOf(edges: { source: string; target: string }[]): Map<string, string[]> {
+  const children = new Map<string, string[]>()
+  for (const e of edges) {
+    const list = children.get(e.source) ?? []
+    list.push(e.target)
+    children.set(e.source, list)
+  }
+  return children
+}
+
+function subtreeOf(children: Map<string, string[]>, root: string): Set<string> {
+  const seen = new Set<string>([root])
+  const queue = [root]
+  while (queue.length) {
+    const n = queue.shift()!
+    for (const c of children.get(n) ?? []) {
+      if (!seen.has(c)) {
+        seen.add(c)
+        queue.push(c)
+      }
+    }
+  }
+  return seen
+}
+
 /**
  * Turn top-level edge ordering into task dependencies. For the orchestrator's
  * direct-child edges that carry an `order`, every task under the team ordered k
@@ -14,37 +39,16 @@ export function deriveOrderDeps(
   orchestratorId: string,
   tasks: { id: string; ownerId: string | null }[]
 ): Record<string, string[]> {
-  const children = new Map<string, string[]>()
-  for (const e of edges) {
-    const list = children.get(e.source) ?? []
-    list.push(e.target)
-    children.set(e.source, list)
-  }
+  const children = childMapOf(edges)
   const teams = edges
     .filter((e) => e.source === orchestratorId && typeof e.order === 'number')
     .map((e) => ({ root: e.target, order: e.order as number }))
     .sort((a, b) => a.order - b.order)
   if (teams.length === 0) return {}
 
-  const subtree = (root: string): Set<string> => {
-    const seen = new Set<string>([root])
-    const queue = [root]
-    while (queue.length) {
-      const n = queue.shift()!
-      for (const c of children.get(n) ?? []) {
-        if (!seen.has(c)) {
-          seen.add(c)
-          queue.push(c)
-        }
-      }
-    }
-    return seen
-  }
-
   const teamTasks = teams.map((t) => {
-    const nodes = subtree(t.root)
-    const ids = tasks.filter((x) => x.ownerId !== null && nodes.has(x.ownerId)).map((x) => x.id)
-    return ids
+    const nodes = subtreeOf(children, t.root)
+    return tasks.filter((x) => x.ownerId !== null && nodes.has(x.ownerId)).map((x) => x.id)
   })
 
   const out: Record<string, string[]> = {}
@@ -52,6 +56,31 @@ export function deriveOrderDeps(
     const earlier = [...new Set(teamTasks.slice(0, k).flat())]
     if (earlier.length === 0) continue
     for (const id of teamTasks[k]) out[id] = earlier
+  }
+  return out
+}
+
+/**
+ * Each owned task's ordered-stage = the Phase-1 `order` of its top-level team
+ * (the orchestrator's direct-child edge whose subtree contains the owner), or 0
+ * when the task's team is unordered or the task is unowned. Used to decide where
+ * execution pauses for a re-plan (Phase 2).
+ */
+export function deriveStages(
+  edges: { source: string; target: string; order?: number }[],
+  orchestratorId: string,
+  tasks: { id: string; ownerId: string | null }[]
+): Record<string, number> {
+  const children = childMapOf(edges)
+  const teams = edges
+    .filter((e) => e.source === orchestratorId && typeof e.order === 'number')
+    .map((e) => ({ order: e.order as number, nodes: subtreeOf(children, e.target) }))
+    .sort((a, b) => a.order - b.order)
+
+  const out: Record<string, number> = {}
+  for (const x of tasks) {
+    const team = x.ownerId === null ? undefined : teams.find((t) => t.nodes.has(x.ownerId!))
+    out[x.id] = team ? team.order : 0
   }
   return out
 }
