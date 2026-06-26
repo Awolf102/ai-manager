@@ -51,6 +51,8 @@ export interface StreamAgentOptions {
   /** tools to withhold from the agent this step (e.g. edit tools for read-only steps) */
   disallowedTools?: string[]
   resume?: boolean
+  /** explicit session id to resume (Phase 3 handoff threads the asker's in-run session; avoids the stale on-disk read) */
+  resumeSessionId?: string
   abort?: AbortController
   /** set false to suppress the "▶ name · model" header line */
   header?: boolean
@@ -93,7 +95,8 @@ export async function streamAgent(
     if (opts.disallowedTools && opts.disallowedTools.length > 0) {
       options.disallowedTools = opts.disallowedTools
     }
-    if (opts.resume && agent.sessionId) options.resume = agent.sessionId
+    if (opts.resumeSessionId) options.resume = opts.resumeSessionId
+    else if (opts.resume && agent.sessionId) options.resume = agent.sessionId
 
     // Per-agent skills: load each assigned skill's plugin (MCP servers skipped —
     // we want the skill guidance, not the warehouse connectors) and filter to the

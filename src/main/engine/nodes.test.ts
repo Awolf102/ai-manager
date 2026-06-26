@@ -886,6 +886,45 @@ describe('orchestrator node graph — peer handoffs (worker site)', () => {
       h.settings.maxHandoffs = 0
     }
   })
+
+  it('threads the asker\'s in-run sessionId into the resume call (not a stale on-disk session)', async () => {
+    h.edges = [{ source: 'w1', target: 'w2', kind: 'handoff' }]
+    h.settings.maxHandoffs = 1
+    try {
+      let capturedResumeSessionId: string | undefined = undefined
+      const runAgent: AgentRunner = async (opts) => {
+        const p = opts.prompt
+        if (p.includes('Produce a concise, ordered list'))
+          return { text: '```json\n{"tasks":[{"id":"t1","title":"Build UI","description":"build the ui"}]}\n```' }
+        if (p.includes('You route planned tasks'))
+          return { text: '```json\n{"assignments":[{"taskId":"t1","childId":"w1","effort":"high","reason":"r"}]}\n```' }
+        if (p.includes('You have been assigned') && p.includes('You may CONSULT')) {
+          // asker's first call returns a handoff request with a known sessionId
+          return { text: '```handoff\n{"to":"W2","ask":"palette?"}\n```', sessionId: 's-w1-1' }
+        }
+        if (p.includes('asked for your help'))
+          return { text: 'Use teal.' }
+        if (p.includes('responded to your request')) {
+          // capture the resumeSessionId that was threaded into this call
+          capturedResumeSessionId = opts.resumeSessionId
+          return { text: 'Built UI with teal.' }
+        }
+        if (p.includes('Judge each task'))
+          return { text: '```json\n{"tasks":[{"taskId":"t1","verdict":"pass","feedback":""}]}\n```' }
+        if (p.includes('Reflect on the work')) return { text: '```json\n{"win":"","loss":"","lessons":[]}\n```' }
+        if (p.includes('Write a clear final report')) return { text: 'DONE' }
+        return { text: '' }
+      }
+      const events: unknown[] = []
+      const out = await run(runAgent, events)
+      expect(out.status).toBe('completed')
+      // The resume call must have received the asker's in-run session from the first call
+      expect(capturedResumeSessionId).toBe('s-w1-1')
+    } finally {
+      h.edges = []
+      h.settings.maxHandoffs = 0
+    }
+  })
 })
 
 describe('orchestrator node graph — peer handoffs (review site)', () => {

@@ -812,7 +812,6 @@ async function runWithHandoffs(
     const req = parseHandoff(result.text, consult.peers)
     if (!req) break
     const peer = consult.peers.find((p) => p.id === req.peerId)!
-    eng.emit({ runId: eng.runId, type: 'status', nodeId: peer.id, status: 'working' })
     eng.emit({ runId: eng.runId, type: 'handoff', askerId: consult.asker, peerId: peer.id, ask: req.ask })
     let answer: string
     try {
@@ -830,9 +829,8 @@ async function runWithHandoffs(
     } catch (err) {
       answer = `ERROR: ${err instanceof Error ? err.message : String(err)}`
     }
-    eng.emit({ runId: eng.runId, type: 'status', nodeId: peer.id, status: 'done' })
-    // resume the ASKER's session with the peer's answer (peer sessionId is NOT persisted)
-    result = await eng.runAgent({ ...base, prompt: resumePrompt(peer.name, answer), resume: true })
+    // resume the ASKER's in-run session with the peer's answer (peer sessionId is NOT persisted)
+    result = await eng.runAgent({ ...base, prompt: resumePrompt(peer.name, answer), resume: true, resumeSessionId: result.sessionId })
   }
   return result
 }
