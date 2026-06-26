@@ -145,21 +145,37 @@ The single prioritized to-do. **1 = do next / most important; higher = later.**
   green; merged `--no-ff`, commits `e70b5bd..df2346b`, merge `26467f2`). Spec/plan under `docs/superpowers/`
   (2026-06-26). **live smoke pending** (eyeball: ordered edge not "stuck selected" after a stamp; badge re-renders on
   re-stamp/clear). Phases 2 (goal-locked re-plan) + 3 (lateral handoffs) remain — still #1.
+- **Workflow-graph canvas — Phase 2: goal-locked mid-run re-planning.** (Roadmap #1, Phase 2 of 3.) PROACTIVE, between-stages
+  re-plan: `executeNode` pauses at a Phase-1 ordered-stage boundary; a new goal-locked `replan` node lets the orchestrator
+  rewrite the NOT-YET-RUN plan from what earlier stages produced (research → re-plan the build), then execution resumes.
+  GOAL is never touched (structural). New pure `shared/replan.ts` (`pendingStageBoundary` + `mergeReplan`, freeze executed /
+  replace pending) + `deriveStages` in `shared/workflow-order.ts`; engine: `replan` graph node, `executeNode` boundary pause,
+  `replanNode`/`replanStep`/`replanPrompt`, shared `parseTasksAndDeps` (planStep+replanStep), `routeNode` routes only un-owned
+  + stamps `stage`. `maxReplans` setting (**default 0 = off = byte-for-byte today**); bounded by `replanAttempts` + a
+  per-boundary `replanStageCursor` (offers each boundary once). Surfaced via a `replan` event → Run-view `⚡ Re-planned` banner
+  + History "Re-plans" section. Built via subagent-driven TDD (9 tasks, 1 fix round + 1 final-review simplification; opus
+  whole-branch review "Ready to merge: Yes" — all 5 invariants verified; 190 tests green; typecheck+build clean; merged to
+  main `--no-ff`, commits `a74ed28..c6c9668`, merge `7996f31`). Spec/plan under `docs/superpowers/` (2026-06-26). **live smoke
+  pending** (eyeball: with `maxReplans>=1` + ordered research(1)→build(2), run pauses after research, banner shows the reason,
+  build runs on the revised plan; `maxReplans=0` unchanged). **ESCALATION re-plan (two-tier v2) + lateral peer handoffs =
+  Phase 3, still deferred.**
 - **Decisions:** Bedrock dropped (provider + Knowledge Bases). Multi-chart-within-a-project dropped.
 
 ---
 
-## 1. Workflow-graph canvas — Phases 2 & 3 (goal-locked re-planning, then lateral handoffs)  ← NEXT (big arc; brainstorm + spec each)
+## 1. Workflow-graph canvas — Phase 3 (lateral team↔team handoffs)  ← NEXT (the re-architecture; brainstorm + spec)
 Evolve the canvas from an ORG CHART (who reports to whom) into ALSO a WORKFLOW GRAPH (what flows where, in what
-order); the orchestrator stays the goal-owning hub. **Phase 1 (clickable edge ordering) is SHIPPED** (see Done above
-— `GraphEdge.order` + `deriveOrderDeps` → `dependsOn` waves + canvas Order mode). Remaining phases, cheapest→deepest:
-**(2) goal-locked mid-run re-planning** — a stage returns (e.g. research) → orchestrator rewrites the REMAINING plan,
-GOAL NEVER TOUCHED; `graph.ts` has loops/checkpoints but node logic plans once today [this is ALSO the two-tier #1
-v2 escalation — build once]; **(3) lateral team handoffs** ("side flow lines", e.g. marketing↔compliance) — a CYCLE
-+ non-parent-child edge the routing core currently forbids; needs TWO EDGE TYPES (solid reporting vs dashed
-flow/handoff), loop-termination bounds, orchestrator kept in the loop [re-architecture — do last]. The
-now-shipped two-tier review was the first step in (its deferred v2 escalation = phase 2 here). Detail → memory
-`ai-manager-workflow-graph`.
+order); the orchestrator stays the goal-owning hub. **Phases 1 (clickable edge ordering) + 2 (goal-locked proactive
+mid-run re-planning) are SHIPPED** (see Done above). Remaining: **(3) lateral peer handoffs** — a non-orchestrator role
+(worker/manager), mid-task, reaches SIDEWAYS to another connected team which does the work and hands it back (e.g. a web
+dev asks the research team for UI ideas; marketing↔compliance). This is a CYCLE + a non-parent-child edge the routing
+core currently forbids (the cycle-break exists to prevent exactly this). Needs: TWO EDGE TYPES (solid = reporting/tree;
+dashed = flow/handoff/lateral — don't overload one line), a handoff runtime (a role pausing to invoke a peer and consume
+its output), loop-termination bounds (A↔B can't ping-pong forever), and the orchestrator kept in the loop. **Phase 2's
+`replan` node is the reusable foundation** (a node rewriting remaining work from what came back) — Phase 3 generalizes
+WHO can trigger it and WHICH edges carry it. Also folds in the deferred **two-tier-review v2 escalation** (a manager kicks
+a mis-scoped task back to be re-broken-up — reactive, vs Phase 2's proactive). Re-architecture — do deliberately. Detail
+→ memory `ai-manager-workflow-graph`.
 
 ## 2. Stage 3 — resume usable + memory-approval gate (HITL)  ⏸ ON HOLD (user — until needed)
 Runtime already supports resume/interrupts; not reachable from the app. Wire `resumeRun` to IPC,
