@@ -77,11 +77,31 @@ The single prioritized to-do. **1 = do next / most important; higher = later.**
 
 ---
 
-## 1. Stage 3 — resume usable + memory-approval gate (HITL)  ⏸ ON HOLD (user — until needed)
+## 1. Two-tier review — domain managers as QA specialists  ← NEXT active design (brainstorm + spec first)
+Make managers earn their keep at RUNTIME. **Today:** routing is hierarchical (a manager sub-assigns tasks to its
+children via `routeTasks`), but review/test/reflect are CENTRALIZED on the orchestrator — `reviewNode` runs one
+pass as `state.orchestratorId` over all tasks, `repairNode` re-runs the worker with the orchestrator's feedback,
+`reflectNode` writes memory for WORKERS only — and `spawnTeamPrompt` biases teams flat. Net: the orchestrator does
+all the checking and manager nodes have no teeth. **Idea (two changes):** (a) dynamic-spawn creates MORE domain
+managers — cluster several related roles (e.g. 3 software + 3 web) under a QA-capable specialist manager [small
+prompt/role tweak in `spawnTeamPrompt` + manager role template]; (b) make managers actually REVIEW + TEST + give
+feedback + REFLECT for their subtree [engine change: `reviewNode`/`repairNode`/`reflectNode` become per-manager].
+**Two-tier labor split:** managers = DEPTH (deep domain review + testing; specialists catch domain bugs and hand
+WELL-WRITTEN, LESS-BUGGY code UP; the manager owns testing so workers just write code; managers COMPOUND QA
+expertise via reflect→`lessonsDigest` and use recorded lessons for better feedback). Orchestrator = BREADTH (the
+broader review — mainly compares the integrated result against the PLAN + GOAL; lighter now that managers pre-filter
+domain bugs). **Watch:** each manager = another review pass (latency/tokens); a manager with 1 worker is overhead →
+keep the spawn threshold at "a cluster of several roles"; the manager-tester must ACTUALLY run the app/tests
+(render-verify lesson → acting mode + Bash). **v2 (defer):** manager ESCALATES a mis-scoped task back to the
+orchestrator to re-break-up (loops back to plan — control-flow change). Pairs with dynamic-spawn (creates the
+managers) + compounding-memory (they get better over time). Meatier than dynamic-spawn (touches the core run loop)
+→ own brainstorm + spec. Priority vs Stage 3 is adjustable.
+
+## 2. Stage 3 — resume usable + memory-approval gate (HITL)  ⏸ ON HOLD (user — until needed)
 Runtime already supports resume/interrupts; not reachable from the app. Wire `resumeRun` to IPC,
 add a resume-on-launch banner, and `reflectNode` interrupt for a `requireMemoryApproval` setting.
 
-## 2. Local semantic-memory RAG  (lowest)
+## 3. Local semantic-memory RAG  (lowest)
 sqlite-vec/LanceDB once an agent's memory outgrows a single prompt. (Ephemeral memory-seeded spawn
 agents were folded into the now-shipped dynamic-spawn design.) The compounding-team foundation
 (a + b1 + b2a + b2b) exists.
