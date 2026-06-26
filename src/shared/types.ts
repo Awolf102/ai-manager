@@ -61,6 +61,8 @@ export interface GraphEdge {
   target: string
   /** 1..N execution sequence; consumed only on edges whose source is the run's orchestrator */
   order?: number
+  /** edge role: absent/'report' = the reporting tree (routing/order/review); 'handoff' = a lateral consult line (Phase 3) */
+  kind?: 'report' | 'handoff'
 }
 
 export interface ProjectMeta {
@@ -95,6 +97,8 @@ export interface ProjectSettings {
   skillInstallThreshold: number
   /** max proactive mid-run re-plans the orchestrator may perform (0 = off) */
   maxReplans: number
+  /** max lateral peer consults a single agent-run may make (0 = off) */
+  maxHandoffs: number
 }
 
 export const DEFAULT_SETTINGS: ProjectSettings = {
@@ -105,7 +109,8 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   adaptiveEffort: true,
   autoSyncTeam: false,
   skillInstallThreshold: 100000,
-  maxReplans: 0
+  maxReplans: 0,
+  maxHandoffs: 0
 }
 
 /** A user-attached reference file (image/doc) for the project, available to every agent. */
@@ -234,6 +239,7 @@ export type OrchestrationEvent =
   | { runId: string; type: 'assignments'; nodeId: string; assignments: Assignment[] }
   | { runId: string; type: 'verdict'; attempt: number; tasks: TaskVerdict[] }
   | { runId: string; type: 'replan'; attempt: number; reason: string; tasks: RunTask[] }
+  | { runId: string; type: 'handoff'; askerId: string; peerId: string; ask: string }
   | {
       runId: string
       type: 'reflection'
@@ -267,6 +273,7 @@ export interface RunRecord {
   reviews: { attempt: number; tasks: TaskVerdict[] }[]
   reflections: { nodeId: string; win: string; loss: string; lessons: string[] }[]
   replans?: { attempt: number; reason: string }[]
+  handoffs?: { askerId: string; peerId: string; ask: string }[]
   final: string
   error?: string
 }
@@ -376,6 +383,8 @@ export interface RunState {
   replanStageCursor: number
   /** one entry per performed re-plan, for the Run view + History */
   replans?: { attempt: number; reason: string }[]
+  /** lateral peer consults performed this run, for the Run view + History */
+  handoffs?: { askerId: string; peerId: string; ask: string }[]
   final: string
   error?: string
   /** set when the run paused for human input (Stage 3) */
