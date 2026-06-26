@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Clock, CloudDownload, CloudUpload, Download, FolderOpen, Plus, Settings as SettingsIcon, Upload, Users } from 'lucide-react'
+import { Clock, CloudDownload, CloudUpload, Download, FolderOpen, Paperclip, Plus, Settings as SettingsIcon, Upload, Users } from 'lucide-react'
 import { useStore } from './store'
 import OrgChart from './canvas/OrgChart'
 import AgentConfigPanel from './panels/AgentConfigPanel'
@@ -9,6 +9,7 @@ import GoalBar from './run/GoalBar'
 import RunView from './run/RunView'
 import HistoryView from './run/HistoryView'
 import SettingsModal from './SettingsModal'
+import ContextModal from './ContextModal'
 import { AGENT_KINDS } from '../shared/types'
 import type { AgentKind, AuthStatus, ProjectGraph, ProjectMeta } from '../shared/types'
 
@@ -26,6 +27,8 @@ export default function App() {
   const applyOrchestration = useStore((s) => s.applyOrchestration)
   const [showAdd, setShowAdd] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showContext, setShowContext] = useState(false)
+  const [dragDepth, setDragDepth] = useState(0)
 
   const [auth, setAuth] = useState<AuthStatus | null>(null)
   const [authChecking, setAuthChecking] = useState(true)
@@ -60,8 +63,36 @@ export default function App() {
 
   const showDock = terminals.length > 0 || showRunView || showHistory
 
+  const hasFiles = (e: React.DragEvent): boolean => Array.from(e.dataTransfer.types).includes('Files')
+  const onDragEnter = (e: React.DragEvent): void => {
+    if (hasFiles(e)) {
+      e.preventDefault()
+      setDragDepth((d) => d + 1)
+    }
+  }
+  const onDragOver = (e: React.DragEvent): void => {
+    if (hasFiles(e)) e.preventDefault()
+  }
+  const onDragLeave = (): void => setDragDepth((d) => Math.max(0, d - 1))
+  const onDrop = async (e: React.DragEvent): Promise<void> => {
+    e.preventDefault()
+    setDragDepth(0)
+    const paths = Array.from(e.dataTransfer.files)
+      .map((f) => window.api.getPathForFile(f))
+      .filter((p) => p) // drop non-file items (text/url) whose path is ''
+    if (paths.length === 0) return
+    setGraph(await window.api.addContext(paths))
+  }
+
   return (
-    <div className="app">
+    <div
+      className="app"
+      onDragEnter={onDragEnter}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={(e) => void onDrop(e)}
+    >
+      {dragDepth > 0 && <div className="ctx-drop-overlay">Drop files to add as project context</div>}
       <div className="topbar">
         <span className="brand">AI Manager</span>
         <span className="project">{graph.project.name}</span>
@@ -128,6 +159,14 @@ export default function App() {
           }}
         >
           <CloudDownload size={14} />
+        </button>
+        <button
+          className="btn ctx-btn"
+          title="Project context — files & images for the team"
+          onClick={() => setShowContext(true)}
+        >
+          <Paperclip size={14} />
+          {(graph.context?.length ?? 0) > 0 && <span className="ctx-badge">{graph.context!.length}</span>}
         </button>
         <button className="btn" title="Settings" onClick={() => setShowSettings(true)}>
           <SettingsIcon size={14} />
@@ -223,6 +262,7 @@ export default function App() {
 
       {showAdd && <AddAgentModal onClose={() => setShowAdd(false)} onCreated={setGraph} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      {showContext && <ContextModal onClose={() => setShowContext(false)} />}
       {authBanner}
     </div>
   )
