@@ -34,14 +34,15 @@ const h = vi.hoisted(() => {
       w2: mk('w2', 'worker')
     } as Record<string, ReturnType<typeof mk>>,
     children: { o: ['w1', 'w2'], w1: [], w2: [] } as Record<string, string[]>,
-    edges: [] as { source: string; target: string; order?: number }[],
+    edges: [] as { source: string; target: string; order?: number; kind?: string }[],
     settings: {
       reviewMode: 'once',
       maxRepairAttempts: 1,
       reflection: true,
       autonomy: 'auto',
       adaptiveEffort: true,
-      maxReplans: 0
+      maxReplans: 0,
+      maxHandoffs: 0
     },
     memory: {} as Record<string, string>,
     reflections: [] as { id: string }[]
@@ -56,6 +57,8 @@ vi.mock('./project-store', () => ({
     return pid ? h.agents[pid] : null
   },
   getEdges: () => h.edges,
+  handoffPeersOf: (id: string) =>
+    h.edges.filter((e) => e.source === id && e.kind === 'handoff').map((e) => h.agents[e.target]),
   rolesOf: async (ids: string[]) =>
     ids.map((id) => ({ id, name: h.agents[id].name, kind: h.agents[id].kind, role: `role ${id}` })),
   readMemory: async (id: string) => h.memory[id] ?? '',
@@ -762,6 +765,226 @@ describe('top-level edge ordering', () => {
     expect(out.status).toBe('completed')
     expect(out.tasks.t1.dependsOn).toBeUndefined()
     expect(out.tasks.t2.dependsOn).toBeUndefined()
+  })
+})
+
+describe('orchestrator node graph — peer handoffs (worker site)', () => {
+  // one task t1 -> w1; w1 may consult w2 via a handoff edge.
+  function fake(order: string[], capture: { ask?: string }, w2Answer: string) {
+    const runAgent: AgentRunner = async (opts) => {
+      const p = opts.prompt
+      if (p.includes('Produce a concise, ordered list'))
+        return { text: '```json\n{"tasks":[{"id":"t1","title":"Build UI","description":"build the ui"}]}\n```' }
+      if (p.includes('You route planned tasks'))
+        return { text: '```json\n{"assignments":[{"taskId":"t1","childId":"w1","effort":"high","reason":"r"}]}\n```' }
+      if (p.includes('responded to your request')) {
+        order.push('w1-resume')
+        return { text: 'Built the UI using the teal palette', sessionId: 's-w1' }
+      }
+      if (p.includes('You have been assigned')) {
+        order.push('w1-task')
+        return p.includes('You may CONSULT')
+          ? { text: '```handoff\n{"to":"W2","ask":"expressive colorful UI ideas"}\n```', sessionId: 's-w1' }
+          : { text: 'Built the UI (no consult)', sessionId: 's-w1' }
+      }
+      if (p.includes('asked for your help')) {
+        order.push('w2-consult')
+        capture.ask = p
+        return { text: w2Answer }
+      }
+      if (p.includes('Judge each task'))
+        return { text: '```json\n{"tasks":[{"taskId":"t1","verdict":"pass","feedback":""}]}\n```' }
+      if (p.includes('Reflect on the work')) return { text: '```json\n{"win":"","loss":"","lessons":[]}\n```' }
+      if (p.includes('Write a clear final report')) return { text: 'DONE' }
+      return { text: '' }
+    }
+    return runAgent
+  }
+
+  function run(runAgent: AgentRunner, events: unknown[]) {
+    const e = eng(runAgent)
+    ;(e as { emit: (ev: unknown) => void }).emit = (ev) => events.push(ev)
+    const store = fakeStore()
+    return runGraph(
+      buildOrchestratorGraph(e),
+      seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' }),
+      store,
+      makeIO(e.abort.signal, store)
+    )
+  }
+
+  it('a worker consults a connected peer and continues with the answer', async () => {
+    h.edges = [{ source: 'w1', target: 'w2', kind: 'handoff' }]
+    h.settings.maxHandoffs = 1
+    try {
+      const order: string[] = []
+      const capture: { ask?: string } = {}
+      const events: unknown[] = []
+      const out = await run(fake(order, capture, 'Use a teal/amber palette'), events)
+      expect(out.status).toBe('completed')
+      expect(order).toEqual(['w1-task', 'w2-consult', 'w1-resume']) // consult happened mid-task
+      expect(capture.ask).toContain('expressive colorful UI ideas') // ask threaded to the peer
+      expect(out.tasks.t1.output).toBe('Built the UI using the teal palette') // resumed output
+      const handoffs = (events as { type: string; askerId: string; peerId: string; ask: string }[]).filter(
+        (ev) => ev.type === 'handoff'
+      )
+      expect(handoffs).toEqual([{ runId: 'run1', type: 'handoff', askerId: 'w1', peerId: 'w2', ask: 'expressive colorful UI ideas' }])
+    } finally {
+      h.edges = []
+      h.settings.maxHandoffs = 0
+    }
+  })
+
+  it('off control: maxHandoffs=0 → no consult, byte-for-byte', async () => {
+    h.edges = [{ source: 'w1', target: 'w2', kind: 'handoff' }]
+    h.settings.maxHandoffs = 0
+    try {
+      const order: string[] = []
+      const events: unknown[] = []
+      const out = await run(fake(order, {}, 'unused'), events)
+      expect(out.status).toBe('completed')
+      expect(order).toEqual(['w1-task']) // worker ran once, not augmented, no consult
+      expect(out.tasks.t1.output).toBe('Built the UI (no consult)')
+      expect((events as { type: string }[]).some((ev) => ev.type === 'handoff')).toBe(false)
+    } finally {
+      h.edges = []
+      h.settings.maxHandoffs = 0
+    }
+  })
+
+  it('caps consults at maxHandoffs (asker keeps asking)', async () => {
+    h.edges = [{ source: 'w1', target: 'w2', kind: 'handoff' }]
+    h.settings.maxHandoffs = 1
+    try {
+      const order: string[] = []
+      const events: unknown[] = []
+      // w2's answer is itself a handoff block; the resumed worker also re-asks — but the cap is 1.
+      const out = await run(fake(order, {}, '```handoff\n{"to":"W2","ask":"again"}\n```'), events)
+      expect(out.status).toBe('completed')
+      expect(order.filter((o) => o === 'w2-consult')).toHaveLength(1) // exactly one consult
+      const handoffs = (events as { type: string }[]).filter((ev) => ev.type === 'handoff')
+      expect(handoffs).toHaveLength(1)
+    } finally {
+      h.edges = []
+      h.settings.maxHandoffs = 0
+    }
+  })
+
+  it('peer answer is terminal: a handoff block in the peer reply is not re-dispatched', async () => {
+    h.edges = [{ source: 'w1', target: 'w2', kind: 'handoff' }]
+    h.settings.maxHandoffs = 3 // budget to spare; terminal-peer is what prevents a second consult
+    try {
+      const order: string[] = []
+      const events: unknown[] = []
+      // w2 replies with a handoff-looking block; the worker's RESUME then finishes normally.
+      const out = await run(fake(order, {}, '```handoff\n{"to":"W2","ask":"chain"}\n```'), events)
+      expect(out.status).toBe('completed')
+      expect(order).toEqual(['w1-task', 'w2-consult', 'w1-resume']) // peer reply NOT re-parsed
+      expect((events as { type: string }[]).filter((ev) => ev.type === 'handoff')).toHaveLength(1)
+    } finally {
+      h.edges = []
+      h.settings.maxHandoffs = 0
+    }
+  })
+
+  it('threads the asker\'s in-run sessionId into the resume call (not a stale on-disk session)', async () => {
+    h.edges = [{ source: 'w1', target: 'w2', kind: 'handoff' }]
+    h.settings.maxHandoffs = 1
+    try {
+      let capturedResumeSessionId: string | undefined = undefined
+      const runAgent: AgentRunner = async (opts) => {
+        const p = opts.prompt
+        if (p.includes('Produce a concise, ordered list'))
+          return { text: '```json\n{"tasks":[{"id":"t1","title":"Build UI","description":"build the ui"}]}\n```' }
+        if (p.includes('You route planned tasks'))
+          return { text: '```json\n{"assignments":[{"taskId":"t1","childId":"w1","effort":"high","reason":"r"}]}\n```' }
+        if (p.includes('You have been assigned') && p.includes('You may CONSULT')) {
+          // asker's first call returns a handoff request with a known sessionId
+          return { text: '```handoff\n{"to":"W2","ask":"palette?"}\n```', sessionId: 's-w1-1' }
+        }
+        if (p.includes('asked for your help'))
+          return { text: 'Use teal.' }
+        if (p.includes('responded to your request')) {
+          // capture the resumeSessionId that was threaded into this call
+          capturedResumeSessionId = opts.resumeSessionId
+          return { text: 'Built UI with teal.' }
+        }
+        if (p.includes('Judge each task'))
+          return { text: '```json\n{"tasks":[{"taskId":"t1","verdict":"pass","feedback":""}]}\n```' }
+        if (p.includes('Reflect on the work')) return { text: '```json\n{"win":"","loss":"","lessons":[]}\n```' }
+        if (p.includes('Write a clear final report')) return { text: 'DONE' }
+        return { text: '' }
+      }
+      const events: unknown[] = []
+      const out = await run(runAgent, events)
+      expect(out.status).toBe('completed')
+      // The resume call must have received the asker's in-run session from the first call
+      expect(capturedResumeSessionId).toBe('s-w1-1')
+    } finally {
+      h.edges = []
+      h.settings.maxHandoffs = 0
+    }
+  })
+})
+
+describe('orchestrator node graph — peer handoffs (review site)', () => {
+  it('a manager consults a peer during domain review, then returns its verdict', async () => {
+    // two-tier: o -> m -> w1 ; m may consult w2 via a handoff edge.
+    h.children = { o: ['m'], m: ['w1'], w1: [], w2: [] }
+    h.edges = [{ source: 'm', target: 'w2', kind: 'handoff' }]
+    h.settings.maxHandoffs = 1
+    try {
+      const order: string[] = []
+      const events: unknown[] = []
+      const runAgent: AgentRunner = async (opts) => {
+        const p = opts.prompt
+        if (p.includes('Produce a concise, ordered list'))
+          return { text: '```json\n{"tasks":[{"id":"t1","title":"T1","description":"d"}]}\n```' }
+        if (p.includes('You route planned tasks')) {
+          const childIds = [...p.matchAll(/- id: (\S+)\n\s+name:/g)].map((mm) => mm[1])
+          return { text: '```json\n{"assignments":[{"taskId":"t1","childId":"' + (childIds[0] ?? 'w1') + '","effort":"high","reason":"r"}]}\n```' }
+        }
+        if (p.includes('You have been assigned')) return { text: 'did t1', sessionId: 's-w1' }
+        if (p.includes('responded to your request')) {
+          order.push('m-resume')
+          return { text: '```json\n{"tasks":[{"taskId":"t1","verdict":"pass","feedback":""}]}\n```' }
+        }
+        if (p.includes('Judge each task')) {
+          order.push('m-review')
+          return { text: '```handoff\n{"to":"W2","ask":"is this compliant?"}\n```' }
+        }
+        if (p.includes('asked for your help')) {
+          order.push('w2-consult')
+          return { text: 'Yes, compliant.' }
+        }
+        if (p.includes('final INTEGRATION review'))
+          return { text: '```json\n{"tasks":[{"taskId":"t1","verdict":"pass","feedback":""}]}\n```' }
+        if (p.includes('Reflect on your REVIEW work')) return { text: '```json\n{"win":"","loss":"","lessons":[]}\n```' }
+        if (p.includes('Reflect on the work')) return { text: '```json\n{"win":"","loss":"","lessons":[]}\n```' }
+        if (p.includes('Write a clear final report')) return { text: 'DONE' }
+        return { text: '' }
+      }
+      const e = eng(runAgent)
+      ;(e as { emit: (ev: unknown) => void }).emit = (ev) => events.push(ev)
+      const store = fakeStore()
+      const out = await runGraph(
+        buildOrchestratorGraph(e),
+        seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' }),
+        store,
+        makeIO(e.abort.signal, store)
+      )
+      expect(out.status).toBe('completed')
+      expect(order).toEqual(['m-review', 'w2-consult', 'm-resume']) // consult mid-review, then verdict
+      expect(out.tasks.t1.status).toBe('passed') // verdict still parsed after the consult
+      const handoffs = (events as { type: string; askerId: string; peerId: string }[]).filter(
+        (ev) => ev.type === 'handoff'
+      )
+      expect(handoffs).toEqual([{ runId: 'run1', type: 'handoff', askerId: 'm', peerId: 'w2', ask: 'is this compliant?' }])
+    } finally {
+      h.children = { o: ['w1', 'w2'], w1: [], w2: [] }
+      h.edges = []
+      h.settings.maxHandoffs = 0
+    }
   })
 })
 

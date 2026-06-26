@@ -99,6 +99,23 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="field">
+          <label>Max peer handoffs per step (0 = off)</label>
+          <input
+            type="number"
+            min={0}
+            max={3}
+            value={s.maxHandoffs}
+            onChange={(e) =>
+              void update({ maxHandoffs: Math.max(0, Math.min(3, Number(e.target.value) || 0)) })
+            }
+          />
+          <div className="radio-desc" style={{ marginTop: 4 }}>
+            When you draw a handoff edge (select an edge → Make handoff), an agent may consult that
+            connected teammate mid-step and continue with their answer. The reporting tree is unaffected.
+          </div>
+        </div>
+
+        <div className="field">
           <label className="check">
             <input
               type="checkbox"

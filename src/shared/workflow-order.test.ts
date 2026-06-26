@@ -122,3 +122,33 @@ describe('deriveStages', () => {
     expect(deriveStages(edges, 'o', tasks)).toEqual({ t1: 1, t2: 0 })
   })
 })
+
+describe('handoff edges are ignored by ordering', () => {
+  it('deriveOrderDeps ignores a handoff edge from the orchestrator', () => {
+    const edges = [
+      { source: 'o', target: 'w1', order: 1 },
+      { source: 'o', target: 'w2', order: 2 },
+      { source: 'o', target: 'x', order: 3, kind: 'handoff' as const } // must NOT become an ordered team
+    ]
+    const tasks = [
+      { id: 't1', ownerId: 'w1' },
+      { id: 't2', ownerId: 'w2' },
+      { id: 'tx', ownerId: 'x' }
+    ]
+    const deps = deriveOrderDeps(edges, 'o', tasks)
+    expect(deps.tx).toBeUndefined() // x is reached only by a handoff edge → unordered
+    expect(deps.t2).toEqual(['t1'])
+  })
+
+  it('deriveStages gives a handoff-only target stage 0', () => {
+    const edges = [
+      { source: 'o', target: 'w1', order: 1 },
+      { source: 'o', target: 'x', order: 2, kind: 'handoff' as const }
+    ]
+    const tasks = [
+      { id: 't1', ownerId: 'w1' },
+      { id: 'tx', ownerId: 'x' }
+    ]
+    expect(deriveStages(edges, 'o', tasks)).toEqual({ t1: 1, tx: 0 })
+  })
+})

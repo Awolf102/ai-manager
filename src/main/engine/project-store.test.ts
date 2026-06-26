@@ -27,6 +27,8 @@ import {
   updateSettings,
   applySpawnedTeam,
   parentOf,
+  childrenOf,
+  handoffPeersOf,
   getContextFiles,
   addContextFiles,
   updateContextFile,
@@ -173,6 +175,29 @@ describe('parentOf', () => {
     expect(parentOf(w.id)?.id).toBe(m.id)
     expect(parentOf(m.id)?.id).toBe(o.id)
     expect(parentOf(o.id)).toBeNull()
+  })
+})
+
+describe('handoff edges and the reporting tree', () => {
+  it('childrenOf/parentOf ignore handoff edges; handoffPeersOf returns handoff targets', async () => {
+    await openProject(await tmpProject())
+    await createAgent({ name: 'Lead', kind: 'manager' })
+    await createAgent({ name: 'Dev', kind: 'worker' })
+    const graph = await createAgent({ name: 'Research', kind: 'worker' })
+    const lead = graph.nodes.find((n) => n.name === 'Lead')!
+    const dev = graph.nodes.find((n) => n.name === 'Dev')!
+    const research = graph.nodes.find((n) => n.name === 'Research')!
+    await setEdges([
+      { id: 'e1', source: lead.id, target: dev.id }, // reporting (no kind = report)
+      { id: 'e2', source: dev.id, target: research.id, kind: 'handoff' } // lateral
+    ])
+
+    expect(childrenOf(lead.id).map((n) => n.id)).toEqual([dev.id]) // dev only
+    expect(childrenOf(dev.id)).toEqual([]) // research is a handoff peer, NOT a child
+    expect(parentOf(research.id)).toBeNull() // handoff edge is not a reporting parent
+    expect(parentOf(dev.id)?.id).toBe(lead.id)
+    expect(handoffPeersOf(dev.id).map((n) => n.id)).toEqual([research.id])
+    expect(handoffPeersOf(lead.id)).toEqual([])
   })
 })
 
