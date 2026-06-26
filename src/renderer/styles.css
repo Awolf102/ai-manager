@@ -1324,3 +1324,22 @@ button {
   font-size: 18px;
   font-weight: 600;
 }
+
+/* ---- workflow edge ordering ---- */
+.react-flow__edge.edge-ordered .react-flow__edge-path {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+.react-flow__edge.edge-ordered .react-flow__edge-text {
+  fill: var(--text);
+  font-weight: 700;
+  font-size: 11px;
+}
+.react-flow__edge.edge-ordered .react-flow__edge-textbg {
+  fill: var(--panel-2);
+}
+.order-toggle.active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--text);
+}
