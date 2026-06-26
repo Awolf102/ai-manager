@@ -63,7 +63,8 @@ export function skillOptionsFor(
   const known = new Set(discovered.flatMap((p) => p.skills.map((s) => s.id)))
   const valid = (assigned ?? []).filter((s) => known.has(s))
   if (valid.length === 0) return null
-  const pluginIds = [...new Set(valid.map((s) => s.slice(0, s.indexOf(':'))))]
+  // valid ids are always '<plugin>:<skill>' (filtered via `known`); guard anyway.
+  const pluginIds = [...new Set(valid.map((s) => (s.includes(':') ? s.slice(0, s.indexOf(':')) : s)))]
   return {
     plugins: pluginIds
       .map((id) => pathByPlugin.get(id))
