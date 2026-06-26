@@ -136,6 +136,19 @@ function RunDetail({ record }: { record: RunRecord }) {
         </div>
       )}
 
+      {(record.handoffs ?? []).length > 0 && (
+        <div className="hist-section">
+          <h4>Handoffs ({record.handoffs!.length})</h4>
+          <ul>
+            {record.handoffs!.map((hnd, i) => (
+              <li key={i}>
+                <b>{nameOf(hnd.askerId)} → {nameOf(hnd.peerId)}</b>: {hnd.ask}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="hist-section">
         <h4>Agents</h4>
         {record.steps.map((s) => (

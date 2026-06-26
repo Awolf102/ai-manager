@@ -118,6 +118,11 @@ export default function RunView() {
             ⚡ Re-planned (#{r.attempt}): {r.reason}
           </div>
         ))}
+        {run.handoffs.map((hnd, i) => (
+          <div key={i} className="run-handoff" title={hnd.ask}>
+            ↪ Handoff: {nameOf(hnd.askerId)} → {nameOf(hnd.peerId)}: {hnd.ask}
+          </div>
+        ))}
         {chain.map(({ id, depth }) => {
           const status = run.nodeStatus[id] ?? 'idle'
           const tasks = run.nodeTasks[id]

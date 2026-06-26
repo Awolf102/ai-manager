@@ -888,6 +888,14 @@ button {
   margin-bottom: 4px;
 }
 
+.run-handoff {
+  padding: 6px 12px;
+  font-size: 11px;
+  color: #d6a44c;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
 .run-verdict {
   font-size: 12px;
   font-weight: 700;
