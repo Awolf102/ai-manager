@@ -129,6 +129,10 @@ function cannedAgent() {
       rec('repair')
       return { text: `repaired ${id}`, sessionId: 's-' + id }
     }
+    if (p.includes('Reflect on your REVIEW work')) {
+      rec('qaReflect')
+      return { text: '```json\n{"win":"caught a bug","loss":"","lessons":[{"text":"run the app","scope":"portable"}]}\n```' }
+    }
     if (p.includes('Reflect on the work')) {
       rec('reflect')
       return {
@@ -616,5 +620,40 @@ describe('two-tier review', () => {
     expect(calls.some((c) => c.kind === 'integration')).toBe(false) // no managers → no integration pass
     expect(out.reviews.length).toBe(2) // two domain rounds only
     expect(out.tasks.t2.attempts).toBe(2)
+  })
+
+  it('managers and the orchestrator reflect on their QA work; workers reflect on implementation', async () => {
+    h.children = { o: ['m'], m: ['w1', 'w2'], w1: [], w2: [] }
+    const { runAgent, calls } = cannedAgent()
+    const e = eng(runAgent)
+    const store = fakeStore()
+    const out = await runGraph(
+      buildOrchestratorGraph(e),
+      seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' }),
+      store,
+      makeIO(e.abort.signal, store)
+    )
+    expect(out.status).toBe('completed')
+    // workers + manager + orchestrator all reflected
+    expect(out.reflections.map((r) => r.nodeId).sort()).toEqual(['m', 'o', 'w1', 'w2'])
+    // the manager + orchestrator used the QA reflect prompt; workers used the implementation reflect
+    expect(calls.filter((c) => c.kind === 'qaReflect').map((c) => c.agentId).sort()).toEqual(['m', 'o'])
+    expect(calls.filter((c) => c.kind === 'reflect').map((c) => c.agentId).sort()).toEqual(['w1', 'w2'])
+  })
+
+  it('flat team: only workers reflect (no QA reflection)', async () => {
+    h.children = { o: ['w1', 'w2'], w1: [], w2: [] }
+    const { runAgent, calls } = cannedAgent()
+    const e = eng(runAgent)
+    const store = fakeStore()
+    const out = await runGraph(
+      buildOrchestratorGraph(e),
+      seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' }),
+      store,
+      makeIO(e.abort.signal, store)
+    )
+    expect(out.status).toBe('completed')
+    expect(out.reflections.map((r) => r.nodeId).sort()).toEqual(['w1', 'w2'])
+    expect(calls.some((c) => c.kind === 'qaReflect')).toBe(false)
   })
 })

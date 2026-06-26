@@ -439,6 +439,30 @@ async function reflectNode(state: RunState, _io: NodeIO, eng: Eng): Promise<Node
     eng.emit({ runId: eng.runId, type: 'reflection', nodeId: wid, ...refl })
     setStatus(eng, steps, wid, 'done')
   })
+
+  // reviewers (managers + the orchestrator's integration pass) reflect on their QA work
+  await mapCapped(reviewerIdsOf(state), MAX_PARALLEL, async (rid) => {
+    if (eng.abort.signal.aborted) return
+    const reviewed =
+      rid === state.orchestratorId
+        ? owned // the orchestrator integration-reviewed the whole
+        : owned.filter((t) => reviewerOf(t.ownerId!, state.orchestratorId) === rid)
+    if (reviewed.length === 0) return
+    setStatus(eng, steps, rid, 'reflecting', reviewed.map((t) => t.task.title))
+    const items = reviewed.map((t) => ({
+      title: t.task.title,
+      output: t.output,
+      review: t.verdict
+        ? `${t.verdict.verdict.toUpperCase()}${t.verdict.feedback ? ' — ' + t.verdict.feedback : ''}`
+        : 'n/a'
+    }))
+    const refl = await reflectStep(eng, state.goal, rid, items, qaReflectPrompt)
+    if (!refl) return
+    await applyReflection(rid, { ...refl, label: state.goal.slice(0, 80) })
+    reflections.push({ nodeId: rid, ...refl })
+    eng.emit({ runId: eng.runId, type: 'reflection', nodeId: rid, ...refl })
+    setStatus(eng, steps, rid, 'done')
+  })
   return { patch: { steps, reflections, phase: 'synthesizing' }, goto: 'synthesize' }
 }
 
@@ -569,14 +593,15 @@ async function reflectStep(
   eng: Eng,
   goal: string,
   workerId: string,
-  items: { title: string; output: string; review: string }[]
+  items: { title: string; output: string; review: string }[],
+  buildPrompt: (goal: string, items: { title: string; output: string; review: string }[]) => string = reflectPrompt
 ): Promise<{ win: string; loss: string; lessons: string[] } | null> {
   if (eng.abort.signal.aborted) return null
   try {
     const parsed = await runStructured(
       eng,
       workerId,
-      reflectPrompt(goal, items),
+      buildPrompt(goal, items),
       (v): v is Record<string, unknown> => typeof v === 'object' && v !== null,
       { permissionMode: 'default', disallowedTools: THINK_DISALLOW }
     )
@@ -988,6 +1013,34 @@ Capture, honestly and concisely:
 - lessons: 1-4 short, reusable rules for your future self — especially how to avoid repeating any mistake the reviewer flagged. For EACH lesson set a "scope":
     - "portable": general software-engineering wisdom that would help on ANY project (testing, verification, debugging, review habits).
     - "project": a fact or convention specific to THIS codebase or goal (file paths, commands, config locations, domain quirks) that would NOT transfer elsewhere.
+  When unsure, use "project".
+
+Reply with ONLY this JSON code block (no other text):
+\`\`\`json
+{ "win": "...", "loss": "...", "lessons": [ { "text": "...", "scope": "portable" } ] }
+\`\`\``
+}
+
+function qaReflectPrompt(goal: string, items: { title: string; output: string; review: string }[]): string {
+  const list = items
+    .map(
+      (it) =>
+        `- task: ${it.title}\n  result: ${it.output.replace(/\s+/g, ' ').slice(0, 800)}\n  your verdict: ${it.review}`
+    )
+    .join('\n')
+  return `Reflect on your REVIEW work this run so your future reviews get sharper. Do NOT change any files — just reflect.
+
+OVERALL GOAL: ${goal}
+
+THE WORK YOU REVIEWED, AND YOUR VERDICT:
+${list}
+
+Capture, honestly and concisely:
+- win: the most useful thing your review caught or did well.
+- loss: the main thing you missed or could check better next time (empty string if none).
+- lessons: 1-4 short, reusable QA rules for your future self — what to TEST or VERIFY in your domain, common failure modes to watch for, what "good" looks like. For EACH lesson set a "scope":
+    - "portable": general QA/testing/review wisdom that helps on ANY project.
+    - "project": a fact specific to THIS codebase or goal (what to check here, where things live).
   When unsure, use "project".
 
 Reply with ONLY this JSON code block (no other text):
