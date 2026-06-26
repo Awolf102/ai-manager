@@ -636,7 +636,8 @@ async function reviewStep(
     orchestratorId,
     reviewPrompt(goal, items),
     (v): v is { tasks: unknown[] } => Array.isArray((v as { tasks?: unknown })?.tasks),
-    { permissionMode: actingMode, disallowedTools: EDIT_TOOLS }
+    { permissionMode: actingMode, disallowedTools: EDIT_TOOLS },
+    consultFor(orchestratorId, goal, actingMode)
   )
   const byId = new Map<string, { verdict: 'pass' | 'fail'; feedback: string }>()
   for (const t of parsed.tasks as Record<string, unknown>[]) {
@@ -664,7 +665,8 @@ async function integrationReviewStep(
     orchestratorId,
     integrationReviewPrompt(goal, plan, items),
     (v): v is { tasks: unknown[] } => Array.isArray((v as { tasks?: unknown })?.tasks),
-    { permissionMode: actingMode, disallowedTools: EDIT_TOOLS }
+    { permissionMode: actingMode, disallowedTools: EDIT_TOOLS },
+    consultFor(orchestratorId, goal, actingMode)
   )
   const byId = new Map<string, { verdict: 'pass' | 'fail'; feedback: string }>()
   for (const t of parsed.tasks as Record<string, unknown>[]) {
@@ -841,13 +843,14 @@ async function runStructured<T>(
   agentId: string,
   basePrompt: string,
   validate: (v: unknown) => v is T,
-  perm: { permissionMode: PermissionMode; disallowedTools?: string[] }
+  perm: { permissionMode: PermissionMode; disallowedTools?: string[] },
+  consult: Consult | null = null
 ): Promise<T> {
   let lastText = ''
   for (let attempt = 0; attempt < 2; attempt++) {
     if (eng.abort.signal.aborted) throw new Error('cancelled')
     const prompt = attempt === 0 ? basePrompt : basePrompt + STRICT_REMINDER
-    const { text } = await eng.runAgent({
+    const base: StreamAgentOptions = {
       wc: eng.wc,
       agentId,
       prompt,
@@ -856,7 +859,8 @@ async function runStructured<T>(
       permissionMode: perm.permissionMode,
       disallowedTools: perm.disallowedTools,
       abort: eng.abort
-    })
+    }
+    const { text } = attempt === 0 ? await runWithHandoffs(eng, base, consult) : await eng.runAgent(base)
     lastText = text
     const parsed = parseJsonBlock(text)
     if (parsed && validate(parsed)) return parsed

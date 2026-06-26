@@ -888,6 +888,67 @@ describe('orchestrator node graph — peer handoffs (worker site)', () => {
   })
 })
 
+describe('orchestrator node graph — peer handoffs (review site)', () => {
+  it('a manager consults a peer during domain review, then returns its verdict', async () => {
+    // two-tier: o -> m -> w1 ; m may consult w2 via a handoff edge.
+    h.children = { o: ['m'], m: ['w1'], w1: [], w2: [] }
+    h.edges = [{ source: 'm', target: 'w2', kind: 'handoff' }]
+    h.settings.maxHandoffs = 1
+    try {
+      const order: string[] = []
+      const events: unknown[] = []
+      const runAgent: AgentRunner = async (opts) => {
+        const p = opts.prompt
+        if (p.includes('Produce a concise, ordered list'))
+          return { text: '```json\n{"tasks":[{"id":"t1","title":"T1","description":"d"}]}\n```' }
+        if (p.includes('You route planned tasks')) {
+          const childIds = [...p.matchAll(/- id: (\S+)\n\s+name:/g)].map((mm) => mm[1])
+          return { text: '```json\n{"assignments":[{"taskId":"t1","childId":"' + (childIds[0] ?? 'w1') + '","effort":"high","reason":"r"}]}\n```' }
+        }
+        if (p.includes('You have been assigned')) return { text: 'did t1', sessionId: 's-w1' }
+        if (p.includes('responded to your request')) {
+          order.push('m-resume')
+          return { text: '```json\n{"tasks":[{"taskId":"t1","verdict":"pass","feedback":""}]}\n```' }
+        }
+        if (p.includes('Judge each task')) {
+          order.push('m-review')
+          return { text: '```handoff\n{"to":"W2","ask":"is this compliant?"}\n```' }
+        }
+        if (p.includes('asked for your help')) {
+          order.push('w2-consult')
+          return { text: 'Yes, compliant.' }
+        }
+        if (p.includes('final INTEGRATION review'))
+          return { text: '```json\n{"tasks":[{"taskId":"t1","verdict":"pass","feedback":""}]}\n```' }
+        if (p.includes('Reflect on your REVIEW work')) return { text: '```json\n{"win":"","loss":"","lessons":[]}\n```' }
+        if (p.includes('Reflect on the work')) return { text: '```json\n{"win":"","loss":"","lessons":[]}\n```' }
+        if (p.includes('Write a clear final report')) return { text: 'DONE' }
+        return { text: '' }
+      }
+      const e = eng(runAgent)
+      ;(e as { emit: (ev: unknown) => void }).emit = (ev) => events.push(ev)
+      const store = fakeStore()
+      const out = await runGraph(
+        buildOrchestratorGraph(e),
+        seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' }),
+        store,
+        makeIO(e.abort.signal, store)
+      )
+      expect(out.status).toBe('completed')
+      expect(order).toEqual(['m-review', 'w2-consult', 'm-resume']) // consult mid-review, then verdict
+      expect(out.tasks.t1.status).toBe('passed') // verdict still parsed after the consult
+      const handoffs = (events as { type: string; askerId: string; peerId: string }[]).filter(
+        (ev) => ev.type === 'handoff'
+      )
+      expect(handoffs).toEqual([{ runId: 'run1', type: 'handoff', askerId: 'm', peerId: 'w2', ask: 'is this compliant?' }])
+    } finally {
+      h.children = { o: ['w1', 'w2'], w1: [], w2: [] }
+      h.edges = []
+      h.settings.maxHandoffs = 0
+    }
+  })
+})
+
 describe('orchestrator node graph — proactive re-plan', () => {
   // research = w1 (stage 1), build = w2 (stage 2), sequenced by canvas order.
   const orderedEdges = [
