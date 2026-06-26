@@ -107,4 +107,24 @@ describe('mergeReplan', () => {
     const out = mergeReplan(plan, tasks, { tasks: [] })
     expect(out).not.toHaveProperty('goal')
   })
+
+  it('with explicit replaceIds=failed, freezes passed and replaces only the failed', () => {
+    const tasks = { t1: mkTask('t1', 'passed', 1), t2: mkTask('t2', 'failed', 2) }
+    const decision = { tasks: [{ id: 't2a', title: 'T2A', description: 'split a' }, { id: 't2b', title: 'T2B', description: 'split b' }] }
+    const out = mergeReplan(plan, tasks, decision, ['t2'])
+    expect(out.tasks.t1).toBe(tasks.t1) // passed frozen (same reference)
+    expect(out.tasks.t2).toBeUndefined() // failed dropped
+    expect(out.tasks.t2a.status).toBe('pending')
+    expect(out.tasks.t2a.ownerId).toBeNull()
+    expect(out.plan.map((p) => p.id)).toEqual(['t1', 't2a', 't2b'])
+  })
+
+  it('with replaceIds, carries dependsOn and leaves non-listed tasks frozen even if pending', () => {
+    const tasks = { t1: mkTask('t1', 'passed', 1), t2: mkTask('t2', 'failed', 2), t3: mkTask('t3', 'pending', 3) }
+    const decision = { tasks: [{ id: 't2a', title: 'T2A', description: 'a' }], deps: { t2a: ['t1'] } }
+    const out = mergeReplan(plan, tasks, decision, ['t2']) // only t2 replaced; t3 (pending) NOT in replaceIds → frozen
+    expect(out.tasks.t3).toBe(tasks.t3) // pending but not listed → kept
+    expect(out.tasks.t2a.dependsOn).toEqual(['t1'])
+    expect(out.tasks.t2).toBeUndefined()
+  })
 })

@@ -29,20 +29,26 @@ export function pendingStageBoundary(
 }
 
 /**
- * Apply a re-plan decision. Executed tasks (status !== 'pending') are frozen verbatim;
- * ALL pending tasks are dropped and replaced by the decision's revised set (each a fresh
- * pending, un-owned TaskState, optional dependsOn from `deps`). The plan is rebuilt as the
- * frozen tasks (in original plan order) followed by the revised tasks.
+ * Apply a re-plan decision. `replaceIds` selects which existing tasks the decision
+ * replaces (defaults to all `pending` ids — Phase-2 proactive behavior); every task
+ * NOT in that set is frozen verbatim. The replaced tasks are dropped and the decision's
+ * revised set is added (each a fresh pending, un-owned TaskState, optional dependsOn from
+ * `deps`). The plan is rebuilt as the frozen tasks (in original plan order) then the
+ * revised tasks. Never reads or writes a goal — the goal-locked invariant is structural.
  */
 export function mergeReplan(
   plan: RunTask[],
   tasks: Record<string, TaskState>,
-  decision: { tasks: RunTask[]; deps?: Record<string, string[]> }
+  decision: { tasks: RunTask[]; deps?: Record<string, string[]> },
+  replaceIds?: string[]
 ): { plan: RunTask[]; tasks: Record<string, TaskState> } {
   const deps = decision.deps ?? {}
+  const replace = new Set(
+    replaceIds ?? Object.keys(tasks).filter((id) => tasks[id].status === 'pending')
+  )
   const frozen: Record<string, TaskState> = {}
   for (const [id, t] of Object.entries(tasks)) {
-    if (t.status !== 'pending') frozen[id] = t
+    if (!replace.has(id)) frozen[id] = t
   }
   const next: Record<string, TaskState> = { ...frozen }
   for (const rt of decision.tasks) {
