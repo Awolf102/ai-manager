@@ -102,6 +102,7 @@ export function buildOrchestratorGraph(eng: Eng): CompiledGraph {
       route: 'execute',
       execute: 'domainReview',
       replan: 'execute',
+      escalate: 'reflect',
       domainReview: 'integrationReview',
       integrationReview: 'reflect',
       repair: 'domainReview',
@@ -113,6 +114,7 @@ export function buildOrchestratorGraph(eng: Eng): CompiledGraph {
       route: (s, io) => routeNode(s, io, eng),
       execute: (s, io) => executeNode(s, io, eng),
       replan: (s, io) => replanNode(s, io, eng),
+      escalate: (s, io) => escalateNode(s, io, eng),
       domainReview: (s, io) => domainReviewNode(s, io, eng),
       integrationReview: (s, io) => integrationReviewNode(s, io, eng),
       repair: (s, io) => repairNode(s, io, eng),
@@ -341,7 +343,7 @@ async function domainReviewNode(state: RunState, _io: NodeIO, eng: Eng): Promise
       ownerName: getAgent(t.ownerId!).name,
       output: t.output
     }))
-    let verdicts: { taskId: string; verdict: 'pass' | 'fail'; feedback: string }[]
+    let verdicts: { taskId: string; verdict: 'pass' | 'fail'; feedback: string; disposition: 'repair' | 'replan' }[]
     try {
       verdicts = await reviewStep(eng, state.goal, state.actingMode, reviewerId, items)
     } catch {
@@ -350,7 +352,7 @@ async function domainReviewNode(state: RunState, _io: NodeIO, eng: Eng): Promise
     for (const v of verdicts) {
       const t = tasks[v.taskId]
       if (!t) continue
-      t.verdict = { verdict: v.verdict, feedback: v.feedback }
+      t.verdict = { verdict: v.verdict, feedback: v.feedback, disposition: v.disposition }
       t.status = v.verdict === 'pass' ? 'passed' : 'failed'
       recorded.push({ taskId: v.taskId, nodeId: t.ownerId ?? null, verdict: v.verdict, feedback: v.feedback })
     }
@@ -362,6 +364,11 @@ async function domainReviewNode(state: RunState, _io: NodeIO, eng: Eng): Promise
   eng.emit({ runId: eng.runId, type: 'verdict', attempt: reviewNo, tasks: recorded })
 
   const failed = Object.values(tasks).filter((t) => t.ownerId && t.status === 'failed')
+  const maxReplans = getSettings().maxReplans ?? 0
+  const misScoped = failed.filter((t) => t.verdict?.disposition === 'replan')
+  if (maxReplans > 0 && misScoped.length > 0 && state.replanAttempts < maxReplans && !eng.abort.signal.aborted) {
+    return { patch: { tasks, steps, reviews, phase: 'replanning' }, goto: 'escalate' }
+  }
   if (failed.length > 0 && state.repairAttempts < maxAttempts && !eng.abort.signal.aborted) {
     return { patch: { tasks, steps, reviews, phase: 'repairing' }, goto: 'repair' }
   }
@@ -388,7 +395,7 @@ async function integrationReviewNode(state: RunState, _io: NodeIO, eng: Eng): Pr
     ownerName: getAgent(t.ownerId!).name,
     output: t.output
   }))
-  let verdicts: { taskId: string; verdict: 'pass' | 'fail'; feedback: string }[]
+  let verdicts: { taskId: string; verdict: 'pass' | 'fail'; feedback: string; disposition: 'repair' | 'replan' }[]
   try {
     verdicts = await integrationReviewStep(eng, state.goal, state.actingMode, state.orchestratorId, state.plan, items)
   } catch {
@@ -399,7 +406,7 @@ async function integrationReviewNode(state: RunState, _io: NodeIO, eng: Eng): Pr
   for (const v of verdicts) {
     const t = tasks[v.taskId]
     if (!t) continue
-    t.verdict = { verdict: v.verdict, feedback: v.feedback }
+    t.verdict = { verdict: v.verdict, feedback: v.feedback, disposition: v.disposition }
     t.status = v.verdict === 'pass' ? 'passed' : 'failed'
     recorded.push({ taskId: v.taskId, nodeId: t.ownerId ?? null, verdict: v.verdict, feedback: v.feedback })
   }
@@ -408,6 +415,11 @@ async function integrationReviewNode(state: RunState, _io: NodeIO, eng: Eng): Pr
   eng.emit({ runId: eng.runId, type: 'verdict', attempt: reviewNo, tasks: recorded })
 
   const failed = Object.values(tasks).filter((t) => t.ownerId && t.status === 'failed')
+  const maxReplans = getSettings().maxReplans ?? 0
+  const misScoped = failed.filter((t) => t.verdict?.disposition === 'replan')
+  if (maxReplans > 0 && misScoped.length > 0 && state.replanAttempts < maxReplans && !eng.abort.signal.aborted) {
+    return { patch: { tasks, steps, reviews, phase: 'replanning' }, goto: 'escalate' }
+  }
   if (failed.length > 0 && state.repairAttempts < maxAttempts && !eng.abort.signal.aborted) {
     return { patch: { tasks, steps, reviews, phase: 'repairing' }, goto: 'repair' }
   }
@@ -454,6 +466,29 @@ async function repairNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeRe
   return { patch: { tasks, steps, phase: 'reviewing', repairAttempts: state.repairAttempts + 1 }, goto: 'domainReview' }
 }
 
+/**
+ * Apply a re-plan/escalation decision into the run: merge the revised tasks (replacing
+ * `replaceIds`, or pending when undefined), bump the shared replanAttempts, reset the
+ * repair budget, record + emit the `replan`, and goto route. `extraPatch` lets a caller
+ * carry extra state (Phase-2 proactive carries replanStageCursor).
+ */
+function applyReplanDecision(
+  state: RunState,
+  eng: Eng,
+  decision: { reason: string; tasks: RunTask[]; deps: Record<string, string[]> },
+  replaceIds?: string[],
+  extraPatch: Partial<RunState> = {}
+): NodeResult {
+  const { plan, tasks } = mergeReplan(state.plan, structuredClone(state.tasks), decision, replaceIds)
+  const attempt = state.replanAttempts + 1
+  const replans = [...(state.replans ?? []), { attempt, reason: decision.reason }]
+  eng.emit({ runId: eng.runId, type: 'replan', attempt, reason: decision.reason, tasks: plan })
+  return {
+    patch: { plan, tasks, replans, replanAttempts: attempt, repairAttempts: 0, phase: 'replanning', ...extraPatch },
+    goto: 'route'
+  }
+}
+
 // Phase 2 — proactive re-plan: at an ordered-stage boundary the orchestrator may rewrite
 // the not-yet-run plan based on what came back. GOAL IS NEVER TOUCHED. No-op when off.
 async function replanNode(state: RunState, _io: NodeIO, eng: Eng): Promise<NodeResult> {
@@ -477,22 +512,30 @@ async function replanNode(state: RunState, _io: NodeIO, eng: Eng): Promise<NodeR
     return { goto: 'execute', patch: { replanStageCursor: boundary } }
   }
 
-  const { plan, tasks } = mergeReplan(state.plan, structuredClone(state.tasks), decision)
-  const attempt = state.replanAttempts + 1
-  const replans = [...(state.replans ?? []), { attempt, reason: decision.reason }]
-  eng.emit({ runId: eng.runId, type: 'replan', attempt, reason: decision.reason, tasks: plan })
-  return {
-    patch: {
-      plan,
-      tasks,
-      replans,
-      replanAttempts: attempt,
-      repairAttempts: 0,
-      replanStageCursor: boundary,
-      phase: 'replanning'
-    },
-    goto: 'route'
+  return applyReplanDecision(state, eng, decision, undefined, { replanStageCursor: boundary })
+}
+
+// v2 escalation — reactive: a reviewer flagged a failed task as MIS-SCOPED, so the
+// orchestrator re-breaks-up the failed work (passed frozen). Reuses the shared apply
+// helper + the `replan` surfacing. Bounded by the shared replanAttempts < maxReplans.
+async function escalateNode(state: RunState, _io: NodeIO, eng: Eng): Promise<NodeResult> {
+  const maxReplans = getSettings().maxReplans ?? 0
+  const owned = ownedTasks(state)
+  const passed = owned.filter((t) => t.status === 'passed')
+  const failed = owned.filter((t) => t.status === 'failed')
+  if (maxReplans <= 0 || state.replanAttempts >= maxReplans || failed.length === 0 || eng.abort.signal.aborted) {
+    return { patch: { steps: markWorkersDone(eng, state), phase: 'reflecting' } } // → reflect (static edge)
   }
+  let decision: { reason: string; tasks: RunTask[]; deps: Record<string, string[]> }
+  try {
+    decision = await escalateStep(eng, state.goal, state.orchestratorId, passed, failed)
+  } catch {
+    return { patch: { steps: markWorkersDone(eng, state), phase: 'reflecting' } } // parse failure = give up
+  }
+  if (decision.tasks.length === 0) {
+    return { patch: { steps: markWorkersDone(eng, state), phase: 'reflecting' } }
+  }
+  return applyReplanDecision(state, eng, decision, failed.map((t) => t.task.id))
 }
 
 async function reflectNode(state: RunState, _io: NodeIO, eng: Eng): Promise<NodeResult> {
@@ -630,25 +673,28 @@ async function reviewStep(
   actingMode: PermissionMode,
   orchestratorId: string,
   items: { taskId: string; title: string; asked: string; ownerName: string; output: string }[]
-): Promise<{ taskId: string; verdict: 'pass' | 'fail'; feedback: string }[]> {
+): Promise<{ taskId: string; verdict: 'pass' | 'fail'; feedback: string; disposition: 'repair' | 'replan' }[]> {
+  const allowReplan = (getSettings().maxReplans ?? 0) > 0
   const parsed = await runStructured(
     eng,
     orchestratorId,
-    reviewPrompt(goal, items),
+    reviewPrompt(goal, items, allowReplan),
     (v): v is { tasks: unknown[] } => Array.isArray((v as { tasks?: unknown })?.tasks),
     { permissionMode: actingMode, disallowedTools: EDIT_TOOLS },
     consultFor(orchestratorId, goal, actingMode)
   )
-  const byId = new Map<string, { verdict: 'pass' | 'fail'; feedback: string }>()
+  const byId = new Map<string, { verdict: 'pass' | 'fail'; feedback: string; disposition: 'repair' | 'replan' }>()
   for (const t of parsed.tasks as Record<string, unknown>[]) {
     const taskId = String(t.taskId ?? '')
     const verdict = String(t.verdict ?? 'pass').toLowerCase() === 'fail' ? 'fail' : 'pass'
-    byId.set(taskId, { verdict, feedback: String(t.feedback ?? '') })
+    const disposition = String(t.disposition ?? 'repair').toLowerCase() === 'replan' ? 'replan' : 'repair'
+    byId.set(taskId, { verdict, feedback: String(t.feedback ?? ''), disposition })
   }
   return items.map((it) => ({
     taskId: it.taskId,
     verdict: byId.get(it.taskId)?.verdict ?? 'pass',
-    feedback: byId.get(it.taskId)?.feedback ?? ''
+    feedback: byId.get(it.taskId)?.feedback ?? '',
+    disposition: byId.get(it.taskId)?.disposition ?? 'repair'
   }))
 }
 
@@ -659,25 +705,28 @@ async function integrationReviewStep(
   orchestratorId: string,
   plan: RunTask[],
   items: { taskId: string; title: string; asked: string; ownerName: string; output: string }[]
-): Promise<{ taskId: string; verdict: 'pass' | 'fail'; feedback: string }[]> {
+): Promise<{ taskId: string; verdict: 'pass' | 'fail'; feedback: string; disposition: 'repair' | 'replan' }[]> {
+  const allowReplan = (getSettings().maxReplans ?? 0) > 0
   const parsed = await runStructured(
     eng,
     orchestratorId,
-    integrationReviewPrompt(goal, plan, items),
+    integrationReviewPrompt(goal, plan, items, allowReplan),
     (v): v is { tasks: unknown[] } => Array.isArray((v as { tasks?: unknown })?.tasks),
     { permissionMode: actingMode, disallowedTools: EDIT_TOOLS },
     consultFor(orchestratorId, goal, actingMode)
   )
-  const byId = new Map<string, { verdict: 'pass' | 'fail'; feedback: string }>()
+  const byId = new Map<string, { verdict: 'pass' | 'fail'; feedback: string; disposition: 'repair' | 'replan' }>()
   for (const t of parsed.tasks as Record<string, unknown>[]) {
     const taskId = String(t.taskId ?? '')
     const verdict = String(t.verdict ?? 'pass').toLowerCase() === 'fail' ? 'fail' : 'pass'
-    byId.set(taskId, { verdict, feedback: String(t.feedback ?? '') })
+    const disposition = String(t.disposition ?? 'repair').toLowerCase() === 'replan' ? 'replan' : 'repair'
+    byId.set(taskId, { verdict, feedback: String(t.feedback ?? ''), disposition })
   }
   return items.map((it) => ({
     taskId: it.taskId,
     verdict: byId.get(it.taskId)?.verdict ?? 'pass',
-    feedback: byId.get(it.taskId)?.feedback ?? ''
+    feedback: byId.get(it.taskId)?.feedback ?? '',
+    disposition: byId.get(it.taskId)?.disposition ?? 'repair'
   }))
 }
 
@@ -747,6 +796,26 @@ async function replanStep(
   const raw = Array.isArray(p.tasks) ? (p.tasks as Record<string, unknown>[]) : []
   const { tasks, deps } = parseTasksAndDeps(raw, 'r')
   return { replan: true, reason, tasks, deps }
+}
+
+async function escalateStep(
+  eng: Eng,
+  goal: string,
+  orchestratorId: string,
+  passed: TaskState[],
+  failed: TaskState[]
+): Promise<{ reason: string; tasks: RunTask[]; deps: Record<string, string[]> }> {
+  const parsed = await runStructured(
+    eng,
+    orchestratorId,
+    escalatePrompt(goal, passed, failed),
+    (v): v is { tasks: unknown[] } => Array.isArray((v as { tasks?: unknown })?.tasks),
+    { permissionMode: 'default', disallowedTools: THINK_DISALLOW }
+  )
+  const p = parsed as { reason?: unknown; tasks?: unknown }
+  const raw = Array.isArray(p.tasks) ? (p.tasks as Record<string, unknown>[]) : []
+  const { tasks, deps } = parseTasksAndDeps(raw, 'e')
+  return { reason: String(p.reason ?? 'mis-scoped tasks re-planned'), tasks, deps }
 }
 
 /** Per-agent-run consult config; null = handoffs off / no peers (→ a plain single call). */
@@ -1155,7 +1224,8 @@ Set "replan" to false (and "tasks" to []) to keep the remaining plan unchanged.`
 
 function reviewPrompt(
   goal: string,
-  items: { taskId: string; title: string; asked: string; ownerName: string; output: string }[]
+  items: { taskId: string; title: string; asked: string; ownerName: string; output: string }[],
+  allowReplan = false
 ): string {
   const list = items
     .map(
@@ -1163,6 +1233,12 @@ function reviewPrompt(
         `- taskId: ${it.taskId}\n  title: ${it.title}\n  asked: ${it.asked}\n  done by: ${it.ownerName}\n  result: ${it.output.replace(/\s+/g, ' ').slice(0, 1200)}`
     )
     .join('\n')
+  const dispoLine = allowReplan
+    ? `\n\nFor each "fail", also set "disposition": "repair" if the task is correctly scoped but the implementation is buggy or incomplete (re-running it can fix it), or "replan" if the TASK ITSELF is mis-scoped — the plan broke the work down wrong and it should be re-broken-up rather than re-run. Default to "repair" when unsure.`
+    : ''
+  const schema = allowReplan
+    ? `{ "tasks": [ { "taskId": "t1", "verdict": "pass", "feedback": "required when fail", "disposition": "repair or replan (only when fail)" } ] }`
+    : `{ "tasks": [ { "taskId": "t1", "verdict": "pass", "feedback": "required when fail" } ] }`
   return `You are reviewing your team's work against the goal. You may READ files and RUN the app/commands to verify (start a server, curl an endpoint, run the tests) — you just must not edit files.
 
 GOAL:
@@ -1170,21 +1246,22 @@ ${goal}
 
 Judge each task below: did the result actually accomplish what was asked, in service of the goal? Mark "pass" or "fail". For any "fail", give specific, actionable feedback the worker can use to fix it.
 
-If the work is a web app or anything that serves pages, do NOT trust unit tests or the worker's report alone — run it: start the app, request the entry URL, and confirm it returns 200 AND every asset it references (CSS, JS, images) also returns 200. A common silent failure is assets 404ing from a static-path/route mismatch, which makes the page render as unstyled HTML even though the code is correct. Fail the task if the page does not render fully.
+If the work is a web app or anything that serves pages, do NOT trust unit tests or the worker's report alone — run it: start the app, request the entry URL, and confirm it returns 200 AND every asset it references (CSS, JS, images) also returns 200. A common silent failure is assets 404ing from a static-path/route mismatch, which makes the page render as unstyled HTML even though the code is correct. Fail the task if the page does not render fully.${dispoLine}
 
 TASKS TO REVIEW:
 ${list}
 
 Reply with ONLY this JSON code block (no other text):
 \`\`\`json
-{ "tasks": [ { "taskId": "t1", "verdict": "pass", "feedback": "required when fail" } ] }
+${schema}
 \`\`\``
 }
 
 function integrationReviewPrompt(
   goal: string,
   plan: RunTask[],
-  items: { taskId: string; title: string; asked: string; ownerName: string; output: string }[]
+  items: { taskId: string; title: string; asked: string; ownerName: string; output: string }[],
+  allowReplan = false
 ): string {
   const planList = plan.map((t, i) => `${i + 1}. ${t.title} — ${t.description}`).join('\n')
   const list = items
@@ -1193,6 +1270,15 @@ function integrationReviewPrompt(
         `- taskId: ${it.taskId}\n  title: ${it.title}\n  by: ${it.ownerName}\n  result: ${it.output.replace(/\s+/g, ' ').slice(0, 1200)}`
     )
     .join('\n')
+  const dispoLine = allowReplan
+    ? `\n\nFor each "fail", also set "disposition": "repair" if the task is correctly scoped but the implementation is buggy or incomplete (re-running it can fix it), or "replan" if the TASK ITSELF is mis-scoped — the plan broke the work down wrong and it should be re-broken-up rather than re-run. Default to "repair" when unsure. If a task is mis-scoped (the plan broke it down wrong), mark it fail with disposition "replan" and it will be re-broken-up.`
+    : ''
+  const replanNote = allowReplan
+    ? ''
+    : ' If the plan itself is missing something needed for the goal, note it in the feedback of the most related task (it will be surfaced; you cannot re-plan here).'
+  const schema = allowReplan
+    ? `{ "tasks": [ { "taskId": "t1", "verdict": "pass", "feedback": "required when fail", "disposition": "repair or replan (only when fail)" } ] }`
+    : `{ "tasks": [ { "taskId": "t1", "verdict": "pass", "feedback": "required when fail" } ] }`
   return `You are doing the final INTEGRATION review of your team's assembled work. Your managers already reviewed each piece for domain correctness — your job is the BROADER check: do the pieces fit together, is anything missing or off-goal, does the integrated whole actually satisfy the plan and the goal? You may READ files and RUN the integrated app to verify — you just must not edit files.
 
 GOAL:
@@ -1204,11 +1290,35 @@ ${planList}
 THE ASSEMBLED RESULT (per task):
 ${list}
 
-Assess each task for whether it fits the integrated whole and serves the goal. Mark "pass" or "fail"; for any "fail" give specific, actionable feedback the worker can use. If the plan itself is missing something needed for the goal, note it in the feedback of the most related task (it will be surfaced; you cannot re-plan here).
+Assess each task for whether it fits the integrated whole and serves the goal. Mark "pass" or "fail"; for any "fail" give specific, actionable feedback the worker can use.${replanNote}${dispoLine}
 
 Reply with ONLY this JSON code block (no other text):
 \`\`\`json
-{ "tasks": [ { "taskId": "t1", "verdict": "pass", "feedback": "required when fail" } ] }
+${schema}
+\`\`\``
+}
+
+function escalatePrompt(goal: string, passed: TaskState[], failed: TaskState[]): string {
+  const kept = passed.map((t) => `- ${t.task.title}: ${t.task.description}`).join('\n')
+  const broken = failed
+    .map((t) => `- id: ${t.task.id} — ${t.task.title}: ${t.task.description}\n  why it failed review: ${(t.verdict?.feedback ?? '').replace(/\s+/g, ' ').slice(0, 600)}`)
+    .join('\n')
+  return `You are the lead for this project. The GOAL below is FIXED and must NOT change — never modify, reinterpret, or expand it.
+
+GOAL (immutable):
+${goal}
+
+Your team COMPLETED and PASSED this work — keep it, do NOT redo it (its changes are already on the filesystem):
+${kept || '(none)'}
+
+These tasks did NOT pass review because they are MIS-SCOPED — the plan broke the work down incorrectly, so simply re-running them will not help:
+${broken}
+
+Re-break-up ONLY the mis-scoped work into a corrected set of tasks: split, merge, drop, or add tasks so the failed portion can actually be done. Keep it the smallest set that fixes the breakdown. Do NOT touch the passed work or the goal. You may READ files to inform the breakdown, but make no changes.
+
+Reply with ONLY this JSON code block (no other text):
+\`\`\`json
+{ "reason": "why the old breakdown was wrong, one sentence", "tasks": [ { "id": "e1", "title": "short title", "description": "what to do", "dependsOn": [] } ] }
 \`\`\``
 }
 

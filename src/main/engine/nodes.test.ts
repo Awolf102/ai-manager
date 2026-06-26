@@ -988,6 +988,140 @@ describe('orchestrator node graph — peer handoffs (review site)', () => {
   })
 })
 
+describe('orchestrator node graph — v2 escalation (mis-scoped re-plan)', () => {
+  // two-tier: o -> m -> w1 ; manager m reviews w1's work.
+  function setupTwoTier() {
+    h.children = { o: ['m'], m: ['w1'], w1: [], w2: [] }
+  }
+  function restore() {
+    h.children = { o: ['w1', 'w2'], w1: [], w2: [] }
+    h.settings.maxReplans = 0
+  }
+  function run(runAgent: AgentRunner, events: unknown[]) {
+    const e = eng(runAgent)
+    ;(e as { emit: (ev: unknown) => void }).emit = (ev) => events.push(ev)
+    const store = fakeStore()
+    return runGraph(
+      buildOrchestratorGraph(e),
+      seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' }),
+      store,
+      makeIO(e.abort.signal, store)
+    )
+  }
+  // route by parsing child ids from the prompt (matches routePrompt format), like cannedAgent
+  function routeJSON(prompt: string): string {
+    const childIds = [...prompt.matchAll(/- id: (\S+)\n\s+name:/g)].map((m) => m[1])
+    const taskIds = [...prompt.matchAll(/- id: (\w+) —/g)].map((m) => m[1])
+    const assignments = taskIds.map((tid) => ({ taskId: tid, childId: childIds[0] ?? null, effort: 'high', reason: 'r' }))
+    return '```json\n' + JSON.stringify({ assignments }) + '\n```'
+  }
+
+  it('a domain reviewer flags a mis-scoped task → escalate re-breaks it up', async () => {
+    setupTwoTier()
+    h.settings.maxReplans = 1
+    try {
+      const order: string[] = []
+      const events: unknown[] = []
+      let escalatePrompt = ''
+      const runAgent: AgentRunner = async (opts) => {
+        const p = opts.prompt
+        if (p.includes('Produce a concise, ordered list'))
+          return { text: '```json\n{"tasks":[{"id":"t1","title":"Build it","description":"too broad"}]}\n```' }
+        if (p.includes('You route planned tasks')) return { text: routeJSON(p) }
+        if (p.includes('You have been assigned')) { order.push(opts.agentId); return { text: `did ${[...p.matchAll(/\d+\. (\w+)/g)].length ? 'task' : ''}`, sessionId: 's' } }
+        if (p.includes('MIS-SCOPED')) { escalatePrompt = p; order.push('escalate'); return { text: '```json\n{"reason":"t1 was too broad","tasks":[{"id":"e1","title":"E1","description":"do e1","dependsOn":[]}]}\n```' } }
+        if (p.includes('Judge each task')) {
+          // fail t1 as mis-scoped on the first review; pass e1 after the re-plan
+          return p.includes('taskId: e1')
+            ? { text: '```json\n{"tasks":[{"taskId":"e1","verdict":"pass","feedback":""}]}\n```' }
+            : { text: '```json\n{"tasks":[{"taskId":"t1","verdict":"fail","feedback":"mis-scoped, split it","disposition":"replan"}]}\n```' }
+        }
+        if (p.includes('final INTEGRATION review'))
+          return { text: '```json\n{"tasks":[{"taskId":"e1","verdict":"pass","feedback":""}]}\n```' }
+        if (p.includes('Reflect on your REVIEW work')) return { text: '```json\n{"win":"","loss":"","lessons":[]}\n```' }
+        if (p.includes('Reflect on the work')) return { text: '```json\n{"win":"","loss":"","lessons":[]}\n```' }
+        if (p.includes('Write a clear final report')) return { text: 'DONE' }
+        return { text: '' }
+      }
+      const out = await run(runAgent, events)
+      expect(out.status).toBe('completed')
+      expect(order).toContain('escalate')
+      expect(escalatePrompt).toContain('t1') // the failed task was handed to the escalate step
+      expect(out.tasks.t1).toBeUndefined() // mis-scoped task replaced
+      expect(out.tasks.e1?.status).toBe('passed') // re-broken-up task ran + passed
+      expect(out.replanAttempts).toBe(1)
+      const replans = (events as { type: string; reason: string }[]).filter((ev) => ev.type === 'replan')
+      expect(replans).toHaveLength(1)
+      expect(replans[0].reason).toBe('t1 was too broad')
+    } finally {
+      restore()
+    }
+  })
+
+  it('off control: maxReplans=0 → no disposition asked, a fail repairs (byte-for-byte)', async () => {
+    setupTwoTier()
+    h.settings.maxReplans = 0
+    try {
+      const order: string[] = []
+      const events: unknown[] = []
+      let reviewPromptText = ''
+      const runAgent: AgentRunner = async (opts) => {
+        const p = opts.prompt
+        if (p.includes('Produce a concise, ordered list'))
+          return { text: '```json\n{"tasks":[{"id":"t1","title":"T1","description":"d"}]}\n```' }
+        if (p.includes('You route planned tasks')) return { text: routeJSON(p) }
+        if (p.includes('You have been assigned')) { order.push('work'); return { text: 'did t1', sessionId: 's' } }
+        if (p.includes('did not pass review')) { order.push('repair'); return { text: 'fixed t1', sessionId: 's' } }
+        if (p.includes('Judge each task')) { reviewPromptText = p; return { text: '```json\n{"tasks":[{"taskId":"t1","verdict":"' + (order.includes('repair') ? 'pass' : 'fail') + '","feedback":"x"}]}\n```' } }
+        if (p.includes('final INTEGRATION review')) return { text: '```json\n{"tasks":[{"taskId":"t1","verdict":"pass","feedback":""}]}\n```' }
+        if (p.includes('MIS-SCOPED')) { order.push('escalate'); return { text: '```json\n{"reason":"x","tasks":[]}\n```' } }
+        if (p.includes('Reflect on your REVIEW work')) return { text: '```json\n{"win":"","loss":"","lessons":[]}\n```' }
+        if (p.includes('Reflect on the work')) return { text: '```json\n{"win":"","loss":"","lessons":[]}\n```' }
+        if (p.includes('Write a clear final report')) return { text: 'DONE' }
+        return { text: '' }
+      }
+      const out = await run(runAgent, events)
+      expect(out.status).toBe('completed')
+      expect(reviewPromptText).not.toContain('disposition') // prompt unchanged when off
+      expect(order).toContain('repair') // a fail repaired as today
+      expect(order).not.toContain('escalate')
+      expect((events as { type: string }[]).some((ev) => ev.type === 'replan')).toBe(false)
+    } finally {
+      restore()
+    }
+  })
+
+  it('a fail with disposition=repair repairs, does not escalate', async () => {
+    setupTwoTier()
+    h.settings.maxReplans = 1
+    try {
+      const order: string[] = []
+      const events: unknown[] = []
+      const runAgent: AgentRunner = async (opts) => {
+        const p = opts.prompt
+        if (p.includes('Produce a concise, ordered list'))
+          return { text: '```json\n{"tasks":[{"id":"t1","title":"T1","description":"d"}]}\n```' }
+        if (p.includes('You route planned tasks')) return { text: routeJSON(p) }
+        if (p.includes('You have been assigned')) { order.push('work'); return { text: 'did t1', sessionId: 's' } }
+        if (p.includes('did not pass review')) { order.push('repair'); return { text: 'fixed', sessionId: 's' } }
+        if (p.includes('Judge each task')) return { text: '```json\n{"tasks":[{"taskId":"t1","verdict":"' + (order.includes('repair') ? 'pass' : 'fail') + '","feedback":"x","disposition":"repair"}]}\n```' }
+        if (p.includes('final INTEGRATION review')) return { text: '```json\n{"tasks":[{"taskId":"t1","verdict":"pass","feedback":""}]}\n```' }
+        if (p.includes('MIS-SCOPED')) { order.push('escalate'); return { text: '```json\n{"reason":"x","tasks":[]}\n```' } }
+        if (p.includes('Reflect')) return { text: '```json\n{"win":"","loss":"","lessons":[]}\n```' }
+        if (p.includes('Write a clear final report')) return { text: 'DONE' }
+        return { text: '' }
+      }
+      const out = await run(runAgent, events)
+      expect(out.status).toBe('completed')
+      expect(order).toContain('repair')
+      expect(order).not.toContain('escalate')
+      expect(out.replanAttempts).toBe(0)
+    } finally {
+      restore()
+    }
+  })
+})
+
 describe('orchestrator node graph — proactive re-plan', () => {
   // research = w1 (stage 1), build = w2 (stage 2), sequenced by canvas order.
   const orderedEdges = [
