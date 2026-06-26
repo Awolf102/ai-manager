@@ -54,7 +54,7 @@ export async function discoverSkills(threshold: number, root?: string): Promise<
   } | null
   const installPathByKey = new Map<string, string>()
   for (const [key, arr] of Object.entries(installed?.plugins ?? {})) {
-    const ip = arr?.[0]?.installPath
+    const ip = arr?.[0]?.installPath // user-scope (first) entry wins; subdir candidates cover the rest
     if (ip) installPathByKey.set(key, ip)
   }
 
@@ -77,6 +77,7 @@ async function fallbackScan(
   marketplaces: Record<string, { source?: { repo?: string }; installLocation?: string }> | null
 ): Promise<DiscoveredPlugin[]> {
   const out: DiscoveredPlugin[] = []
+  const seen = new Set<string>()
   for (const [marketplace, m] of Object.entries(marketplaces ?? {})) {
     const repo = String(m.source?.repo ?? '')
     if (!isTrusted({ marketplaceRepo: repo }, Number.POSITIVE_INFINITY)) continue // anthropics/* only
@@ -104,6 +105,8 @@ async function fallbackScan(
         }
         if (names.length === 0) continue
         const skills: DiscoveredSkill[] = names.map((name) => ({ id: `${ent.name}:${name}`, name, description: '' }))
+        if (seen.has(ent.name)) continue
+        seen.add(ent.name)
         out.push({
           id: ent.name, marketplace, marketplaceRepo: repo, author: 'Anthropic',
           uniqueInstalls: 0, trusted: true, path: pluginPath, skills
