@@ -83,6 +83,8 @@ export function seedRunState(args: {
     reviews: [],
     reflections: [],
     repairAttempts: 0,
+    replanAttempts: 0,
+    replanStageCursor: 0,
     final: ''
   }
 }

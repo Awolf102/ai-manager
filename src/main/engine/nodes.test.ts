@@ -436,6 +436,14 @@ describe('orchestrator node graph — manager layer', () => {
   })
 })
 
+describe('seedRunState', () => {
+  it('seeds the re-plan counters at zero', () => {
+    const s = seedRunState({ runId: 'r', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' })
+    expect(s.replanAttempts).toBe(0)
+    expect(s.replanStageCursor).toBe(0)
+  })
+})
+
 describe('maxEffort', () => {
   it('returns the highest effort present, or undefined when none', () => {
     expect(maxEffort([])).toBeUndefined()

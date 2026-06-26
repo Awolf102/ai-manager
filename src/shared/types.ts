@@ -93,6 +93,8 @@ export interface ProjectSettings {
   autoSyncTeam: boolean
   /** install-count floor for trusting a non-Anthropic plugin's skills */
   skillInstallThreshold: number
+  /** max proactive mid-run re-plans the orchestrator may perform (0 = off) */
+  maxReplans: number
 }
 
 export const DEFAULT_SETTINGS: ProjectSettings = {
@@ -102,7 +104,8 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   autonomy: 'auto',
   adaptiveEffort: true,
   autoSyncTeam: false,
-  skillInstallThreshold: 100000
+  skillInstallThreshold: 100000,
+  maxReplans: 0
 }
 
 /** A user-attached reference file (image/doc) for the project, available to every agent. */
@@ -230,6 +233,7 @@ export type OrchestrationEvent =
   | { runId: string; type: 'plan'; nodeId: string; tasks: RunTask[] }
   | { runId: string; type: 'assignments'; nodeId: string; assignments: Assignment[] }
   | { runId: string; type: 'verdict'; attempt: number; tasks: TaskVerdict[] }
+  | { runId: string; type: 'replan'; attempt: number; reason: string; tasks: RunTask[] }
   | {
       runId: string
       type: 'reflection'
@@ -262,6 +266,7 @@ export interface RunRecord {
   steps: RunStepRecord[]
   reviews: { attempt: number; tasks: TaskVerdict[] }[]
   reflections: { nodeId: string; win: string; loss: string; lessons: string[] }[]
+  replans?: { attempt: number; reason: string }[]
   final: string
   error?: string
 }
@@ -306,6 +311,7 @@ export type RunPhase =
   | 'executing'
   | 'reviewing'
   | 'repairing'
+  | 'replanning'
   | 'reflecting'
   | 'synthesizing'
   | 'done'
@@ -336,6 +342,8 @@ export interface TaskState {
   effort?: Effort
   /** task ids that must finish first (Stage 4 — unused in Stage 1) */
   dependsOn?: string[]
+  /** Phase-1 ordered-stage of this task (0/undefined = unordered); set in routeNode */
+  stage?: number
 }
 
 /**
@@ -362,6 +370,12 @@ export interface RunState {
   reviews: { attempt: number; tasks: TaskVerdict[] }[]
   reflections: { nodeId: string; win: string; loss: string; lessons: string[] }[]
   repairAttempts: number
+  /** proactive re-plans performed this run (bounds the outer loop) */
+  replanAttempts: number
+  /** highest ordered-stage boundary already offered for re-plan (ask-once) */
+  replanStageCursor: number
+  /** one entry per performed re-plan, for the Run view + History */
+  replans?: { attempt: number; reason: string }[]
   final: string
   error?: string
   /** set when the run paused for human input (Stage 3) */
