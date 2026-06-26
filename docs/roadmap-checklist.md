@@ -115,6 +115,23 @@ The single prioritized to-do. **1 = do next / most important; higher = later.**
   (`buildContextBlock([]) === ''`). Built via subagent-driven TDD (5 tasks; final opus whole-branch review
   "Ready to merge"; 143 tests green; merged to main `--no-ff`, commits `2e3aad0..f24b460`, merge `6f63769`).
   Spec/plan under `docs/superpowers/` (2026-06-26). **live smoke pending.**
+- **Trusted skill catalog + auto-assigned skills.** (Out-of-band user request.) The app now AUTO-DISCOVERS the
+  skills of TRUSTED installed Claude Code plugins instead of a hardcoded list, and the orchestrator equips
+  dynamically-created agents with them. **Trust rule:** author Anthropic, OR an `anthropics/*` marketplace repo,
+  OR `unique_installs >= skillInstallThreshold` (Settings, default 100k). Discovery reads `~/.claude/plugins`
+  metadata (`installed_plugins.json` + `plugin-catalog-cache.json` [has `components.skills`, `unique_installs`,
+  `marketplace_entry.author`] + `known_marketplaces.json`), resolves each plugin's on-disk `skills/` dir
+  (installed-cache / marketplace-clone / `plugins/` layouts), with an Anthropic-only filesystem fallback when
+  the cache is absent. New pure `shared/skill-trust.ts` (`isTrusted`/`shapeCatalog`/`skillOptionsFor`/
+  `offeredSkills`); `main/engine/skill-discovery.ts` (`discoverSkills(threshold, root?)`) + `skills:list` IPC;
+  `agent-runner` loads skills from discovery (cached per run; hardcoded `resolvePluginPath` dropped);
+  `skill-catalog.ts` RETIRED; AgentConfigPanel picker is dynamic (author / "Nk installs" badges). The orchestrator
+  assigns ≤5 skills/member in **Build-team** and **Draft-roles** (offered a ≤40 condensed catalog ranked
+  Anthropic+installs), shown in the editable previews, persisted to `node.skills`. **No trusted skills installed =
+  byte-for-byte today's behavior** (`skillOptionsFor → null`); discovery never throws into a run. Built via
+  subagent-driven TDD (6 tasks + 5 review fixes; final opus review "Ready to merge: Yes"; 156 tests green;
+  merged `--no-ff`, commits `4ab4bb1..f0b161a`, merge `280b9fa`). Spec/plan under `docs/superpowers/` (2026-06-26).
+  **live smoke pending.** Note: `plugin-catalog-cache.json` is an internal/undocumented CC file (parsed tolerantly).
 - **Decisions:** Bedrock dropped (provider + Knowledge Bases). Multi-chart-within-a-project dropped.
 
 ---
