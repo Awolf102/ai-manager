@@ -439,7 +439,8 @@ export const IPC = {
   addContext: 'context:add',
   updateContext: 'context:update',
   removeContext: 'context:remove',
-  contextThumbnail: 'context:thumbnail'
+  contextThumbnail: 'context:thumbnail',
+  listSkills: 'skills:list'
 } as const
 
 /** The typed API the preload bridge exposes on window.api. */
@@ -500,6 +501,7 @@ export interface RendererApi {
   removeContext: (id: string) => Promise<ProjectGraph>
   contextThumbnail: (id: string) => Promise<string | null>
   getPathForFile: (file: File) => string
+  listSkills: () => Promise<DiscoveredPlugin[]>
   onServerLog: (cb: (e: ServerLogEvent) => void) => () => void
   onServerStatus: (cb: (e: ServerStatusEvent) => void) => () => void
   onServerReady: (cb: (e: ServerReadyEvent) => void) => () => void
