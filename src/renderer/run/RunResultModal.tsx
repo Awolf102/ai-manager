@@ -12,44 +12,53 @@ export default function RunResultModal({
   const [port, setPort] = useState(manifest.port ? String(manifest.port) : '')
   const [path, setPath] = useState(manifest.path ?? '/')
   const [serverId, setServerId] = useState<string | null>(null)
+  const [launching, setLaunching] = useState(false)
   const [status, setStatus] = useState<ServerStatus | 'idle'>('idle')
   const [url, setUrl] = useState<string | null>(null)
   const [log, setLog] = useState('')
   const logRef = useRef<HTMLPreElement>(null)
+  const serverIdRef = useRef<string | null>(null)
   const launchable = manifest.type === 'web' || manifest.type === 'static'
 
   useEffect(() => {
     const offLog = window.api.onServerLog((e) => {
-      if (e.serverId === serverId) setLog((p) => p + e.data)
+      if (e.serverId === serverIdRef.current) setLog((p) => p + e.data)
     })
     const offStatus = window.api.onServerStatus((e) => {
-      if (e.serverId === serverId) setStatus(e.status)
+      if (e.serverId === serverIdRef.current) setStatus(e.status)
     })
     const offReady = window.api.onServerReady((e) => {
-      if (e.serverId === serverId) setUrl(e.url)
+      if (e.serverId === serverIdRef.current) setUrl(e.url)
     })
     return () => {
       offLog()
       offStatus()
       offReady()
     }
-  }, [serverId])
+  }, [])
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight
   }, [log])
 
   const launch = async (): Promise<void> => {
-    setLog('')
-    setUrl(null)
-    setStatus('starting')
-    const p = parseInt(port, 10)
-    const { serverId: id } = await window.api.launchServer({
-      startCommand: cmd.trim(),
-      port: Number.isInteger(p) && p > 0 ? p : undefined,
-      path: path.trim() || '/'
-    })
-    setServerId(id)
+    if (launching) return
+    setLaunching(true)
+    try {
+      setLog('')
+      setUrl(null)
+      setStatus('starting')
+      const p = parseInt(port, 10)
+      const { serverId: id } = await window.api.launchServer({
+        startCommand: cmd.trim(),
+        port: Number.isInteger(p) && p > 0 ? p : undefined,
+        path: path.trim() || '/'
+      })
+      serverIdRef.current = id
+      setServerId(id)
+    } finally {
+      setLaunching(false)
+    }
   }
   const stop = (): void => {
     if (serverId) window.api.stopServer(serverId)
@@ -102,7 +111,7 @@ export default function RunResultModal({
                 Stop
               </button>
             ) : (
-              <button className="btn primary" onClick={() => void launch()} disabled={!cmd.trim()}>
+              <button className="btn primary" onClick={() => void launch()} disabled={!cmd.trim() || launching}>
                 Launch &amp; open
               </button>
             )
