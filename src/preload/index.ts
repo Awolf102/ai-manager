@@ -5,7 +5,10 @@ import type {
   OrchestrationEvent,
   PtyDataEvent,
   PtyExitEvent,
-  RendererApi
+  RendererApi,
+  ServerLogEvent,
+  ServerReadyEvent,
+  ServerStatusEvent
 } from '../shared/types'
 
 function sub<T>(channel: string, cb: (e: T) => void): () => void {
@@ -49,7 +52,14 @@ const api: RendererApi = {
   refreshFromTeam: () => ipcRenderer.invoke(IPC.refreshTeam),
   draftRoles: (input) => ipcRenderer.invoke(IPC.draftRoles, input),
   spawnTeam: (input) => ipcRenderer.invoke(IPC.spawnTeam, input),
-  applySpawnedTeam: (input) => ipcRenderer.invoke(IPC.applySpawn, input)
+  applySpawnedTeam: (input) => ipcRenderer.invoke(IPC.applySpawn, input),
+  detectManifest: (input) => ipcRenderer.invoke(IPC.detectManifest, input),
+  launchServer: (input) => ipcRenderer.invoke(IPC.launchServer, input),
+  stopServer: (serverId) => ipcRenderer.send(IPC.stopServer, serverId),
+  openProjectPath: () => ipcRenderer.send(IPC.openPath),
+  onServerLog: (cb) => sub<ServerLogEvent>(IPC.serverLog, cb),
+  onServerStatus: (cb) => sub<ServerStatusEvent>(IPC.serverStatus, cb),
+  onServerReady: (cb) => sub<ServerReadyEvent>(IPC.serverReady, cb)
 }
 
 contextBridge.exposeInMainWorld('api', api)

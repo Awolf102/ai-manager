@@ -446,5 +446,16 @@ export interface RendererApi {
     members?: SpawnedMember[]
     error?: string
   }>
-  applySpawnedTeam: (input: { members: SpawnedMember[]; orchestratorId: string }) => Promise<ProjectGraph>
+  applySpawnedTeam: (input: { members: SpawnedMember[]; orchestratorId: string }) => Promise<ProjectGraph>,
+  detectManifest: (input: { goal: string; orchestratorId: string }) => Promise<{
+    ok: boolean
+    manifest?: RunManifest
+    error?: string
+  }>
+  launchServer: (input: { startCommand: string; port?: number; path?: string }) => Promise<{ serverId: string }>
+  stopServer: (serverId: string) => void
+  openProjectPath: () => void
+  onServerLog: (cb: (e: ServerLogEvent) => void) => () => void
+  onServerStatus: (cb: (e: ServerStatusEvent) => void) => () => void
+  onServerReady: (cb: (e: ServerReadyEvent) => void) => () => void
 }
