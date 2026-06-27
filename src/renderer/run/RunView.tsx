@@ -4,6 +4,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { useStore } from '../store'
 import { effortOfWorker } from '../../shared/effort'
 import type { ProjectGraph } from '../../shared/types'
+import ActivityFeed from './ActivityFeed'
 
 function buildChain(graph: ProjectGraph, rootId: string | null): { id: string; depth: number }[] {
   if (!rootId) return []
@@ -167,7 +168,10 @@ export default function RunView() {
         })}
         {run.error && <div className="run-error">✗ {run.error}</div>}
       </div>
-      <div className="run-output" ref={hostRef} />
+      <div className="run-right">
+        <ActivityFeed runId={run.runId} />
+        <div className="run-output" ref={hostRef} />
+      </div>
     </div>
   )
 }
