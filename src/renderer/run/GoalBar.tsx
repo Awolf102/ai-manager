@@ -1,10 +1,19 @@
 import { useState } from 'react'
 import { Network, Play, Rocket, Sparkles, Square, Target } from 'lucide-react'
+import { isGoalSubmitKey } from './goalbar-keys'
 import { useStore } from '../store'
 import RoleDraftModal from '../RoleDraftModal'
 import TeamSpawnModal from '../TeamSpawnModal'
 import RunResultModal from './RunResultModal'
 import type { RunManifest, SpawnedMember } from '../../shared/types'
+
+const MAX_GOAL_HEIGHT = 160 // px — ~8 lines, then the textarea scrolls
+
+/** Grow the goal textarea to fit its content, capped at MAX_GOAL_HEIGHT. */
+function autosize(el: HTMLTextAreaElement): void {
+  el.style.height = 'auto'
+  el.style.height = `${Math.min(el.scrollHeight, MAX_GOAL_HEIGHT)}px`
+}
 
 export default function GoalBar() {
   const graph = useStore((s) => s.graph)
@@ -86,13 +95,20 @@ export default function GoalBar() {
 
   return (
     <div className="goalbar">
-      <input
+      <textarea
         className="goal-input"
-        placeholder="Describe a goal for the chain to build…"
+        rows={1}
+        placeholder="Describe a goal for the chain to build…  (Enter to run, Shift+Enter for a new line)"
         value={goal}
-        onChange={(e) => setGoal(e.target.value)}
+        onChange={(e) => {
+          setGoal(e.target.value)
+          autosize(e.target)
+        }}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && canRun) void start()
+          if (isGoalSubmitKey(e.key, e.shiftKey)) {
+            e.preventDefault()
+            if (canRun) void start()
+          }
         }}
         disabled={running}
       />
