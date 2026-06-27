@@ -76,4 +76,17 @@ describe('toRunRecord', () => {
     )
     expect(withHandoffs.handoffs).toEqual([{ askerId: 'w1', peerId: 'w2', ask: 'UI ideas' }])
   })
+
+  it('maps userRequests when present and omits when absent', () => {
+    const base = {
+      runId: 'r', goal: 'g', orchestratorId: 'o', startedAt: 'S', updatedAt: 'U',
+      status: 'completed' as const, phase: 'done' as const, cursor: '__end__',
+      actingMode: 'auto' as const, plan: [], tasks: {}, steps: {}, reviews: [],
+      reflections: [], repairAttempts: 0, replanAttempts: 0, replanStageCursor: 0,
+      userRequestCount: 1, final: ''
+    }
+    expect(toRunRecord(base).userRequests).toBeUndefined()
+    const withReqs = { ...base, userRequests: [{ askerId: 'w1', question: 'Q?' }] }
+    expect(toRunRecord(withReqs).userRequests).toEqual([{ askerId: 'w1', question: 'Q?' }])
+  })
 })

@@ -88,6 +88,7 @@ export function seedRunState(args: {
     repairAttempts: 0,
     replanAttempts: 0,
     replanStageCursor: 0,
+    userRequestCount: 0,
     final: ''
   }
 }
