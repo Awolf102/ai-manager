@@ -865,6 +865,8 @@ button {
 }
 
 .run-output {
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
   padding: 6px 8px;
   background: #0b0c10;
@@ -1399,6 +1401,54 @@ button {
   font-size: 12px;
   padding: 2px 10px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- activity feed ---- */
+.run-right {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.activity-feed {
+  flex: 0 0 38%;
+  overflow-y: auto;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  padding: 4px 0;
+  font-size: 12px;
+}
+.activity-empty {
+  padding: 8px 12px;
+  color: var(--muted);
+}
+.activity-row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 2px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.activity-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.activity-time {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+.activity-agent {
+  color: var(--accent);
+  font-weight: 600;
+  flex: none;
+}
+.activity-text {
+  color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
 }
