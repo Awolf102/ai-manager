@@ -42,6 +42,7 @@ const api: RendererApi = {
   onPtyExit: (cb) => sub<PtyExitEvent>(IPC.ptyExit, cb),
   startRun: (input) => ipcRenderer.invoke(IPC.startRun, input),
   stopRun: (runId) => ipcRenderer.invoke(IPC.stopRun, runId),
+  resumeRun: (runId, answer) => ipcRenderer.invoke(IPC.resumeRun, runId, answer),
   onOrchestration: (cb) => sub<OrchestrationEvent>(IPC.orchestration, cb),
   checkAuth: () => ipcRenderer.invoke(IPC.checkAuth),
   listRuns: () => ipcRenderer.invoke(IPC.listRuns),

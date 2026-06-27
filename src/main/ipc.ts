@@ -87,6 +87,9 @@ export function registerIpc(): void {
     orchestrator.startRun(e.sender, input)
   )
   ipcMain.handle(IPC.stopRun, (_e, runId: string) => orchestrator.stopRun(runId))
+  ipcMain.handle(IPC.resumeRun, (e: IpcMainInvokeEvent, runId: string, answer: string) =>
+    orchestrator.resumeRun(e.sender, runId, answer)
+  )
 
   // ---- auth ----
   ipcMain.handle(IPC.checkAuth, () => checkAuth())
