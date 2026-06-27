@@ -868,6 +868,25 @@ ${answer}
 Continue your task using this. If you need another consult, emit another handoff block; otherwise finish and report what you did.`
 }
 
+function askUserSection(): string {
+  return `\n\nYou may ASK THE USER one question if you are blocked on information only they can provide (a decision, a missing detail, a preference). To ask, reply with ONLY this block and nothing else:
+\`\`\`ask
+{ "question": "<exactly what you need from the user>" }
+\`\`\`
+Do NOT ask for secrets (API keys, passwords) — those belong in environment files. Ask only when genuinely blocked; otherwise just finish normally.`
+}
+
+function answerResumePrompt(answer: string): string {
+  if (answer.trim() === '') {
+    return `The user did not provide an answer. Make a reasonable assumption and proceed best-effort. When finished, briefly report what you did and note the assumption you made.`
+  }
+  return `The user answered your question:
+
+${answer}
+
+Continue your task using this. When finished, briefly report what you changed.`
+}
+
 /**
  * Run an agent, letting it CONSULT connected peers (Phase 3). With no consult config
  * (off / no peers) this is a single un-augmented runAgent call → byte-for-byte. The
