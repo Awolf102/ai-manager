@@ -182,7 +182,7 @@ if (asksAvailable()) {
 - **Bounded:** every consumed ask increments `userRequestCount`; once it reaches `maxUserRequests`, the ask section is no longer injected and stray blocks are ignored → no infinite ask loop.
 - **One at a time:** the run is sequential; multiple asks in one wave are serialized (first chosen, rest re-ask later). Documented in code comments.
 - **Skip never stalls:** empty answer resumes best-effort; the worker always completes.
-- **Cancel during pause:** `stopRun(runId)` aborts; on a subsequent resume the abort short-circuits the wave loop as today.
+- **Cancel during pause:** while paused, the run has already left the orchestrator's `active` map (its `drive` returned), so `stopRun(runId)` has no live `AbortController` to abort and is a no-op. The UI therefore **disables the Stop button while a question is outstanding** (`run.pendingInterrupt` set); the user resolves the pause with Submit or Skip, after which the run is back in `active` and Stop aborts the wave loop as usual. (Skip → best-effort is the intended "I don't want to answer" exit; truly abandoning a paused run mid-question is a possible follow-up.)
 - **Sensitive scrub:** answer touches only `resumeInput` (transient) and the resumed agent call; it is never copied into `pendingAsk`, `userRequests`, `steps`, `reviews`, `RunRecord`, or the checkpoint's durable fields. (Caveat: agent *output* may echo it.)
 - **Crash while interrupted:** there is no active crash-recovery IPC wiring today, so this is out of scope. Defensive note: if `executeNode` re-enters with `pendingAsk` set but `resumeInput === undefined`, it clears `pendingAsk` and the wave loop re-runs the still-`pending` group fresh.
 
