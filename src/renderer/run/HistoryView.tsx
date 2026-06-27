@@ -149,6 +149,19 @@ function RunDetail({ record }: { record: RunRecord }) {
         </div>
       )}
 
+      {(record.userRequests ?? []).length > 0 && (
+        <div className="hist-section">
+          <h4>User requests ({record.userRequests!.length})</h4>
+          <ul>
+            {record.userRequests!.map((ur, i) => (
+              <li key={i}>
+                <b>{nameOf(ur.askerId)}</b>: {ur.question}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="hist-section">
         <h4>Agents</h4>
         {record.steps.map((s) => (

@@ -20,6 +20,7 @@ export default function GoalBar() {
   const selectedId = useStore((s) => s.selectedAgentId)
   const running = useStore((s) => s.run.running)
   const runId = useStore((s) => s.run.runId)
+  const pendingInterrupt = useStore((s) => s.run.pendingInterrupt)
   const beginRun = useStore((s) => s.beginRun)
   const [goal, setGoal] = useState('')
   const [drafting, setDrafting] = useState(false)
@@ -140,7 +141,16 @@ export default function GoalBar() {
         <Rocket size={14} /> {detecting ? 'Detecting…' : 'Run result'}
       </button>
       {running ? (
-        <button className="btn danger" onClick={stop}>
+        <button
+          className="btn danger"
+          onClick={stop}
+          disabled={!!pendingInterrupt}
+          title={
+            pendingInterrupt
+              ? 'The run is waiting on your answer — Submit or Skip the question to continue'
+              : undefined
+          }
+        >
           <Square size={13} /> Stop
         </button>
       ) : (

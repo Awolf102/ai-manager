@@ -229,4 +229,35 @@ describe('resumeGraph', () => {
     const graph: CompiledGraph = { entry: 'a', edges: { a: END }, nodes: { a: async () => ({}) } }
     await expect(resumeGraph(graph, 'ghost', store, io(live, store))).rejects.toThrow()
   })
+
+  it('scrubs resumeInput from the error checkpoint when a node throws after consuming the answer', async () => {
+    const store = fakeStore()
+    // First pass: node pauses with an interrupt
+    const graph: CompiledGraph = {
+      entry: 'a',
+      edges: { a: END },
+      nodes: {
+        a: async (s) => {
+          if (s.resumeInput !== undefined) {
+            // Consumed the answer — now something downstream throws
+            throw new Error('boom')
+          }
+          return { interrupt: { kind: 'ask', prompt: 'q?' } }
+        }
+      }
+    }
+    const initial = mkState({ runId: 'r2' })
+    const out1 = await runGraph(graph, initial, store, io(live, store))
+    expect(out1.status).toBe('interrupted')
+
+    // Second pass: resume with a sensitive answer; node throws after reading it
+    const out2 = await resumeGraph(graph, 'r2', store, io(live, store), 'SECRET-ANSWER')
+    expect(out2.status).toBe('error')
+
+    // The persisted checkpoint must NOT contain the sensitive answer
+    const persisted = store.puts.at(-1)!
+    expect(persisted.status).toBe('error')
+    expect(persisted.resumeInput).toBeUndefined()
+    expect(JSON.stringify(persisted)).not.toContain('SECRET-ANSWER')
+  })
 })

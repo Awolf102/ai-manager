@@ -39,11 +39,11 @@ export function startRun(wc: WebContents, input: StartRunInput): { runId: string
   return { runId }
 }
 
-/** Resume a crashed/interrupted run from its checkpoint (re-runs only unfinished work). */
-export function resumeRun(wc: WebContents, runId: string): { runId: string } {
+/** Resume a crashed run, or (Stage 3) resume an interrupted run with a user's answer. */
+export function resumeRun(wc: WebContents, runId: string, resumeInput?: unknown): { runId: string } {
   const abort = new AbortController()
   active.set(runId, abort)
-  void resumeDrive(wc, runId, abort).finally(() => active.delete(runId))
+  void resumeDrive(wc, runId, abort, resumeInput).finally(() => active.delete(runId))
   return { runId }
 }
 
@@ -82,21 +82,33 @@ async function drive(wc: WebContents, state: RunState, abort: AbortController): 
   await finishRun(wc, final, store)
 }
 
-async function resumeDrive(wc: WebContents, runId: string, abort: AbortController): Promise<void> {
+async function resumeDrive(
+  wc: WebContents,
+  runId: string,
+  abort: AbortController,
+  resumeInput?: unknown
+): Promise<void> {
   const { eng, io, store } = makeDeps(wc, runId, abort)
   const saved = await store.get(runId)
   if (!saved) {
     emit(wc, { runId, type: 'run-finished', status: 'error', error: 'no checkpoint to resume' })
     return
   }
-  emit(wc, { runId, type: 'run-started', orchestratorId: saved.orchestratorId, goal: saved.goal })
-  const final = await resumeGraph(buildOrchestratorGraph(eng), runId, store, io)
+  // HITL continuation (an answer was supplied) keeps the live run view — don't reset it
+  // with a fresh run-started. Crash-recovery (no answer) rebuilds the view from scratch.
+  if (resumeInput === undefined) {
+    emit(wc, { runId, type: 'run-started', orchestratorId: saved.orchestratorId, goal: saved.goal })
+  }
+  const final = await resumeGraph(buildOrchestratorGraph(eng), runId, store, io, resumeInput)
   await finishRun(wc, final, store)
 }
 
 async function finishRun(wc: WebContents, final: RunState, store: RunStore): Promise<void> {
   if (final.status === 'interrupted') {
     // Paused for human input (Stage 3): keep the checkpoint for resume, don't finalize.
+    if (final.pendingInterrupt) {
+      emit(wc, { runId: final.runId, type: 'interrupt', interrupt: final.pendingInterrupt })
+    }
     return
   }
   try {

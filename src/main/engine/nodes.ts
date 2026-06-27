@@ -39,6 +39,7 @@ import {
   updateAgent
 } from './project-store'
 import { parseHandoff } from '../../shared/handoff'
+import { parseAskUser } from '../../shared/ask-user'
 
 export const MAX_PARALLEL = 3
 
@@ -88,6 +89,7 @@ export function seedRunState(args: {
     repairAttempts: 0,
     replanAttempts: 0,
     replanStageCursor: 0,
+    userRequestCount: 0,
     final: ''
   }
 }
@@ -222,6 +224,54 @@ async function routeTasks(
 async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeResult> {
   const tasks = structuredClone(state.tasks)
   const steps = { ...state.steps }
+  const maxUserRequests = getSettings().maxUserRequests ?? 0
+  let userRequestCount = state.userRequestCount ?? 0
+  const userRequests = [...(state.userRequests ?? [])]
+  // collected when a worker asks during a wave (one is chosen to pause on)
+  const asks: { ownerId: string; taskIds: string[]; sessionId?: string; question: string }[] = []
+  const asksAvailable = (): boolean => maxUserRequests > 0 && userRequestCount < maxUserRequests
+  // cleared on EVERY return so a consumed answer never persists (sensitive)
+  const scrub = { resumeInput: undefined, pendingAsk: undefined } as Partial<RunState>
+
+  // ── RE-ENTRY: a human answered (or skipped). Resume the asking worker's session. ──
+  if (state.resumeInput !== undefined && state.pendingAsk) {
+    const ask = state.pendingAsk
+    const answer = String(state.resumeInput ?? '')
+    const owned = ask.taskIds.map((id) => tasks[id]).filter(Boolean)
+    const titles = owned.map((t) => t.task.title)
+    setStatus(eng, steps, ask.ownerId, 'working', titles)
+    try {
+      const r = await eng.runAgent({
+        wc: eng.wc,
+        agentId: ask.ownerId,
+        prompt: answerResumePrompt(answer),
+        runId: eng.runId,
+        stepId: ask.ownerId,
+        permissionMode: state.actingMode,
+        resume: true,
+        resumeSessionId: ask.sessionId,
+        abort: eng.abort
+      })
+      if (r.sessionId) await updateAgent({ id: ask.ownerId, sessionId: r.sessionId })
+      const out = r.text || '(no output)'
+      for (const t of owned) {
+        t.status = 'done'
+        t.output = out
+      }
+      steps[ask.ownerId] = { ...stepBase(ask.ownerId, steps), output: out }
+      setStatus(eng, steps, ask.ownerId, eng.abort.signal.aborted ? 'skipped' : 'done', titles)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      for (const t of owned) {
+        t.status = 'done'
+        t.output = `ERROR: ${msg}`
+      }
+      steps[ask.ownerId] = { ...stepBase(ask.ownerId, steps), output: `ERROR: ${msg}` }
+      setStatus(eng, steps, ask.ownerId, 'error', titles)
+    }
+    userRequestCount += 1
+    await io.checkpoint({ ...state, ...scrub, tasks: structuredClone(tasks), steps: { ...steps }, userRequestCount, phase: 'executing' })
+  }
 
   // Execute one worker's batch of ready tasks in a single agent call.
   const runGroup = async (ownerId: string, group: TaskState[]): Promise<void> => {
@@ -237,7 +287,7 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
       const base: StreamAgentOptions = {
         wc: eng.wc,
         agentId: ownerId,
-        prompt: workerPrompt(state.goal, group.map((t) => t.task)),
+        prompt: workerPrompt(state.goal, group.map((t) => t.task)) + (asksAvailable() ? askUserSection() : ''),
         runId: eng.runId,
         stepId: ownerId,
         permissionMode: state.actingMode,
@@ -250,6 +300,15 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
         base,
         consultFor(ownerId, state.goal, state.actingMode)
       )
+      // ── ASK DETECTION: a worker asked → leave its group pending, record the ask. ──
+      if (asksAvailable()) {
+        const req = parseAskUser(text)
+        if (req) {
+          for (const t of group) tasks[t.task.id].status = 'pending'
+          asks.push({ ownerId, taskIds: group.map((t) => t.task.id), sessionId, question: req.question })
+          return
+        }
+      }
       if (sessionId) await updateAgent({ id: ownerId, sessionId })
       const out = text || '(no output)'
       for (const t of group) {
@@ -261,13 +320,13 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       for (const t of group) {
-        tasks[t.task.id].status = 'done' // executed (with error) → flows into review like before
+        tasks[t.task.id].status = 'done'
         tasks[t.task.id].output = `ERROR: ${msg}`
       }
       steps[ownerId] = { ...stepBase(ownerId, steps), output: `ERROR: ${msg}` }
       setStatus(eng, steps, ownerId, 'error', titles)
     }
-    await io.checkpoint({ ...state, tasks: structuredClone(tasks), steps: { ...steps }, phase: 'executing' })
+    await io.checkpoint({ ...state, ...scrub, tasks: structuredClone(tasks), steps: { ...steps }, userRequestCount, phase: 'executing' })
   }
 
   // Wave loop: each wave runs the still-pending tasks whose dependencies have
@@ -283,7 +342,7 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
     if (maxReplans > 0 && state.replanAttempts < maxReplans) {
       const boundary = pendingStageBoundary(tasks, state.replanStageCursor)
       if (boundary != null) {
-        return { patch: { tasks, steps, replanStageCursor: boundary, phase: 'replanning' }, goto: 'replan' }
+        return { patch: { ...scrub, tasks, steps, userRequestCount, ...(userRequests.length ? { userRequests } : {}), replanStageCursor: boundary, phase: 'replanning' }, goto: 'replan' }
       }
     }
     let ready = pending.filter((t) => depsSatisfied(t, tasks))
@@ -298,9 +357,25 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
       byOwner.set(t.ownerId!, list)
     }
     await mapCapped([...byOwner.entries()], MAX_PARALLEL, ([ownerId, group]) => runGroup(ownerId, group))
+
+    // ── A worker asked during this wave → pause on the first (by plan order). ──
+    if (asks.length > 0 && !eng.abort.signal.aborted) {
+      asks.sort((a, b) => state.plan.findIndex((p) => p.id === a.taskIds[0]) - state.plan.findIndex((p) => p.id === b.taskIds[0]))
+      const chosen = asks[0]
+      userRequests.push({ askerId: chosen.ownerId, question: chosen.question })
+      const interrupt = {
+        kind: 'ask-user',
+        prompt: chosen.question,
+        payload: { askerId: chosen.ownerId, askerName: getAgent(chosen.ownerId).name, question: chosen.question }
+      }
+      return {
+        patch: { resumeInput: undefined, tasks, steps, userRequestCount, ...(userRequests.length ? { userRequests } : {}), pendingAsk: chosen, phase: 'executing' },
+        interrupt
+      }
+    }
   }
 
-  return { patch: { tasks, steps, phase: 'reviewing' } }
+  return { patch: { ...scrub, tasks, steps, userRequestCount, ...(userRequests.length ? { userRequests } : {}), phase: 'reviewing' } }
 }
 
 /** The immediate manager that reviews a task (the owner's parent), or the orchestrator. */
@@ -865,6 +940,25 @@ function resumePrompt(peerName: string, answer: string): string {
 ${answer}
 
 Continue your task using this. If you need another consult, emit another handoff block; otherwise finish and report what you did.`
+}
+
+function askUserSection(): string {
+  return `\n\nYou may ASK THE USER one question if you are blocked on information only they can provide (a decision, a missing detail, a preference). To ask, reply with ONLY this block and nothing else:
+\`\`\`ask
+{ "question": "<exactly what you need from the user>" }
+\`\`\`
+Do NOT ask for secrets (API keys, passwords) — those belong in environment files. Ask only when genuinely blocked; otherwise just finish normally.`
+}
+
+function answerResumePrompt(answer: string): string {
+  if (answer.trim() === '') {
+    return `The user did not provide an answer. Make a reasonable assumption and proceed best-effort. When finished, briefly report what you did and note the assumption you made.`
+  }
+  return `The user answered your question:
+
+${answer}
+
+Continue your task using this. When finished, briefly report what you changed.`
 }
 
 /**

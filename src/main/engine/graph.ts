@@ -66,6 +66,7 @@ export async function runGraph(
         ...state,
         status: 'error',
         error: err instanceof Error ? err.message : String(err),
+        resumeInput: undefined,
         updatedAt: now()
       }
       await store.put(state)

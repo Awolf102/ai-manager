@@ -103,6 +103,8 @@ export interface ProjectSettings {
   maxReplans: number
   /** max lateral peer consults a single agent-run may make (0 = off) */
   maxHandoffs: number
+  /** max times a worker may pause the run to ask the user a question (0 = off) */
+  maxUserRequests: number
 }
 
 export const DEFAULT_SETTINGS: ProjectSettings = {
@@ -116,7 +118,8 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   skillsPackEnabled: true,
   skillsPackPath: '',
   maxReplans: 0,
-  maxHandoffs: 0
+  maxHandoffs: 0,
+  maxUserRequests: 0
 }
 
 /** A user-attached reference file (image/doc) for the project, available to every agent. */
@@ -246,6 +249,7 @@ export type OrchestrationEvent =
   | { runId: string; type: 'verdict'; attempt: number; tasks: TaskVerdict[] }
   | { runId: string; type: 'replan'; attempt: number; reason: string; tasks: RunTask[] }
   | { runId: string; type: 'handoff'; askerId: string; peerId: string; ask: string }
+  | { runId: string; type: 'interrupt'; interrupt: Interrupt }
   | {
       runId: string
       type: 'reflection'
@@ -280,6 +284,7 @@ export interface RunRecord {
   reflections: { nodeId: string; win: string; loss: string; lessons: string[] }[]
   replans?: { attempt: number; reason: string }[]
   handoffs?: { askerId: string; peerId: string; ask: string }[]
+  userRequests?: { askerId: string; question: string }[]
   final: string
   error?: string
 }
@@ -392,6 +397,12 @@ export interface RunState {
   replans?: { attempt: number; reason: string }[]
   /** lateral peer consults performed this run, for the Run view + History */
   handoffs?: { askerId: string; peerId: string; ask: string }[]
+  /** asks the user made this run, recorded for the run view + History (questions only — never answers) */
+  userRequests?: { askerId: string; question: string }[]
+  /** bounds worker→user questions this run (mirrors replanAttempts) */
+  userRequestCount: number
+  /** the worker waiting on a user answer; carries its session id across resume (never the answer) */
+  pendingAsk?: { ownerId: string; taskIds: string[]; sessionId?: string; question: string }
   final: string
   error?: string
   /** set when the run paused for human input (Stage 3) */
@@ -450,6 +461,7 @@ export const IPC = {
   ptyExit: 'pty:exit',
   startRun: 'run:start',
   stopRun: 'run:stop',
+  resumeRun: 'run:resume',
   orchestration: 'run:orchestration',
   checkAuth: 'auth:check',
   listRuns: 'runs:list',
@@ -501,6 +513,7 @@ export interface RendererApi {
   onPtyExit: (cb: (e: PtyExitEvent) => void) => () => void
   startRun: (input: StartRunInput) => Promise<{ runId: string }>
   stopRun: (runId: string) => Promise<void>
+  resumeRun: (runId: string, answer: string) => Promise<void>
   onOrchestration: (cb: (e: OrchestrationEvent) => void) => () => void
   checkAuth: () => Promise<AuthStatus>
   listRuns: () => Promise<RunSummary[]>
