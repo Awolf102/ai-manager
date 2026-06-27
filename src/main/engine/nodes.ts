@@ -40,6 +40,7 @@ import {
 } from './project-store'
 import { parseHandoff } from '../../shared/handoff'
 import { parseAskUser } from '../../shared/ask-user'
+import { clampEffort } from '../../shared/model-caps'
 
 export const MAX_PARALLEL = 3
 
@@ -736,12 +737,20 @@ async function assignStep(
     (v): v is { assignments: unknown[] } => Array.isArray((v as { assignments?: unknown })?.assignments),
     { permissionMode: 'default', disallowedTools: THINK_DISALLOW }
   )
-  return (parsed.assignments as Record<string, unknown>[]).map((a) => ({
-    taskId: String(a.taskId ?? ''),
-    childId: typeof a.childId === 'string' && a.childId !== 'null' ? a.childId : null,
-    effort: parseEffort(a.effort),
-    reason: String(a.reason ?? '')
-  }))
+  const validChildIds = new Set(childRoles.map((c) => c.id))
+  return (parsed.assignments as Record<string, unknown>[]).map((a) => {
+    const childId = typeof a.childId === 'string' && a.childId !== 'null' ? a.childId : null
+    return {
+      taskId: String(a.taskId ?? ''),
+      childId,
+      effort: effortForModel(
+        childId && validChildIds.has(childId) ? getAgent(childId).model : undefined,
+        parseEffort(a.effort),
+        getSettings().adaptiveEffort
+      ),
+      reason: String(a.reason ?? '')
+    }
+  })
 }
 
 async function reviewStep(
@@ -1117,6 +1126,17 @@ export function normalizeLessonInput(raw: unknown): string | null {
     return formatLessonBullet(scope, text)
   }
   return null
+}
+
+/** The effort to record/dispatch for an assignment: clamp to the worker's model
+ *  when adaptive effort is on and a worker was chosen; otherwise the request as-is. */
+export function effortForModel(
+  model: string | undefined,
+  requested: Effort | undefined,
+  adaptiveEnabled: boolean
+): Effort | undefined {
+  if (!adaptiveEnabled || !model) return requested
+  return clampEffort(model, requested)
 }
 
 /** The highest effort in a worker's batch (so the hardest task is served), or undefined. */

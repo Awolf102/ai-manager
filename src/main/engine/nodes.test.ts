@@ -4,6 +4,7 @@ import {
   buildOrchestratorGraph,
   seedRunState,
   maxEffort,
+  effortForModel,
   lessonsDigest,
   depsSatisfied,
   normalizeLessonInput,
@@ -1403,5 +1404,19 @@ describe('HITL user requests (Stage 3)', () => {
     expect(final.status).toBe('completed')
     const resume = calls.find((c) => c.kind === 'resume' && c.agentId === 'w1')
     expect(resume!.prompt).toContain('did not provide an answer')
+  })
+})
+
+describe('effortForModel', () => {
+  it('clamps a requested effort to the worker model when adaptive is on', () => {
+    expect(effortForModel('claude-sonnet-4-6', 'xhigh', true)).toBe('max')
+    expect(effortForModel('claude-haiku-4-5', 'high', true)).toBeUndefined()
+    expect(effortForModel('claude-opus-4-8', 'xhigh', true)).toBe('xhigh')
+  })
+  it('passes the requested effort through unchanged when adaptive is off', () => {
+    expect(effortForModel('claude-sonnet-4-6', 'xhigh', false)).toBe('xhigh')
+  })
+  it('passes through unchanged when there is no assigned model (childId null)', () => {
+    expect(effortForModel(undefined, 'xhigh', true)).toBe('xhigh')
   })
 })
