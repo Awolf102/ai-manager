@@ -42,7 +42,8 @@ const h = vi.hoisted(() => {
       autonomy: 'auto',
       adaptiveEffort: true,
       maxReplans: 0,
-      maxHandoffs: 0
+      maxHandoffs: 0,
+      maxUserRequests: 0
     },
     memory: {} as Record<string, string>,
     reflections: [] as { id: string }[]
@@ -1264,5 +1265,138 @@ describe('orchestrator node graph — proactive re-plan', () => {
       h.edges = []
       h.settings.maxReplans = 0
     }
+  })
+})
+
+describe('HITL user requests (Stage 3)', () => {
+  // A worker (w1) asks once on its first work call, then completes on resume.
+  // Plan→route reuse the canned shapes; only the work/resume calls are bespoke.
+  function askingAgent() {
+    const calls: { agentId: string; kind: string; prompt: string }[] = []
+    let w1Asked = false
+    const runAgent: AgentRunner = async (opts) => {
+      const p = opts.prompt
+      const id = opts.agentId
+      if (p.includes('Produce a concise, ordered list')) {
+        return {
+          text: '```json\n{"tasks":[{"id":"t1","title":"T1","description":"do t1"},{"id":"t2","title":"T2","description":"do t2"}]}\n```',
+          sessionId: 's-' + id
+        }
+      }
+      if (p.includes('You route planned tasks')) {
+        const childIds = [...p.matchAll(/- id: (\S+)\n\s+name:/g)].map((m) => m[1])
+        const taskIds = [...p.matchAll(/- id: (t\d+) —/g)].map((m) => m[1])
+        const assignments = taskIds.map((tid, i) => ({
+          taskId: tid, childId: childIds[i % childIds.length] ?? null, reason: 'r'
+        }))
+        return { text: '```json\n' + JSON.stringify({ assignments }) + '\n```' }
+      }
+      if (p.includes('The user answered') || p.includes('did not provide an answer')) {
+        calls.push({ agentId: id, kind: 'resume', prompt: p })
+        return { text: `resumed ${id}`, sessionId: 's2-' + id }
+      }
+      if (p.includes('You have been assigned the following task')) {
+        if (id === 'w1' && !w1Asked) {
+          w1Asked = true
+          calls.push({ agentId: id, kind: 'ask', prompt: p })
+          return { text: '```ask\n{"question":"Which color?"}\n```', sessionId: 'sess-w1' }
+        }
+        calls.push({ agentId: id, kind: 'work', prompt: p })
+        return { text: `worked ${id}`, sessionId: 's-' + id }
+      }
+      // reviews / reflect / synth → pass-through so the run can finish
+      if (p.includes('Judge each task')) return { text: '```json\n{"tasks":[{"taskId":"t1","verdict":"pass","feedback":""},{"taskId":"t2","verdict":"pass","feedback":""}]}\n```' }
+      if (p.includes('final INTEGRATION review')) return { text: '```json\n{"tasks":[{"taskId":"t1","verdict":"pass","feedback":""},{"taskId":"t2","verdict":"pass","feedback":""}]}\n```' }
+      if (p.includes('Reflect on')) return { text: '```json\n{"win":"w","loss":"","lessons":[]}\n```' }
+      if (p.includes('Write a clear final report')) return { text: 'FINAL' }
+      return { text: 'unknown' }
+    }
+    return { runAgent, calls }
+  }
+
+  it('off (maxUserRequests=0): an ask block is treated as ordinary output', async () => {
+    h.settings.maxUserRequests = 0
+    const { runAgent } = askingAgent()
+    const e = eng(runAgent)
+    const store = fakeStore()
+    const final = await runGraph(
+      buildOrchestratorGraph(e),
+      seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' }),
+      store,
+      makeIO(e.abort.signal, store)
+    )
+    expect(final.status).toBe('completed')
+    expect(final.pendingInterrupt).toBeUndefined()
+    expect(final.pendingAsk).toBeUndefined()
+    // the ask text became the worker's output (not a pause)
+    expect(final.tasks['t1'].output).toContain('ask')
+  })
+
+  it('on: a worker ask pauses the run with an interrupt + pendingAsk', async () => {
+    h.settings.maxUserRequests = 2
+    const events: { type: string }[] = []
+    const { runAgent } = askingAgent()
+    const e: Eng = { ...eng(runAgent), emit: (ev) => events.push(ev) }
+    const store = fakeStore()
+    const io: NodeIO = { signal: e.abort.signal, emit: (ev) => events.push(ev), checkpoint: (s) => store.put(s) }
+    const final = await runGraph(
+      buildOrchestratorGraph(e),
+      seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' }),
+      store,
+      io
+    )
+    expect(final.status).toBe('interrupted')
+    expect(final.pendingInterrupt?.kind).toBe('ask-user')
+    expect(final.pendingInterrupt?.prompt).toBe('Which color?')
+    expect(final.pendingAsk?.ownerId).toBe('w1')
+    expect(final.pendingAsk?.sessionId).toBe('sess-w1')
+    expect(final.pendingAsk?.taskIds).toContain('t1')
+    expect(final.userRequests).toEqual([{ askerId: 'w1', question: 'Which color?' }])
+    // the asking task is left pending; the answer is nowhere in state
+    expect(final.tasks['t1'].status).toBe('pending')
+  })
+
+  it('resume with an answer continues the asking worker and finishes; no answer persisted', async () => {
+    h.settings.maxUserRequests = 2
+    const { runAgent, calls } = askingAgent()
+    const e = eng(runAgent)
+    const store = fakeStore()
+    const io = makeIO(e.abort.signal, store)
+    await runGraph(
+      buildOrchestratorGraph(e),
+      seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' }),
+      store,
+      io
+    )
+    const final = await resumeGraph(buildOrchestratorGraph(e), 'run1', store, io, 'Use teal')
+    expect(final.status).toBe('completed')
+    expect(final.userRequestCount).toBe(1)
+    expect(final.pendingAsk).toBeUndefined()
+    expect(final.resumeInput).toBeUndefined()
+    // the asker was resumed via its captured session with the answer
+    const resume = calls.find((c) => c.kind === 'resume' && c.agentId === 'w1')
+    expect(resume).toBeTruthy()
+    expect(resume!.prompt).toContain('Use teal')
+    // the raw answer never lands in persisted run state (questions are fine; answers are not)
+    const persisted = JSON.stringify({ ...final, steps: undefined })  // steps.output may echo; exclude
+    expect(persisted).not.toContain('Use teal')
+  })
+
+  it('skip (empty answer) resumes best-effort and finishes', async () => {
+    h.settings.maxUserRequests = 2
+    const { runAgent, calls } = askingAgent()
+    const e = eng(runAgent)
+    const store = fakeStore()
+    const io = makeIO(e.abort.signal, store)
+    await runGraph(
+      buildOrchestratorGraph(e),
+      seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' }),
+      store,
+      io
+    )
+    const final = await resumeGraph(buildOrchestratorGraph(e), 'run1', store, io, '')
+    expect(final.status).toBe('completed')
+    const resume = calls.find((c) => c.kind === 'resume' && c.agentId === 'w1')
+    expect(resume!.prompt).toContain('did not provide an answer')
   })
 })
