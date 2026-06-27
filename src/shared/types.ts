@@ -13,6 +13,7 @@ export interface SpawnedMember {
   kind: 'manager' | 'worker'
   role: string
   reportsTo: string
+  model?: string
   skills?: string[]
 }
 

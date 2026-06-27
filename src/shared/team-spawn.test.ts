@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { spawnTeamPrompt, parseSpawnedTeam } from './team-spawn'
+import { spawnTeamPrompt, parseSpawnedTeam, pickSpawnModel } from './team-spawn'
 
 describe('spawnTeamPrompt', () => {
   it('includes the goal, orchestrator name, existing members, and the JSON shape', () => {
@@ -77,5 +77,48 @@ describe('parseSpawnedTeam', () => {
   it('omits skills when none are valid / none provided', () => {
     const text = '```json\n{"members":[{"id":"m1","name":"D","kind":"worker","role":"# R","reportsTo":"orchestrator"}]}\n```'
     expect(parseSpawnedTeam(text, ['data:airflow'])![0].skills).toBeUndefined()
+  })
+})
+
+describe('spawnTeamPrompt model rubric', () => {
+  it('omits the model field when assignModels is false (byte-for-byte today)', () => {
+    const p = spawnTeamPrompt('g', 'Boss', [], [], false)
+    expect(p).not.toMatch(/"model"/)
+    expect(p).not.toMatch(/Opus/)
+  })
+  it('asks for a model with a tier rubric when assignModels is true', () => {
+    const p = spawnTeamPrompt('g', 'Boss', [], [], true)
+    expect(p).toContain('"model"')
+    expect(p).toContain('claude-sonnet-4-6')
+    expect(p).toContain('claude-opus-4-8')
+    expect(p).not.toContain('claude-haiku-4-5') // never offered to workers
+  })
+})
+
+describe('parseSpawnedTeam model', () => {
+  const wrap = (m: object) => '```json\n' + JSON.stringify({ members: [m] }) + '\n```'
+  it('keeps a valid model', () => {
+    const r = parseSpawnedTeam(wrap({ id: 'a', name: 'A', kind: 'worker', role: 'r', model: 'claude-opus-4-8' }))
+    expect(r?.[0].model).toBe('claude-opus-4-8')
+  })
+  it('drops an invalid model', () => {
+    const r = parseSpawnedTeam(wrap({ id: 'a', name: 'A', kind: 'worker', role: 'r', model: 'gpt-5' }))
+    expect(r?.[0].model).toBeUndefined()
+  })
+  it('rejects Haiku for a worker', () => {
+    const r = parseSpawnedTeam(wrap({ id: 'a', name: 'A', kind: 'worker', role: 'r', model: 'claude-haiku-4-5' }))
+    expect(r?.[0].model).toBeUndefined()
+  })
+})
+
+describe('pickSpawnModel', () => {
+  it('uses the proposed model when autoAssign is on and it is set', () => {
+    expect(pickSpawnModel({ id: 'a', name: 'A', kind: 'worker', role: 'r', reportsTo: 'orchestrator', model: 'claude-opus-4-8' }, true)).toBe('claude-opus-4-8')
+  })
+  it('falls back to the kind default when autoAssign is off', () => {
+    expect(pickSpawnModel({ id: 'a', name: 'A', kind: 'worker', role: 'r', reportsTo: 'orchestrator', model: 'claude-opus-4-8' }, false)).toBe('claude-sonnet-4-6')
+  })
+  it('falls back to the kind default when no model proposed', () => {
+    expect(pickSpawnModel({ id: 'a', name: 'A', kind: 'worker', role: 'r', reportsTo: 'orchestrator' }, true)).toBe('claude-sonnet-4-6')
   })
 })
