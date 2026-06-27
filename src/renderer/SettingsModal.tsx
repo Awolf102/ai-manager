@@ -143,6 +143,30 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="field">
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={s.skillsPackEnabled}
+              onChange={(e) => void update({ skillsPackEnabled: e.target.checked })}
+            />
+            Skills pack — load curated design + Playwright skills as options for every agent
+          </label>
+        </div>
+
+        <div className="field">
+          <label>Skills-pack folder (optional)</label>
+          <input
+            type="text"
+            placeholder="~/.ai-manager/skills-pack"
+            value={s.skillsPackPath}
+            onChange={(e) => void update({ skillsPackPath: e.target.value })}
+          />
+          <div className="radio-desc" style={{ marginTop: 4 }}>
+            Leave blank for the default. Skills are model-invoked — available to every agent, never forced.
+          </div>
+        </div>
+
+        <div className="field">
           <label>Autonomy (acting steps)</label>
           <select
             value={s.autonomy}
