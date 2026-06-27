@@ -91,6 +91,8 @@ export interface ProjectSettings {
   autonomy: Autonomy
   /** manager assesses task difficulty and assigns a reasoning effort per task */
   adaptiveEffort: boolean
+  /** orchestrator picks each spawned worker's model tier at team build (off = static default) */
+  autoAssignModels: boolean
   /** auto pull the linked team brain before a run + push after (B2b) */
   autoSyncTeam: boolean
   /** install-count floor for trusting a non-Anthropic plugin's skills */
@@ -113,6 +115,7 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   reflection: true,
   autonomy: 'auto',
   adaptiveEffort: true,
+  autoAssignModels: false,
   autoSyncTeam: false,
   skillInstallThreshold: 100000,
   skillsPackEnabled: true,
