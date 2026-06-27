@@ -60,10 +60,16 @@ export const MODEL_EFFORT_CAPS: Record<string, Effort[]> = {
   'claude-haiku-4-5':  [],                                  // no effort parameter
 }
 
-/** Highest supported level ≤ the requested effort, or undefined when the model
- *  supports no effort (e.g. Haiku) or no effort was requested. */
+/** Clamp a requested effort to what the model supports: round UP to the nearest
+ *  supported level ≥ requested (e.g. Sonnet `xhigh` → `max`); cap at the model's
+ *  ceiling if the request exceeds it; `undefined` when the model has no effort
+ *  parameter (Haiku) or no effort was requested; pass through for an unknown model. */
 export function clampEffort(model: string, effort: Effort | undefined): Effort | undefined
 ```
+
+Clamp direction is **round up** so a task judged harder-than-`high` is not silently
+reduced below its intended difficulty (Sonnet has `high` and `max` but no `xhigh`, so
+`xhigh` → `max`). This matches the approved design example.
 
 Rationale for a static map over querying the SDK's `ModelInfo.effort`: only 3 models,
 deterministic, synchronous (no async in the routing hot path), trivially unit-testable.
@@ -71,25 +77,35 @@ Adding a future model is one map entry. (SDK `ModelInfo` is the fallback if the 
 ever grows large.) Unknown model id → treat as "no clamp data": return the requested effort
 unchanged (defensive; never throws).
 
-### 2. Routing-time clamp — `nodes.ts`
+### 2. Routing-time clamp — `nodes.ts` (`assignStep`)
 
-At the points where a task's effort is finalized onto the assignment / passed to the runner
-(`nodes.ts:285`, `nodes.ts:517`), clamp to the resolved worker's model:
+Clamp at the single point where an assignment is built (`assignStep`, `nodes.ts:739-744`) —
+where the chosen worker (`childId`) and the raw effort first meet — via a pure combiner:
 
 ```ts
-const effort = getSettings().adaptiveEffort
-  ? clampEffort(getAgent(childId).model, assignedEffort)
-  : undefined
+export function effortForModel(model: string | undefined, requested: Effort | undefined, adaptiveEnabled: boolean): Effort | undefined {
+  if (!adaptiveEnabled || !model) return requested
+  return clampEffort(model, requested)
+}
+// assignStep: effort: effortForModel(childId ? getAgent(childId).model : undefined, parseEffort(a.effort), getSettings().adaptiveEffort)
 ```
 
-This guarantees the value reaching `agent-runner.ts:132` (`options.effort = opts.effort`) is
-always valid for `agent.model` (`agent-runner.ts:109`). Applies to **all** workers regardless
-of how they were created (it is a correctness fix, not gated by `autoAssignModels`).
+This is the right single site: the merge at `nodes.ts:201` (`tasks[a.taskId].effort = a.effort`),
+the dispatch sites (`:285`, `:517`), and the badge (`effortOfWorker`, which reads the recorded
+assignment effort) all read this value — so clamping once here makes the badge, the merged task
+effort, and the dispatched effort consistent, and guarantees the value reaching
+`agent-runner.ts:132` is valid for `agent.model`. Applies to **all** workers regardless of how
+they were created (correctness fix, not gated by `autoAssignModels`).
 
-**Parity:** `adaptiveEffort` off → effort already `undefined` → clamp never runs → byte-for-byte
-unchanged. On → clamp only ever lowers effort to a valid level.
+**Parity:** `adaptiveEffort` off → `effortForModel` returns the request unchanged (today's
+behavior — raw effort recorded, dispatch already passes `undefined` via the `:285`/`:517` gate)
+→ byte-for-byte unchanged. On → clamp only ever adjusts effort to a model-valid level.
 
-### 3. Build-time model assignment — `team-spawner.ts`, `spawnTeamPrompt`, `role-drafter.ts`
+### 3. Build-time model assignment — `team-spawn.ts` (prompt + parser), `team-spawner.ts`, `applySpawnedTeam`
+
+(Note: `role-drafter.ts` is **not** a model site — it drafts role.md for agents that already
+exist; it never creates agents, so it never picks a model. Model assignment happens only at
+team spawn.)
 
 Extend the orchestrator's team/role proposal so each proposed **worker** carries a `model`,
 chosen via a tier rubric aligned with the existing effort rubric (`nodes.ts:1242`) so model and
@@ -145,12 +161,13 @@ no-op when effort is off).
 ## Files touched
 
 - `src/shared/model-caps.ts` (new) + `model-caps.test.ts`
-- `src/main/engine/nodes.ts` (clamp at effort-assignment points)
-- `src/main/engine/team-spawner.ts`, `spawnTeamPrompt`, `src/main/engine/role-drafter.ts`
-  (model field + rubric + parse/validate/fallback)
-- `src/shared/types.ts` (`autoAssignModels` in Settings + default)
+- `src/main/engine/nodes.ts` (export `effortForModel`; clamp in `assignStep`)
+- `src/shared/team-spawn.ts` (`spawnTeamPrompt` model rubric, `parseSpawnedTeam` validate, `pickSpawnModel`)
+- `src/main/engine/team-spawner.ts` (pass `autoAssignModels` to the prompt)
+- `src/main/engine/project-store.ts` (`applySpawnedTeam` uses `pickSpawnModel`)
+- `src/shared/types.ts` (`SpawnedMember.model?`, `autoAssignModels` in Settings + default, `Assignment.assignedEffort?`)
 - `src/renderer/SettingsModal.tsx` (toggle)
-- `src/renderer/run/RunView.tsx` (optional downgrade tooltip)
+- `src/renderer/run/RunView.tsx` + `src/shared/effort.ts` (optional capped tooltip)
 - Tests alongside each.
 
 ## Out of scope
