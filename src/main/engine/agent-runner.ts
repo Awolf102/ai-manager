@@ -7,6 +7,7 @@ import type { AgentStreamEvent, ContextFile, Effort, PermissionMode, RunHeadless
 import { IPC } from '../../shared/types'
 import { skillOptionsFor } from '../../shared/skill-trust'
 import { assembleAgentSkills, headlessNote } from '../../shared/skills-pack'
+import { narrateTool } from '../../shared/narrate'
 import { discoverSkills } from './skill-discovery'
 import { resolvePackPath, discoverPackSkills } from './skills-pack'
 import { buildContextBlock } from '../../shared/context-files'
@@ -140,7 +141,8 @@ export async function streamAgent(
             outText += block.text + '\n'
             send('assistant', toTerminal(block.text))
           } else if (block.type === 'tool_use') {
-            send('tool_use', `\x1b[36m⚙ ${block.name}\x1b[0m ${oneLine(JSON.stringify(block.input))}\r\n`)
+            send('tool_use', `\x1b[36m⚙ ${block.name}\x1b[0m ${oneLine(JSON.stringify(block.input))}\r\n`,
+              { narration: narrateTool(block.name, block.input) })
           }
         }
       } else if (message.type === 'user') {

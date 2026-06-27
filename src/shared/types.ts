@@ -180,6 +180,8 @@ export interface AgentStreamEvent {
   /** present on the final 'result' event */
   sessionId?: string
   isFinal?: boolean
+  /** plain-English narration of a tool call (set only on 'tool_use' events) */
+  narration?: string
 }
 
 export interface PtyDataEvent {
