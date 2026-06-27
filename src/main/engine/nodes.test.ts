@@ -1269,6 +1269,11 @@ describe('orchestrator node graph — proactive re-plan', () => {
 })
 
 describe('HITL user requests (Stage 3)', () => {
+  // Restore the off-default so this block can't leak maxUserRequests into a later suite.
+  afterEach(() => {
+    h.settings.maxUserRequests = 0
+  })
+
   // A worker (w1) asks once on its first work call, then completes on resume.
   // Plan→route reuse the canned shapes; only the work/resume calls are bespoke.
   function askingAgent() {
