@@ -6,7 +6,9 @@ import type { Options, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { AgentStreamEvent, ContextFile, Effort, PermissionMode, RunHeadlessInput } from '../../shared/types'
 import { IPC } from '../../shared/types'
 import { skillOptionsFor } from '../../shared/skill-trust'
+import { assembleAgentSkills, headlessNote } from '../../shared/skills-pack'
 import { discoverSkills } from './skill-discovery'
+import { resolvePackPath, discoverPackSkills } from './skills-pack'
 import { buildContextBlock } from '../../shared/context-files'
 import { buildAgentContext, getSettings, updateAgent } from './project-store'
 
@@ -35,6 +37,21 @@ async function discoveredPlugins(): Promise<import('../../shared/types').Discove
   const plugins = await discoverSkills(getSettings().skillInstallThreshold ?? 100000)
   discoveryCache = { at: now, plugins }
   return plugins
+}
+
+let packCache: { at: number; path: string; names: string[] } | null = null
+/** Discover the always-available pack skills, cached briefly like discoveredPlugins(). */
+async function packSkills(): Promise<{ path: string; names: string[] }> {
+  const s = getSettings()
+  if (!s.skillsPackEnabled) return { path: '', names: [] }
+  const path = resolvePackPath(s.skillsPackPath ?? '')
+  const now = Date.now()
+  if (packCache && packCache.path === path && now - packCache.at < 30_000) {
+    return { path, names: packCache.names }
+  }
+  const names = await discoverPackSkills(path)
+  packCache = { at: now, path, names }
+  return { path, names }
 }
 
 export interface StreamAgentOptions {
@@ -84,10 +101,12 @@ export async function streamAgent(
       send('system', `\x1b[2m▶ ${agent.name} · ${agent.model}\x1b[0m\r\n`)
     }
 
+    const pack = await packSkills()
+
     const options: Options = {
       cwd: projectPath,
       model: agent.model,
-      systemPrompt: { type: 'preset', preset: 'claude_code', append: composeAppend(role, memory, context) },
+      systemPrompt: { type: 'preset', preset: 'claude_code', append: composeAppend(role, memory, context) + headlessNote(pack.names) },
       permissionMode: opts.permissionMode ?? agent.permissionMode,
       settingSources: ['project'],
       abortController: abort
@@ -101,10 +120,12 @@ export async function streamAgent(
     // Per-agent skills: load each assigned skill's plugin (MCP servers skipped —
     // we want the skill guidance, not the warehouse connectors) and filter to the
     // assigned ids. Discovered paths are already verified to exist on disk.
-    const skillOpts = skillOptionsFor(agent.skills, await discoveredPlugins())
-    if (skillOpts) {
-      options.plugins = skillOpts.plugins
-      options.skills = skillOpts.skills
+    // Merge with the always-available skills pack (off = byte-for-byte unchanged).
+    const perAgent = skillOptionsFor(agent.skills, await discoveredPlugins())
+    const { options: skillSdk } = assembleAgentSkills(perAgent, pack.path, pack.names)
+    if (skillSdk) {
+      options.plugins = skillSdk.plugins
+      options.skills = skillSdk.skills
     }
 
     if (opts.effort) options.effort = opts.effort

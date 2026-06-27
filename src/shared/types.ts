@@ -95,6 +95,10 @@ export interface ProjectSettings {
   autoSyncTeam: boolean
   /** install-count floor for trusting a non-Anthropic plugin's skills */
   skillInstallThreshold: number
+  /** load the always-available curated skills pack for every agent */
+  skillsPackEnabled: boolean
+  /** override the skills-pack dir; empty = ~/.ai-manager/skills-pack */
+  skillsPackPath: string
   /** max proactive mid-run re-plans the orchestrator may perform (0 = off) */
   maxReplans: number
   /** max lateral peer consults a single agent-run may make (0 = off) */
@@ -109,6 +113,8 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   adaptiveEffort: true,
   autoSyncTeam: false,
   skillInstallThreshold: 100000,
+  skillsPackEnabled: true,
+  skillsPackPath: '',
   maxReplans: 0,
   maxHandoffs: 0
 }
