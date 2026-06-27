@@ -25,36 +25,46 @@ cpSync(join(pwTmp, 'skills', 'playwright-skill'), join(skillsDir, 'playwright-sk
 run('npm run setup', join(skillsDir, 'playwright-skill')) // npm install + npx playwright install chromium
 rmSync(pwTmp, { recursive: true, force: true })
 
-// --- Design skills: run each installer in a temp project, copy resulting .claude/skills/* ---
-// (impeccable's `/impeccable init` is a Claude Code slash command; run it once yourself if its
-//  setup needs it. This copies whatever skill folders the installers emit.)
-const designInstalls = [
-  'npx -y skills add emilkowalski/skill',
-  'npx -y skills add Leonxlnx/taste-skill',
-  'npx -y impeccable install',
-  'npx -y uipro init --ai claude'
+// --- Design skills: install into ONE temp dir with the correct non-interactive flags,
+// then copy only the CURATED set into the pack. The `skills` CLI agent id is `claude-code`
+// (not `claude`); uipro ships as the `uipro-cli` npm package. impeccable's `/impeccable init`
+// is a Claude Code slash command — run it once yourself for its full design context.
+const SELECTED = [
+  'emil-design-eng',            // emilkowalski/skill
+  'review-animations',          // emilkowalski/skill
+  'design-taste-frontend',      // Leonxlnx/taste-skill
+  'high-end-visual-design',     // Leonxlnx/taste-skill
+  'redesign-existing-projects', // Leonxlnx/taste-skill
+  'ui-ux-pro-max',              // uipro-cli
+  'impeccable'                  // npx impeccable install
 ]
-for (const cmd of designInstalls) {
-  const t = join(tmpdir(), `skill-${process.pid}-${Math.abs(hash(cmd))}`)
-  rmSync(t, { recursive: true, force: true })
-  mkdirSync(t, { recursive: true })
+const designCmds = [
+  'npx -y skills add emilkowalski/skill -y --copy --skill "*" --agent claude-code',
+  'npx -y skills add Leonxlnx/taste-skill -y --copy --skill "*" --agent claude-code',
+  'npx -y uipro-cli init --ai claude --force',
+  'npx -y impeccable install'
+]
+const dTmp = join(tmpdir(), `skills-design-${process.pid}`)
+rmSync(dTmp, { recursive: true, force: true })
+mkdirSync(dTmp, { recursive: true })
+for (const cmd of designCmds) {
   try {
-    run(cmd, t)
-    const src = join(t, '.claude', 'skills')
-    if (existsSync(src)) {
-      for (const name of readdirSync(src)) cpSync(join(src, name), join(skillsDir, name), { recursive: true })
-    } else {
-      console.warn(`[warn] "${cmd}" produced no .claude/skills/ in ${t} — inspect and copy manually.`)
-    }
+    run(cmd, dTmp)
   } catch (e) {
     console.warn(`[warn] "${cmd}" failed: ${e.message} — skipping; install manually if needed.`)
-  } finally {
-    rmSync(t, { recursive: true, force: true })
   }
 }
-
-// tiny stable hash for temp dir names (Math.random is fine here; not in the app)
-function hash(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return h }
+const dSrc = join(dTmp, '.claude', 'skills')
+for (const name of SELECTED) {
+  const from = join(dSrc, name)
+  if (existsSync(from)) {
+    cpSync(from, join(skillsDir, name), { recursive: true })
+    console.log(`  + ${name}`)
+  } else {
+    console.warn(`[warn] selected skill "${name}" not found in ${dSrc} — install it manually.`)
+  }
+}
+rmSync(dTmp, { recursive: true, force: true })
 
 console.log(`\nSkills pack ready at: ${pack}`)
 console.log('Skills installed:', existsSync(skillsDir) ? readdirSync(skillsDir).join(', ') : '(none)')
