@@ -740,16 +740,12 @@ async function assignStep(
   const validChildIds = new Set(childRoles.map((c) => c.id))
   return (parsed.assignments as Record<string, unknown>[]).map((a) => {
     const childId = typeof a.childId === 'string' && a.childId !== 'null' ? a.childId : null
-    return {
-      taskId: String(a.taskId ?? ''),
-      childId,
-      effort: effortForModel(
-        childId && validChildIds.has(childId) ? getAgent(childId).model : undefined,
-        parseEffort(a.effort),
-        getSettings().adaptiveEffort
-      ),
-      reason: String(a.reason ?? '')
-    }
+    const model = childId && validChildIds.has(childId) ? getAgent(childId).model : undefined
+    const requested = parseEffort(a.effort)
+    const effort = effortForModel(model, requested, getSettings().adaptiveEffort)
+    const out: Assignment = { taskId: String(a.taskId ?? ''), childId, effort, reason: String(a.reason ?? '') }
+    if (requested && effort && requested !== effort) out.assignedEffort = requested
+    return out
   })
 }
 

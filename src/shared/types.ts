@@ -236,6 +236,8 @@ export interface Assignment {
   childId: string | null
   /** reasoning effort the manager assigned by assessing the task's difficulty */
   effort?: Effort
+  /** the manager's pre-clamp requested effort, recorded only when it was capped to the model */
+  assignedEffort?: Effort
   reason: string
 }
 
