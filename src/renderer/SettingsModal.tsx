@@ -116,6 +116,23 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="field">
+          <label>Max user questions per run (0 = off)</label>
+          <input
+            type="number"
+            min={0}
+            max={5}
+            value={s.maxUserRequests}
+            onChange={(e) =>
+              void update({ maxUserRequests: Math.max(0, Math.min(5, Number(e.target.value) || 0)) })
+            }
+          />
+          <div className="radio-desc" style={{ marginTop: 4 }}>
+            When on, a worker that is blocked may pause the run to ask you one question. Your answer
+            resumes that worker. Workers only — it's sent to the agent, so don't share secrets.
+          </div>
+        </div>
+
+        <div className="field">
           <label className="check">
             <input
               type="checkbox"

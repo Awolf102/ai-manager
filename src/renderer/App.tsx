@@ -10,6 +10,7 @@ import RunView from './run/RunView'
 import HistoryView from './run/HistoryView'
 import SettingsModal from './SettingsModal'
 import ContextModal from './ContextModal'
+import HitlModal from './HitlModal'
 import { AGENT_KINDS } from '../shared/types'
 import type { AgentKind, AuthStatus, ProjectGraph, ProjectMeta } from '../shared/types'
 
@@ -267,6 +268,7 @@ export default function App() {
       {showAdd && <AddAgentModal onClose={() => setShowAdd(false)} onCreated={setGraph} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showContext && <ContextModal onClose={() => setShowContext(false)} />}
+      <HitlModal />
       {authBanner}
     </div>
   )

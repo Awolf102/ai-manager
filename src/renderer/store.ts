@@ -31,6 +31,9 @@ export interface RunState {
   reviewAttempt: number
   replans: { attempt: number; reason: string }[]
   handoffs: { askerId: string; peerId: string; ask: string }[]
+  userRequests: { askerId: string; question: string }[]
+  pendingInterrupt: { question: string; askerName: string; askerId: string } | null
+  interruptMinimized: boolean
   memoryUpdated: Record<string, number>
   final: string
   error?: string
@@ -50,6 +53,9 @@ const emptyRun: RunState = {
   reviewAttempt: 0,
   replans: [],
   handoffs: [],
+  userRequests: [],
+  pendingInterrupt: null,
+  interruptMinimized: false,
   memoryUpdated: {},
   final: '',
   error: undefined,
@@ -75,6 +81,8 @@ interface AppState {
   beginRun: (runId: string, goal: string, orchestratorId: string) => void
   applyOrchestration: (e: OrchestrationEvent) => void
   selectStep: (id: string) => void
+  answerInterrupt: (answer: string) => void
+  minimizeInterrupt: (v: boolean) => void
   setShowRunView: (v: boolean) => void
   openHistory: () => void
 
@@ -187,6 +195,15 @@ export const useStore = create<AppState>((set, get) => ({
         case 'handoff':
           run.handoffs = [...run.handoffs, { askerId: e.askerId, peerId: e.peerId, ask: e.ask }]
           return { run }
+        case 'interrupt': {
+          const pl = e.interrupt.payload as { askerId: string; askerName: string; question: string } | undefined
+          run.pendingInterrupt = pl
+            ? { question: pl.question, askerName: pl.askerName, askerId: pl.askerId }
+            : { question: e.interrupt.prompt, askerName: 'Agent', askerId: '' }
+          run.interruptMinimized = false
+          run.userRequests = [...run.userRequests, { askerId: run.pendingInterrupt.askerId, question: run.pendingInterrupt.question }]
+          return { run }
+        }
         case 'reflection':
           run.memoryUpdated = { ...run.memoryUpdated, [e.nodeId]: e.lessons.length }
           return { run }
@@ -203,6 +220,13 @@ export const useStore = create<AppState>((set, get) => ({
     }),
 
   selectStep: (id) => set((s) => ({ run: { ...s.run, selectedStepId: id } })),
+  answerInterrupt: (answer) =>
+    set((s) => {
+      const runId = s.run.runId
+      if (runId) void window.api.resumeRun(runId, answer)
+      return { run: { ...s.run, pendingInterrupt: null, interruptMinimized: false } }
+    }),
+  minimizeInterrupt: (v) => set((s) => ({ run: { ...s.run, interruptMinimized: v } })),
   setShowRunView: (v) => set({ showRunView: v }),
   openHistory: () => set({ showHistory: true, activeDockId: 'history' }),
 

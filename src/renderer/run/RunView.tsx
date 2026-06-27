@@ -123,6 +123,11 @@ export default function RunView() {
             ↪ Handoff: {nameOf(hnd.askerId)} → {nameOf(hnd.peerId)}: {hnd.ask}
           </div>
         ))}
+        {run.userRequests.map((ur, i) => (
+          <div key={`ur-${i}`} className="run-userrequest" title={ur.question}>
+            ❓ Asked you · {nameOf(ur.askerId)}: {ur.question}
+          </div>
+        ))}
         {chain.map(({ id, depth }) => {
           const status = run.nodeStatus[id] ?? 'idle'
           const tasks = run.nodeTasks[id]

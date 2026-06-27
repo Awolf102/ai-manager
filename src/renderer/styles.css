@@ -1368,3 +1368,37 @@ button {
   stroke: #d6a44c;
   stroke-dasharray: 6 4;
 }
+
+/* ---- human-in-the-loop modal ---- */
+.hitl-question {
+  background: #11131a;
+  border: 1px solid #2a2d3a;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 8px 0;
+  white-space: pre-wrap;
+}
+.hitl-badge {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 50;
+  background: #2b2150;
+  color: #e6e8ee;
+  border: 1px solid #4b3f86;
+  border-radius: 999px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.hitl-badge:hover {
+  background: #392b6b;
+}
+.run-userrequest {
+  color: #c8b6ff;
+  font-size: 12px;
+  padding: 2px 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
