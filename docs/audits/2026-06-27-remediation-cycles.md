@@ -83,3 +83,16 @@ should be captured as overhaul acceptance criteria:
 - **2026-06-28** — **Cycle S1 (Autonomy blast-radius hardening) ✅ MERGED to main** (merge `ff2bc73`). New pure `permission-options.ts` (`buildPermissionOptions`) sets the SDK-required `allowDangerouslySkipPermissions:true` for `bypassPermissions` (fixes a likely-broken Full-auto run); `agent-runner.streamAgent` spreads it (single query() site). `SettingsModal` gives Full auto honest danger copy + an acknowledgement gate (reuses U1 `ConfirmDialog`) + `.autonomy-danger` styling. `buildContextBlock` reframes user-attached context files as data-not-instructions (`#20`). 313 tests, opus whole-branch review = ready-to-merge. Audit #3 + #9 + #20 resolved (the **danger-UI/correctness/framing** parts). ⚠️ **RESIDUAL (deferred, documented in the spec):** true filesystem confinement of a Full-auto/`bypassPermissions` run is NOT achievable in-SDK (`additionalDirectories` only widens; bypass skips the permission system). A real jail needs an **OS-level sandbox spike** (the SDK `sandbox` option — seatbelt/bubblewrap, macOS-uncertain) — **NEW BACKLOG ITEM, not yet scheduled.** Next recommended cycle: **S3 (plugin/skill trust hardening — #2/#19)**.
 
 Update this file's "Status" + check off cycles as they merge.
+
+---
+
+## Execution notes for the next session (batching + sequencing)
+
+Five cycles shipped in the first session (S2, U1, P1, P2, S1 — all merged to main). Remaining:
+**S3, S4, S5, P3, R1, R2, R3 + the NEW OS-level-sandbox spike** (from S1's residual). Guidance for running them efficiently:
+
+- **`nodes.ts` collision → keep the run-loop cluster SERIAL.** S5, R1, R2, R3 all rewrite `nodes.ts` (the ~1,500-line run loop); `agent-runner.ts` (S3+S4), `project-store.ts` (S4+R3), and `run-state.ts` (S5+R2) are each shared by two. Do **not** parallel-branch these — they'd merge-conflict in the most interdependent file. Run S5 → R1 → R2 → R3 one at a time.
+- **Parallelism, if any, only via git worktrees** (never multiple terminals on one repo dir — that races `.git/index`/HEAD). The safe ceiling is ~2 file-disjoint cycles at once, e.g. **S3 (or S4)** in one worktree + **P3** (`run-store`/`orchestrator`/`ipc` — no `nodes.ts`) in another.
+- **Hard sequencing:** **R1 & R2 must follow the live-verification session** — their bugs live on code paths that have never run live against real Claude (escalation, mid-run re-plan, handoff); patching blind is risky. Run the live-verify "no" rows first.
+- **Preferred speedup = BATCH, not parallelize.** Collapse related findings into fewer, larger cycles to cut per-cycle pipeline overhead: e.g. **S3 + S4 → one "external-data trust" cycle** (both validate untrusted external input), and the **~30 Minors → one "papercuts sweep"** cycle. Fewer design rounds + fewer branches, same per-branch agent throughput.
+- **Per-cycle execution defaults** (see the `ai-manager-cycle-workflow-prefs` memory): subagent-driven; auto-merge to main locally on a clean opus final review. Human gates = design + spec approval only.
