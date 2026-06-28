@@ -1,12 +1,22 @@
 import { useState } from 'react'
+import { useStore } from './store'
 
 type Draft = { agentId: string; name: string; role: string; skills?: string[] }
 
 export default function RoleDraftModal({ drafts, onClose }: { drafts: Draft[]; onClose: () => void }) {
   const [edited, setEdited] = useState<Draft[]>(drafts)
   const [applying, setApplying] = useState(false)
+  const requestConfirm = useStore((s) => s.requestConfirm)
 
   const apply = async (): Promise<void> => {
+    const n = edited.length
+    const ok = await requestConfirm({
+      title: `Overwrite ${n} role${n === 1 ? '' : 's'}?`,
+      body: `This replaces the current role for ${n} agent${n === 1 ? '' : 's'} with the drafted version${n === 1 ? '' : 's'}. Existing roles will be overwritten.`,
+      confirmLabel: 'Overwrite roles',
+      danger: true
+    })
+    if (!ok) return
     setApplying(true)
     try {
       for (const d of edited) {
