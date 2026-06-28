@@ -34,11 +34,15 @@ export function registerIpc(): void {
     })
     if (r.canceled || r.filePaths.length === 0) return null
     serverMgr.killAllServers()
-    return store.openProject(r.filePaths[0])
+    const graph = await store.openProject(r.filePaths[0])
+    await orchestrator.gcCheckpoints()
+    return graph
   })
-  ipcMain.handle(IPC.openProject, (_e, path: string) => {
+  ipcMain.handle(IPC.openProject, async (_e, path: string) => {
     serverMgr.killAllServers()
-    return store.openProject(path)
+    const graph = await store.openProject(path)
+    await orchestrator.gcCheckpoints()
+    return graph
   })
   ipcMain.handle(IPC.getRecentProjects, () => store.getRecentProjects())
 
@@ -87,9 +91,11 @@ export function registerIpc(): void {
     orchestrator.startRun(e.sender, input)
   )
   ipcMain.handle(IPC.stopRun, (_e, runId: string) => orchestrator.stopRun(runId))
-  ipcMain.handle(IPC.resumeRun, (e: IpcMainInvokeEvent, runId: string, answer: string) =>
+  ipcMain.handle(IPC.resumeRun, (e: IpcMainInvokeEvent, runId: string, answer?: string) =>
     orchestrator.resumeRun(e.sender, runId, answer)
   )
+  ipcMain.handle(IPC.listResumable, () => orchestrator.listResumable())
+  ipcMain.handle(IPC.discardRun, (_e, runId: string) => orchestrator.discardRun(runId))
 
   // ---- auth ----
   ipcMain.handle(IPC.checkAuth, () => checkAuth())
