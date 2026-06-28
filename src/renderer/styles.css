@@ -1478,5 +1478,9 @@ button {
 }
 
 /* ---- resumable banner + badge ---- */
-.resume-banner { position: fixed; top: 48px; left: 0; right: 0; z-index: 50; display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: #2d2a1e; border-bottom: 1px solid #4a432a; font-size: 13px; }
+/* The banner is a real grid row (NOT position:fixed) so it pushes the topbar + GoalBar down and can never
+   overlap or intercept their clicks. .app is `grid-template-rows: 48px 1fr` (topbar, body); when the banner
+   shows we add a leading auto row for it. */
+.app.has-resume-banner { grid-template-rows: auto 48px 1fr; }
+.resume-banner { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: #2d2a1e; border-bottom: 1px solid #4a432a; font-size: 13px; }
 .resume-badge { margin-left: 4px; background: #b54; color: #fff; border-radius: 8px; padding: 0 5px; font-size: 11px; }

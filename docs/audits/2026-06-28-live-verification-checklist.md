@@ -28,9 +28,13 @@ git add -A && git commit -qm "init scratch project"
    - **maxUserRequests = 1** (HITL)
    - **maxHandoffs = 1** (handoff)
    - **maxReplans = 1** (re-plan + escalation)
-3. **Build a team:** click **Build team** (orchestrator proposes one — accept a small 1-orchestrator + 2-worker
-   team), or manually add an orchestrator + 2 workers. Name the two workers something distinct
-   (e.g. **Builder** and **Docs**) — Test 2 needs two peers.
+3. **Add an Orchestrator FIRST.** Click **`+ Add agent`** (top-right) → add an **Orchestrator**. The GoalBar
+   buttons (Draft roles / **Build team** / Run result / Run) are **disabled until an orchestrator exists** —
+   they all act *through* an orchestrator, so Build team can't bootstrap an empty project. (Tell-tale when
+   it's missing: the 🎯 hint reads "add an Orchestrator to run a goal".)
+4. **Build the rest of the team:** with the orchestrator present + a goal typed, click **Build team** (it
+   proposes a team — accept a small one), or manually **Add agent** two workers. Name the two workers
+   distinctly (e.g. **Builder** and **Docs**) — Test 2 needs two peers.
 
 > Each test below is its own run. Commit the scratch repo between runs if you want a clean slate
 > (`git -C ~/live-verify add -A && git commit -qm wip`).
