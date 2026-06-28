@@ -109,6 +109,10 @@ describe('parseSpawnedTeam model', () => {
     const r = parseSpawnedTeam(wrap({ id: 'a', name: 'A', kind: 'worker', role: 'r', model: 'claude-haiku-4-5' }))
     expect(r?.[0].model).toBeUndefined()
   })
+  it('rejects Haiku for a manager too (never an auto-assigned tier)', () => {
+    const r = parseSpawnedTeam(wrap({ id: 'a', name: 'A', kind: 'manager', role: 'r', model: 'claude-haiku-4-5' }))
+    expect(r?.[0].model).toBeUndefined()
+  })
 })
 
 describe('pickSpawnModel', () => {
