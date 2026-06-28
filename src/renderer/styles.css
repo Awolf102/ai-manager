@@ -1228,6 +1228,11 @@ button {
   font-size: 12px;
   color: var(--muted, #9aa0aa);
 }
+.rr-error {
+  margin: 4px 0;
+  font-size: 12px;
+  color: var(--danger);
+}
 .rr-status {
   margin: 6px 0;
   font-size: 12px;

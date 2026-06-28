@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { detectManifestPrompt, parseManifest } from './run-manifest'
+import { detectManifestPrompt, parseManifest, parseStartCommand } from './run-manifest'
 
 describe('detectManifestPrompt', () => {
   it('includes the goal, the JSON shape, the serve-static hint, and the default-path rule', () => {
@@ -42,5 +42,55 @@ describe('parseManifest', () => {
 
   it('returns null when there is no JSON object', () => {
     expect(parseManifest('sorry, no idea')).toBeNull()
+  })
+})
+
+describe('parseStartCommand', () => {
+  it('splits a simple command into command + args', () => {
+    expect(parseStartCommand('npm run dev')).toEqual({ ok: true, command: 'npm', args: ['run', 'dev'] })
+    expect(parseStartCommand('vite --port 5173')).toEqual({ ok: true, command: 'vite', args: ['--port', '5173'] })
+    expect(parseStartCommand('python3 -m http.server 8000')).toEqual({
+      ok: true,
+      command: 'python3',
+      args: ['-m', 'http.server', '8000']
+    })
+  })
+
+  it('honors single and double quotes, keeping operators inside them literal', () => {
+    expect(parseStartCommand('node "my server.js"')).toEqual({ ok: true, command: 'node', args: ['my server.js'] })
+    expect(parseStartCommand("node 'my server.js'")).toEqual({ ok: true, command: 'node', args: ['my server.js'] })
+    expect(parseStartCommand('node "a;b.js"')).toEqual({ ok: true, command: 'node', args: ['a;b.js'] })
+  })
+
+  it('collapses surrounding and repeated whitespace', () => {
+    expect(parseStartCommand('  npm   run  dev ')).toEqual({ ok: true, command: 'npm', args: ['run', 'dev'] })
+  })
+
+  it('rejects empty input', () => {
+    expect(parseStartCommand('')).toEqual({ ok: false, error: 'Enter a start command.' })
+    expect(parseStartCommand('   ')).toEqual({ ok: false, error: 'Enter a start command.' })
+  })
+
+  it('rejects unquoted shell operators', () => {
+    for (const bad of [
+      'npm run dev; rm -rf /',
+      'a && b',
+      'a | b',
+      'echo $(whoami)',
+      'echo `whoami`',
+      'a > b',
+      'a < b',
+      'a\nb'
+    ]) {
+      expect(parseStartCommand(bad).ok).toBe(false)
+    }
+  })
+
+  it('rejects a leading VAR=value env assignment', () => {
+    expect(parseStartCommand('PORT=3000 npm start').ok).toBe(false)
+  })
+
+  it('rejects an unbalanced quote', () => {
+    expect(parseStartCommand('node "server.js')).toEqual({ ok: false, error: 'Unbalanced quote in command.' })
   })
 })

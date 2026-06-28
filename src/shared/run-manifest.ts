@@ -44,6 +44,60 @@ export function parseManifest(text: string): RunManifest | null {
   return { type, startCommand, ...(port !== undefined ? { port } : {}), path, ...(notes ? { notes } : {}) }
 }
 
+export type ParsedCommand =
+  | { ok: true; command: string; args: string[] }
+  | { ok: false; error: string }
+
+const SHELL_OPERATORS = new Set([';', '&', '|', '$', '`', '(', ')', '<', '>', '\n', '\r'])
+const OPERATOR_ERROR = 'Remove shell characters (; & | $ ` ( ) < >). The launcher runs without a shell.'
+
+// Tokenize a launch command into argv WITHOUT a shell. Quotes group tokens and make
+// their contents literal; unquoted shell operators and leading VAR= prefixes are refused
+// so shell-dependent commands fail loudly instead of being mangled or injected.
+export function parseStartCommand(raw: string): ParsedCommand {
+  const tokens: string[] = []
+  let cur = ''
+  let inToken = false
+  let quote: '"' | "'" | null = null
+
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i]
+    if (quote) {
+      if (ch === quote) quote = null
+      else cur += ch
+      continue
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch
+      inToken = true
+      continue
+    }
+    if (ch === ' ' || ch === '\t') {
+      if (inToken) {
+        tokens.push(cur)
+        cur = ''
+        inToken = false
+      }
+      continue
+    }
+    if (SHELL_OPERATORS.has(ch)) return { ok: false, error: OPERATOR_ERROR }
+    cur += ch
+    inToken = true
+  }
+  if (quote) return { ok: false, error: 'Unbalanced quote in command.' }
+  if (inToken) tokens.push(cur)
+
+  if (tokens.length === 0) return { ok: false, error: 'Enter a start command.' }
+  const [command, ...args] = tokens
+  if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(command)) {
+    return {
+      ok: false,
+      error: 'Set environment in the app, not an inline VAR=value prefix; put the port in the Port field.'
+    }
+  }
+  return { ok: true, command, args }
+}
+
 function parseJsonBlock(text: string): unknown {
   const candidates: string[] = []
   const fences = [...text.matchAll(/\x60{3}(?:json)?\s*([\s\S]*?)\x60{3}/gi)]

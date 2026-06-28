@@ -9,6 +9,7 @@ import type { WebContents } from 'electron'
 import { IPC } from '../../shared/types'
 import type { ServerStatus } from '../../shared/types'
 import { getCurrentProjectPath } from './project-store'
+import { parseStartCommand } from '../../shared/run-manifest'
 
 type Server = { serverId: string; proc: ChildProcess }
 let active: Server | null = null
@@ -33,8 +34,15 @@ export function launchServer(
   stopActive() // one server at a time
   const serverId = randomUUID()
   const projectPath = getCurrentProjectPath()
-  const proc = spawn(input.startCommand, {
-    shell: true,
+  const parsed = parseStartCommand(input.startCommand)
+  if (!parsed.ok) {
+    sendStatus(wc, serverId, 'error')
+    if (!wc.isDestroyed())
+      wc.send(IPC.serverLog, { serverId, data: `[cannot launch] ${parsed.error}\n` })
+    return { serverId }
+  }
+  const proc = spawn(parsed.command, parsed.args, {
+    shell: false,
     detached: true,
     cwd: projectPath,
     env: cleanEnv()

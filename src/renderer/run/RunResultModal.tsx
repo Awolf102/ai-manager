@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { RunManifest, ServerStatus } from '../../shared/types'
+import { parseStartCommand } from '../../shared/run-manifest'
 
 export default function RunResultModal({
   manifest,
@@ -19,6 +20,8 @@ export default function RunResultModal({
   const logRef = useRef<HTMLPreElement>(null)
   const serverIdRef = useRef<string | null>(null)
   const launchable = manifest.type === 'web' || manifest.type === 'static'
+  const parsedCmd = parseStartCommand(cmd)
+  const cmdError = cmd.trim() && !parsedCmd.ok ? parsedCmd.error : null
 
   useEffect(() => {
     const offLog = window.api.onServerLog((e) => {
@@ -75,6 +78,7 @@ export default function RunResultModal({
             <div className="field">
               <label>Start command</label>
               <input className="spawn-name" value={cmd} onChange={(e) => setCmd(e.target.value)} />
+              {cmdError && <p className="rr-error">{cmdError}</p>}
             </div>
             <div className="rr-row">
               <div className="field">
@@ -111,7 +115,7 @@ export default function RunResultModal({
                 Stop
               </button>
             ) : (
-              <button className="btn primary" onClick={() => void launch()} disabled={!cmd.trim() || launching}>
+              <button className="btn primary" onClick={() => void launch()} disabled={!parsedCmd.ok || launching}>
                 Launch &amp; open
               </button>
             )
