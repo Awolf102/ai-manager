@@ -36,7 +36,11 @@ let discoveryCache: { at: number; plugins: import('../../shared/types').Discover
 async function discoveredPlugins(): Promise<import('../../shared/types').DiscoveredPlugin[]> {
   const now = Date.now()
   if (discoveryCache && now - discoveryCache.at < 30_000) return discoveryCache.plugins
-  const plugins = await discoverSkills(getSettings().skillInstallThreshold ?? 100000)
+  const s = getSettings()
+  const plugins = await discoverSkills({
+    mode: s.trustAnthropicOnly ? 'anthropic-only' : 'anthropic-marketplaces',
+    blockHooks: s.blockPluginHooks
+  })
   discoveryCache = { at: now, plugins }
   return plugins
 }
@@ -110,7 +114,7 @@ export async function streamAgent(
       cwd: projectPath,
       model: agent.model,
       systemPrompt: { type: 'preset', preset: 'claude_code', append: composeAppend(role, memory, context) + headlessNote(pack.names) },
-      ...buildPermissionOptions(mode),
+      ...buildPermissionOptions(mode, { lockBypass: getSettings().lockBypassPermissions }),
       settingSources: ['project'],
       abortController: abort
     }

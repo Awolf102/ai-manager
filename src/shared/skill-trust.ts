@@ -3,30 +3,53 @@
 // which feeds already-parsed JSON into shapeCatalog here.
 import type { DiscoveredPlugin, DiscoveredSkill } from './types'
 
-/** A plugin is trusted iff: Anthropic author, OR an anthropics/* marketplace repo, OR installs >= threshold. */
-export function isTrusted(
-  p: { author?: string; marketplaceRepo?: string; uniqueInstalls?: number },
-  threshold: number
-): boolean {
-  if ((p.author ?? '').trim().toLowerCase() === 'anthropic') return true
-  if ((p.marketplaceRepo ?? '').toLowerCase().startsWith('anthropics/')) return true
-  return (p.uniqueInstalls ?? 0) >= threshold
+export type SkillTrustMode = 'anthropic-only' | 'anthropic-marketplaces'
+
+function isAnthropicAuthor(author: unknown): boolean {
+  return String(author ?? '').trim().toLowerCase() === 'anthropic'
 }
 
-export interface SkillSdkOptions {
-  plugins: { type: 'local'; path: string; skipMcpDiscovery: true }[]
-  skills: string[]
+/** True iff `source` is a github-type marketplace source whose owner is exactly `anthropics`.
+ *  Accepts 'owner/name', 'github.com/owner/name', 'https://github.com/owner/name'. */
+export function isAnthropicOwnedRepo(source: unknown): boolean {
+  const s = source as { source?: unknown; repo?: unknown } | null
+  if (!s || typeof s !== 'object') return false
+  if (String(s.source ?? '').trim().toLowerCase() !== 'github') return false
+  const repo = String(s.repo ?? '').trim().toLowerCase()
+  if (!repo) return false
+  const path = repo.replace(/^https?:\/\//, '').replace(/^github\.com\//, '')
+  return path.split('/')[0] === 'anthropics'
+}
+
+/** True if a plugin dir ships any hooks (hooks run code). */
+export function pluginShipsHooks(signals: {
+  hasHooksJson?: boolean
+  hasPluginJsonHooksKey?: boolean
+  hooksDirNonEmpty?: boolean
+}): boolean {
+  return !!(signals.hasHooksJson || signals.hasPluginJsonHooksKey || signals.hooksDirNonEmpty)
+}
+
+/** A plugin is trusted per the mode. Both modes require a verified anthropics-owned repo;
+ *  'anthropic-only' additionally requires the plugin's own author to be Anthropic. */
+export function isTrusted(
+  p: { author?: string; marketplaceSource?: unknown },
+  mode: SkillTrustMode
+): boolean {
+  if (!isAnthropicOwnedRepo(p.marketplaceSource)) return false
+  if (mode === 'anthropic-marketplaces') return true
+  return isAnthropicAuthor(p.author)
 }
 
 /** Shape the parsed catalog-cache + known-marketplaces into trusted plugin candidates (no on-disk path). */
 export function shapeCatalog(
   cacheJson: unknown,
   marketplacesJson: unknown,
-  threshold: number
+  mode: SkillTrustMode
 ): Omit<DiscoveredPlugin, 'path'>[] {
   const plugins = (cacheJson as { catalog?: { plugins?: Record<string, unknown> } })?.catalog?.plugins
   if (!plugins || typeof plugins !== 'object') return []
-  const markets = (marketplacesJson as Record<string, { source?: { repo?: string } }>) ?? {}
+  const markets = (marketplacesJson as Record<string, { source?: { source?: string; repo?: string } }>) ?? {}
   const out: Omit<DiscoveredPlugin, 'path'>[] = []
   for (const [key, raw] of Object.entries(plugins)) {
     const at = key.lastIndexOf('@')
@@ -38,11 +61,12 @@ export function shapeCatalog(
       components?: { skills?: { name?: unknown }[] }
       marketplace_entry?: { author?: { name?: unknown }; description?: unknown }
     }
-    const marketplaceRepo = String(markets[marketplace]?.source?.repo ?? '')
+    const marketplaceSource = markets[marketplace]?.source
+    const marketplaceRepo = String(marketplaceSource?.repo ?? '')
     const authorName = e.marketplace_entry?.author?.name
     const author = typeof authorName === 'string' ? authorName : ''
     const uniqueInstalls = typeof e.unique_installs === 'number' ? e.unique_installs : 0
-    if (!isTrusted({ author, marketplaceRepo, uniqueInstalls }, threshold)) continue
+    if (!isTrusted({ author, marketplaceSource }, mode)) continue
     const description = String(e.marketplace_entry?.description ?? '')
     const skills: DiscoveredSkill[] = (e.components?.skills ?? [])
       .map((s) => String(s?.name ?? '').trim())
@@ -52,6 +76,11 @@ export function shapeCatalog(
     out.push({ id: pluginId, marketplace, marketplaceRepo, author, uniqueInstalls, trusted: true, skills })
   }
   return out
+}
+
+export interface SkillSdkOptions {
+  plugins: { type: 'local'; path: string; skipMcpDiscovery: true }[]
+  skills: string[]
 }
 
 /** Build the SDK plugins+skills options from an agent's assigned ids, restricted to discovered (trusted) skills. */

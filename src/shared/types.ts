@@ -96,8 +96,14 @@ export interface ProjectSettings {
   autoAssignModels: boolean
   /** auto pull the linked team brain before a run + push after (B2b) */
   autoSyncTeam: boolean
-  /** install-count floor for trusting a non-Anthropic plugin's skills */
+  /** @deprecated no longer consulted for trust (was a forgeable local cache); kept to avoid a settings migration */
   skillInstallThreshold: number
+  /** ON ⇒ auto-trust only plugins whose own author is Anthropic in a verified anthropics-owned repo (strict); OFF ⇒ any skill from a verified anthropics-owned marketplace */
+  trustAnthropicOnly: boolean
+  /** ON ⇒ exclude any discovered plugin that ships hooks (hooks run code) */
+  blockPluginHooks: boolean
+  /** ON ⇒ clamp any bypassPermissions run down to acceptEdits, engine-wide */
+  lockBypassPermissions: boolean
   /** load the always-available curated skills pack for every agent */
   skillsPackEnabled: boolean
   /** override the skills-pack dir; empty = ~/.ai-manager/skills-pack */
@@ -119,6 +125,9 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   autoAssignModels: false,
   autoSyncTeam: false,
   skillInstallThreshold: 100000,
+  trustAnthropicOnly: true,
+  blockPluginHooks: true,
+  lockBypassPermissions: false,
   skillsPackEnabled: true,
   skillsPackPath: '',
   maxReplans: 0,
@@ -475,7 +484,8 @@ export const IPC = {
   listRuns: 'runs:list',
   loadRun: 'runs:load',
   exportTeam: 'team:export',
-  importTeam: 'team:import',
+  importTeamPreview: 'team:import-preview',
+  importTeamApply: 'team:import-apply',
   syncTeam: 'team:syncTo',
   refreshTeam: 'team:refreshFrom',
   draftRoles: 'roles:draft',
@@ -527,7 +537,12 @@ export interface RendererApi {
   listRuns: () => Promise<RunSummary[]>
   loadRun: (file: string) => Promise<RunRecord | null>
   exportTeam: () => Promise<{ saved: boolean; path?: string }>
-  importTeam: () => Promise<{ imported: boolean; graph?: ProjectGraph; error?: string }>
+  importTeamPreview: () => Promise<
+    | { status: 'canceled' }
+    | { status: 'error'; error: string }
+    | { status: 'ok'; bundle: unknown; path: string; preview: { members: { name: string; kind: AgentKind; role: string }[]; warnings: string[] } }
+  >
+  importTeamApply: (bundle: unknown, path: string) => Promise<{ graph: ProjectGraph } | { error: string }>
   syncToTeam: () => Promise<{ synced: boolean; graph?: ProjectGraph; teamPath?: string }>
   refreshFromTeam: () => Promise<{ refreshed: boolean; graph?: ProjectGraph; updated?: number; error?: string }>
   draftRoles: (input: { goal: string; orchestratorId: string }) => Promise<{

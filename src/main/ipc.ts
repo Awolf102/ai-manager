@@ -14,7 +14,7 @@ import type {
   SpawnedMember
 } from '../shared/types'
 import * as store from './engine/project-store'
-import { validateTeamBundle } from '../shared/team-bundle'
+import { validateTeamBundle, previewOf } from '../shared/team-bundle'
 import * as runner from './engine/agent-runner'
 import * as ptyMgr from './engine/pty-manager'
 import * as orchestrator from './engine/orchestrator'
@@ -110,23 +110,29 @@ export function registerIpc(): void {
     await fs.writeFile(r.filePath, JSON.stringify(bundle, null, 2), 'utf8')
     return { saved: true, path: r.filePath }
   })
-  ipcMain.handle(IPC.importTeam, async () => {
+  ipcMain.handle(IPC.importTeamPreview, async () => {
     const r = await dialog.showOpenDialog({
       title: 'Import team',
       properties: ['openFile'],
       filters: [{ name: 'AI Manager team', extensions: ['json'] }]
     })
-    if (r.canceled || r.filePaths.length === 0) return { imported: false }
+    if (r.canceled || r.filePaths.length === 0) return { status: 'canceled' as const }
     let parsed: unknown
     try {
       parsed = JSON.parse(await fs.readFile(r.filePaths[0], 'utf8'))
     } catch {
-      return { imported: false, error: 'That file is not valid JSON.' }
+      return { status: 'error' as const, error: 'That file is not valid JSON.' }
     }
     const v = validateTeamBundle(parsed)
-    if (!v.ok) return { imported: false, error: v.error }
-    const graph = await store.importTeam(v.bundle, r.filePaths[0])
-    return { imported: true, graph }
+    if (!v.ok) return { status: 'error' as const, error: v.error }
+    return { status: 'ok' as const, bundle: v.bundle, path: r.filePaths[0], preview: previewOf(v.bundle, v.warnings) }
+  })
+
+  ipcMain.handle(IPC.importTeamApply, async (_e, bundle: unknown, path: string) => {
+    const v = validateTeamBundle(bundle) // re-validate defensively
+    if (!v.ok) return { error: v.error }
+    const graph = await store.importTeam(v.bundle, path)
+    return { graph }
   })
 
   // ---- team brain (B2 living team) ----
@@ -262,5 +268,11 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.contextThumbnail, (_e, id: string) => store.contextThumbnail(id))
 
   // ---- skills ----
-  ipcMain.handle(IPC.listSkills, () => discoverSkills(store.getSettings().skillInstallThreshold ?? 100000))
+  ipcMain.handle(IPC.listSkills, () => {
+    const s = store.getSettings()
+    return discoverSkills({
+      mode: s.trustAnthropicOnly ? 'anthropic-only' : 'anthropic-marketplaces',
+      blockHooks: s.blockPluginHooks
+    })
+  })
 }

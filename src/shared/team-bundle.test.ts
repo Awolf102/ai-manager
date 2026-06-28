@@ -4,9 +4,11 @@ import {
   buildSeededMemory,
   validateTeamBundle,
   planTeamImport,
+  previewOf,
   type TeamBundle
 } from './team-bundle'
 import type { AgentNodeData, GraphEdge } from './types'
+import { MODELS } from './types'
 
 const node = (over: Partial<AgentNodeData>): AgentNodeData => ({
   id: 'id1', name: 'Dana', slug: 'dana', kind: 'worker', icon: 'i',
@@ -88,5 +90,67 @@ describe('planTeamImport', () => {
     expect(m.skills).toEqual(['data:analyze'])
     expect(m.position).toEqual({ x: 58, y: 68 }) // +48 offset
     expect(m.memory).toContain('- [portable] write tests first')
+  })
+})
+
+function rawBundle(members: unknown[]): unknown {
+  return { kind: 'ai-manager-team', version: 1, name: 't', exportedAt: 'x', members, edges: [] }
+}
+
+describe('validateTeamBundle (normalize)', () => {
+  it('clamps oversized role + lessons and whitelists model/permissionMode, never throws', () => {
+    const r = validateTeamBundle(rawBundle([{
+      memberId: 'm1', name: 'A', kind: 'worker', icon: 'x',
+      model: 'evil-model', permissionMode: 'bypassPermissions',
+      position: { x: Number.NaN, y: 3 },
+      role: 'z'.repeat(60000),
+      lessons: Array.from({ length: 500 }, () => 'L'.repeat(5000))
+    }]))
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    const m = r.bundle.members[0]
+    expect(m.model).toBe('claude-sonnet-4-6') // unknown → worker default
+    expect(MODELS.some((x) => x.id === m.model)).toBe(true)
+    expect(m.permissionMode).toBe('bypassPermissions') // valid enum value kept here; planTeamImport forces acceptEdits
+    expect(m.position).toEqual({ x: 0, y: 3 })
+    expect(m.role.length).toBe(50000)
+    expect(m.lessons.length).toBe(200)
+    expect(m.lessons[0].length).toBe(2000)
+  })
+
+  it('coerces an unknown permissionMode to acceptEdits', () => {
+    const r = validateTeamBundle(rawBundle([{ memberId: 'm', name: 'A', kind: 'worker', icon: 'x', model: 'claude-sonnet-4-6', permissionMode: 'sudo', position: { x: 0, y: 0 }, role: '', lessons: [] }]))
+    expect(r.ok && r.bundle.members[0].permissionMode).toBe('acceptEdits')
+  })
+
+  it('rejects a member missing memberId/name and a too-large team', () => {
+    expect(validateTeamBundle(rawBundle([{ name: 'A', kind: 'worker' }])).ok).toBe(false)
+    const many = Array.from({ length: 201 }, (_, i) => ({ memberId: `m${i}`, name: 'A', kind: 'worker', icon: 'x', model: 'claude-sonnet-4-6', permissionMode: 'acceptEdits', position: { x: 0, y: 0 }, role: '', lessons: [] }))
+    expect(validateTeamBundle(rawBundle(many)).ok).toBe(false)
+  })
+
+  it('keeps a well-formed exported bundle valid (round-trip) and reports warnings', () => {
+    const good = validateTeamBundle(rawBundle([{ memberId: 'm', name: 'A', kind: 'manager', icon: 'x', model: 'claude-opus-4-8', permissionMode: 'acceptEdits', position: { x: 1, y: 2 }, role: 'hi', lessons: ['a'] }]))
+    expect(good.ok).toBe(true)
+    if (good.ok) expect(Array.isArray(good.warnings)).toBe(true)
+  })
+})
+
+describe('planTeamImport (force safe mode)', () => {
+  it('forces acceptEdits regardless of the bundle value', () => {
+    const v = validateTeamBundle(rawBundle([{ memberId: 'm', name: 'A', kind: 'worker', icon: 'x', model: 'claude-sonnet-4-6', permissionMode: 'bypassPermissions', position: { x: 0, y: 0 }, role: '', lessons: [] }]))
+    if (!v.ok) throw new Error('precondition')
+    const plan = planTeamImport(v.bundle, [])
+    expect(plan.members[0].permissionMode).toBe('acceptEdits')
+  })
+})
+
+describe('previewOf', () => {
+  it('summarizes members with their forced mode', () => {
+    const v = validateTeamBundle(rawBundle([{ memberId: 'm', name: 'A', kind: 'worker', icon: 'x', model: 'claude-sonnet-4-6', permissionMode: 'bypassPermissions', position: { x: 0, y: 0 }, role: 'do x', lessons: [] }]))
+    if (!v.ok) throw new Error('precondition')
+    const p = previewOf(v.bundle, v.warnings)
+    expect(p.members[0]).toEqual({ name: 'A', kind: 'worker', role: 'do x' })
+    expect(Array.isArray(p.warnings)).toBe(true)
   })
 })

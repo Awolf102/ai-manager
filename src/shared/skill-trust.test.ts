@@ -1,83 +1,68 @@
 import { describe, it, expect } from 'vitest'
-import { isTrusted, shapeCatalog, skillOptionsFor, offeredSkills } from './skill-trust'
+import {
+  isTrusted, isAnthropicOwnedRepo, pluginShipsHooks, shapeCatalog,
+  skillOptionsFor, offeredSkills
+} from './skill-trust'
 import type { DiscoveredPlugin } from './types'
 
+const ghAnthropic = { source: 'github', repo: 'anthropics/claude-plugins-official' }
+const ghOther = { source: 'github', repo: 'someone/community-pack' }
+
+describe('isAnthropicOwnedRepo', () => {
+  it('accepts a github source owned by anthropics, various spellings', () => {
+    expect(isAnthropicOwnedRepo(ghAnthropic)).toBe(true)
+    expect(isAnthropicOwnedRepo({ source: 'github', repo: 'github.com/anthropics/x' })).toBe(true)
+    expect(isAnthropicOwnedRepo({ source: 'github', repo: 'https://github.com/Anthropics/X' })).toBe(true)
+  })
+  it('rejects look-alikes, non-github sources, and junk', () => {
+    expect(isAnthropicOwnedRepo({ source: 'github', repo: 'anthropics-evil/x' })).toBe(false)
+    expect(isAnthropicOwnedRepo({ source: 'github', repo: 'notanthropics/x' })).toBe(false)
+    expect(isAnthropicOwnedRepo({ source: 'git', repo: 'anthropics/x' })).toBe(false)
+    expect(isAnthropicOwnedRepo({ source: 'github', repo: '' })).toBe(false)
+    expect(isAnthropicOwnedRepo(undefined)).toBe(false)
+  })
+})
+
 describe('isTrusted', () => {
-  it('trusts Anthropic author regardless of installs', () => {
-    expect(isTrusted({ author: 'Anthropic', uniqueInstalls: 3 }, 100000)).toBe(true)
-    expect(isTrusted({ author: 'anthropic', uniqueInstalls: 0 }, 100000)).toBe(true)
+  it('anthropic-only: needs anthropic author AND an anthropics-owned repo', () => {
+    expect(isTrusted({ author: 'Anthropic', marketplaceSource: ghAnthropic }, 'anthropic-only')).toBe(true)
+    expect(isTrusted({ author: 'someone', marketplaceSource: ghAnthropic }, 'anthropic-only')).toBe(false)
+    expect(isTrusted({ author: 'Anthropic', marketplaceSource: ghOther }, 'anthropic-only')).toBe(false)
   })
-  it('trusts an anthropics/* marketplace repo', () => {
-    expect(isTrusted({ marketplaceRepo: 'anthropics/claude-plugins-official', uniqueInstalls: 0 }, 100000)).toBe(true)
+  it('anthropic-marketplaces: any member of an anthropics-owned repo passes', () => {
+    expect(isTrusted({ author: 'someone', marketplaceSource: ghAnthropic }, 'anthropic-marketplaces')).toBe(true)
+    expect(isTrusted({ author: 'Anthropic', marketplaceSource: ghOther }, 'anthropic-marketplaces')).toBe(false)
   })
-  it('trusts a non-Anthropic plugin at/above the threshold', () => {
-    expect(isTrusted({ author: 'Adobe', uniqueInstalls: 100000 }, 100000)).toBe(true)
-    expect(isTrusted({ author: 'Adobe', uniqueInstalls: 250000 }, 100000)).toBe(true)
-  })
-  it('does NOT trust a non-Anthropic plugin below the threshold', () => {
-    expect(isTrusted({ author: '42Crunch', uniqueInstalls: 1262 }, 100000)).toBe(false)
-    expect(isTrusted({ uniqueInstalls: 99999 }, 100000)).toBe(false)
+})
+
+describe('pluginShipsHooks', () => {
+  it('true when any signal set, false when none', () => {
+    expect(pluginShipsHooks({})).toBe(false)
+    expect(pluginShipsHooks({ hasHooksJson: true })).toBe(true)
+    expect(pluginShipsHooks({ hasPluginJsonHooksKey: true })).toBe(true)
+    expect(pluginShipsHooks({ hooksDirNonEmpty: true })).toBe(true)
   })
 })
 
 describe('shapeCatalog', () => {
-  const cache = {
-    catalog: {
-      plugins: {
-        'data@knowledge-work-plugins': {
-          unique_installs: 5,
-          components: { skills: [{ name: 'airflow' }, { name: 'sql-queries' }] },
-          marketplace_entry: { author: { name: 'Anthropic' }, description: 'Data work.' }
-        },
-        'adobe-for-creativity@claude-plugins-official': {
-          unique_installs: 250000,
-          components: { skills: [{ name: 'edit-image' }] },
-          marketplace_entry: { author: { name: 'Adobe' }, description: 'Creative tools.' }
-        },
-        'tiny-thing@claude-plugins-official': {
-          unique_installs: 12,
-          components: { skills: [{ name: 'x' }] },
-          marketplace_entry: { author: { name: 'Somebody' }, description: 'niche' }
-        }
-      }
-    }
-  }
-  const marketplaces = {
-    'knowledge-work-plugins': { source: { repo: 'anthropics/knowledge-work-plugins' }, installLocation: '/m/kw' },
-    'claude-plugins-official': { source: { repo: 'anthropics/claude-plugins-official' }, installLocation: '/m/off' }
-  }
-
-  it('keeps trusted plugins, derives <plugin>:<skill> ids, drops untrusted', () => {
-    const out = shapeCatalog(cache, marketplaces, 100000)
-    const ids = out.map((p) => p.id).sort()
-    // data trusted (Anthropic author), adobe trusted (250k>=100k); tiny-thing untrusted...
-    // BUT tiny-thing's marketplace repo is anthropics/* → it IS trusted by repo.
-    expect(ids).toEqual(['adobe-for-creativity', 'data', 'tiny-thing'])
-    const data = out.find((p) => p.id === 'data')!
-    expect(data.skills.map((s) => s.id)).toEqual(['data:airflow', 'data:sql-queries'])
-    expect(data.marketplaceRepo).toBe('anthropics/knowledge-work-plugins')
-    expect(data.author).toBe('Anthropic')
+  const markets = { official: { source: ghAnthropic }, comm: { source: ghOther } }
+  const cache = { catalog: { plugins: {
+    'fd@official': { unique_installs: 5, marketplace_entry: { author: { name: 'Anthropic' }, description: 'd' }, components: { skills: [{ name: 'design' }] } },
+    'third@official': { unique_installs: 999999, marketplace_entry: { author: { name: 'someone' }, description: 'd' }, components: { skills: [{ name: 's' }] } },
+    'x@comm': { unique_installs: 999999, marketplace_entry: { author: { name: 'Anthropic' }, description: 'd' }, components: { skills: [{ name: 's' }] } }
+  } } }
+  it('anthropic-only keeps only the anthropic-authored plugin in an anthropics repo', () => {
+    const out = shapeCatalog(cache, markets, 'anthropic-only')
+    expect(out.map((p) => p.id)).toEqual(['fd'])
   })
-
-  it('drops a non-anthropics, sub-threshold plugin', () => {
-    const cache2 = {
-      catalog: {
-        plugins: {
-          'niche@third-party': {
-            unique_installs: 10,
-            components: { skills: [{ name: 'x' }] },
-            marketplace_entry: { author: { name: 'Someone' }, description: '' }
-          }
-        }
-      }
-    }
-    const mk2 = { 'third-party': { source: { repo: 'someone/plugins' }, installLocation: '/m/tp' } }
-    expect(shapeCatalog(cache2, mk2, 100000)).toEqual([])
+  it('anthropic-marketplaces keeps all members of the anthropics repo, drops the community one', () => {
+    const out = shapeCatalog(cache, markets, 'anthropic-marketplaces')
+    expect(out.map((p) => p.id).sort()).toEqual(['fd', 'third'])
   })
-
-  it('tolerates missing/garbage input', () => {
-    expect(shapeCatalog(null, null, 100000)).toEqual([])
-    expect(shapeCatalog({ catalog: {} }, {}, 100000)).toEqual([])
+  it('tolerates null/garbage input', () => {
+    expect(shapeCatalog(null, null, 'anthropic-only')).toEqual([])
+    expect(shapeCatalog({ catalog: {} }, {}, 'anthropic-only')).toEqual([])
+    expect(shapeCatalog({ catalog: { plugins: {} } }, {}, 'anthropic-marketplaces')).toEqual([])
   })
 })
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Clock, CloudDownload, CloudUpload, Download, FolderOpen, Paperclip, Plus, Settings as SettingsIcon, Upload, Users } from 'lucide-react'
 import { useStore } from './store'
+import { buildImportConfirmBody } from './import-confirm'
 import OrgChart from './canvas/OrgChart'
 import AgentConfigPanel from './panels/AgentConfigPanel'
 import RoleMemoryEditor from './panels/RoleMemoryEditor'
@@ -27,6 +28,7 @@ export default function App() {
   const showHistory = useStore((s) => s.showHistory)
   const openHistory = useStore((s) => s.openHistory)
   const applyOrchestration = useStore((s) => s.applyOrchestration)
+  const requestConfirm = useStore((s) => s.requestConfirm)
   const [showAdd, setShowAdd] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showContext, setShowContext] = useState(false)
@@ -129,9 +131,19 @@ export default function App() {
           className="btn"
           title="Import a team into this project"
           onClick={async () => {
-            const r = await window.api.importTeam()
-            if (r.imported && r.graph) setGraph(r.graph)
-            else if (r.error) window.alert(r.error)
+            const r = await window.api.importTeamPreview()
+            if (r.status === 'canceled') return
+            if (r.status === 'error') { window.alert(r.error); return }
+            const ok = await requestConfirm({
+              title: 'Import this team?',
+              body: buildImportConfirmBody(r.preview),
+              confirmLabel: 'Import',
+              danger: false
+            })
+            if (!ok) return
+            const a = await window.api.importTeamApply(r.bundle, r.path)
+            if ('graph' in a && a.graph) setGraph(a.graph)
+            else if ('error' in a && a.error) window.alert(a.error)
           }}
         >
           <Download size={14} />

@@ -21,9 +21,13 @@ export async function spawnTeam(
   runAgent: AgentRunner = streamAgent
 ): Promise<SpawnedMember[]> {
   const { agents } = await rosterForDrafting()
-  const discovered = await discoverSkills(getSettings().skillInstallThreshold ?? 100000)
+  const s = getSettings()
+  const discovered = await discoverSkills({
+    mode: s.trustAnthropicOnly ? 'anthropic-only' : 'anthropic-marketplaces',
+    blockHooks: s.blockPluginHooks
+  })
   const offered = offeredSkills(discovered, 40)
-  const validIds = discovered.flatMap((p) => p.skills.map((s) => s.id))
+  const validIds = discovered.flatMap((p) => p.skills.map((sk) => sk.id))
   const base = spawnTeamPrompt(opts.goal, getAgent(opts.orchestratorId).name, agents, offered, getSettings().autoAssignModels)
   let last = ''
   for (let attempt = 0; attempt < 2; attempt++) {

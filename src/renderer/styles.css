@@ -674,6 +674,7 @@ button {
   margin: 8px 0;
   font-size: 13px;
   line-height: 1.45;
+  white-space: pre-wrap;
 }
 
 .seg {
@@ -1468,4 +1469,10 @@ button {
 
 .autonomy-danger {
   color: var(--danger);
+}
+
+.settings-section {
+  margin: 18px 0 6px;
+  font-size: 13px;
+  opacity: .8;
 }

@@ -184,29 +184,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        <div className="field">
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={s.skillsPackEnabled}
-              onChange={(e) => void update({ skillsPackEnabled: e.target.checked })}
-            />
-            Skills pack — load curated design + Playwright skills as options for every agent
-          </label>
-        </div>
-
-        <div className="field">
-          <label>Skills-pack folder (optional)</label>
-          <input
-            type="text"
-            placeholder="~/.ai-manager/skills-pack"
-            value={s.skillsPackPath}
-            onChange={(e) => void update({ skillsPackPath: e.target.value })}
-          />
-          <div className="radio-desc" style={{ marginTop: 4 }}>
-            Leave blank for the default. Skills are model-invoked — available to every agent, never forced.
-          </div>
-        </div>
+        <h3 className="settings-section">Security</h3>
 
         <div className="field">
           <label>Autonomy (acting steps)</label>
@@ -230,6 +208,74 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
             )}
             {s.autonomy === 'cautious' &&
               "Workers edit files, but commands (including the review's tests) are blocked."}
+          </div>
+        </div>
+
+        <div className="field">
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={s.lockBypassPermissions}
+              onChange={(e) => void update({ lockBypassPermissions: e.target.checked })}
+            />
+            Never bypass permissions (lock)
+          </label>
+          <div className="radio-desc" style={{ marginTop: 4 }}>
+            Forces any Full-auto or per-agent run down to "accept edits", engine-wide. A hard ceiling.
+          </div>
+        </div>
+
+        <div className="field">
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={s.trustAnthropicOnly}
+              onChange={(e) => void update({ trustAnthropicOnly: e.target.checked })}
+            />
+            Auto-trust only Anthropic-authored skills
+          </label>
+          <div className="radio-desc" style={{ marginTop: 4 }}>
+            {s.trustAnthropicOnly
+              ? 'Only skills authored by Anthropic (in a verified anthropics-owned marketplace) are offered to agents.'
+              : '⚠ Third-party skills from anthropics-owned marketplaces are also trusted — their plugin code runs under the agent’s permission mode.'}
+          </div>
+        </div>
+
+        <div className="field">
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={s.blockPluginHooks}
+              onChange={(e) => void update({ blockPluginHooks: e.target.checked })}
+            />
+            Block skills whose plugin ships hooks
+          </label>
+          <div className="radio-desc" style={{ marginTop: 4 }}>
+            Plugin hooks run shell/HTTP/MCP commands at tool events. Blocked plugins are not offered to agents.
+          </div>
+        </div>
+
+        <div className="field">
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={s.skillsPackEnabled}
+              onChange={(e) => void update({ skillsPackEnabled: e.target.checked })}
+            />
+            Skills pack — load curated design + Playwright skills as options for every agent
+          </label>
+        </div>
+
+        <div className="field">
+          <label>Skills-pack folder (optional)</label>
+          <input
+            type="text"
+            placeholder="~/.ai-manager/skills-pack"
+            value={s.skillsPackPath}
+            onChange={(e) => void update({ skillsPackPath: e.target.value })}
+          />
+          <div className="radio-desc" style={{ marginTop: 4 }}>
+            Leave blank for the default. Skills are model-invoked — available to every agent, never forced.
           </div>
         </div>
 

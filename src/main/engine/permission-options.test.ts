@@ -2,18 +2,16 @@ import { describe, it, expect } from 'vitest'
 import { buildPermissionOptions } from './permission-options'
 
 describe('buildPermissionOptions', () => {
-  it('sets allowDangerouslySkipPermissions for bypassPermissions', () => {
-    expect(buildPermissionOptions('bypassPermissions')).toEqual({
-      permissionMode: 'bypassPermissions',
-      allowDangerouslySkipPermissions: true
-    })
+  it('lockBypass clamps bypassPermissions to acceptEdits', () => {
+    expect(buildPermissionOptions('bypassPermissions', { lockBypass: true }))
+      .toEqual({ permissionMode: 'acceptEdits' })
   })
-
-  it('does not set the flag for non-bypass modes', () => {
-    for (const mode of ['auto', 'acceptEdits', 'default', 'plan'] as const) {
-      const out = buildPermissionOptions(mode)
-      expect(out).toEqual({ permissionMode: mode })
-      expect('allowDangerouslySkipPermissions' in out).toBe(false)
-    }
+  it('without lock, bypass keeps the dangerous flag', () => {
+    expect(buildPermissionOptions('bypassPermissions'))
+      .toEqual({ permissionMode: 'bypassPermissions', allowDangerouslySkipPermissions: true })
+  })
+  it('non-bypass modes are unaffected by the lock', () => {
+    expect(buildPermissionOptions('acceptEdits', { lockBypass: true })).toEqual({ permissionMode: 'acceptEdits' })
+    expect(buildPermissionOptions('auto', { lockBypass: true })).toEqual({ permissionMode: 'auto' })
   })
 })
