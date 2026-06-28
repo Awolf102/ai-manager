@@ -22,6 +22,7 @@ import { slugify, uniqueSlug } from '../../shared/slug'
 import { isImageName, uniqueContextName } from '../../shared/context-files'
 import { parseLessonBullet } from '../../shared/lessons'
 import { buildTeamBundle, planTeamImport, validateTeamBundle, type TeamBundle } from '../../shared/team-bundle'
+import { atomicWriteWithBackup } from './atomic-write'
 import { mergeBrainPush, planBrainPull, mergeLessons } from '../../shared/team-brain'
 import { pickSpawnModel } from '../../shared/team-spawn'
 import type { DraftRosterAgent } from '../../shared/role-draft'
@@ -153,7 +154,7 @@ task, record what worked and what didn't so you don't repeat mistakes.
 async function saveGraph(): Promise<ProjectGraph> {
   const { path, graph } = requireCurrent()
   await fs.mkdir(aimPath(path), { recursive: true })
-  await fs.writeFile(aimPath(path, GRAPH_FILE), JSON.stringify(graph, null, 2), 'utf8')
+  await atomicWriteWithBackup(aimPath(path, GRAPH_FILE), JSON.stringify(graph, null, 2))
   return graph
 }
 
@@ -164,9 +165,32 @@ async function ensureScaffold(projectPath: string): Promise<void> {
 export async function openProject(projectPath: string): Promise<ProjectGraph> {
   await ensureScaffold(projectPath)
   const graphFile = aimPath(projectPath, GRAPH_FILE)
-  let graph: ProjectGraph
+  const bakFile = `${graphFile}.bak`
+  let graph: ProjectGraph | null = null
+
   if (existsSync(graphFile)) {
-    graph = JSON.parse(await fs.readFile(graphFile, 'utf8')) as ProjectGraph
+    try {
+      graph = JSON.parse(await fs.readFile(graphFile, 'utf8')) as ProjectGraph
+    } catch {
+      // corrupt graph.json — preserve it for forensics, then fall back to the backup
+      try {
+        await fs.rename(graphFile, `${graphFile}.corrupt-${Date.now()}`)
+      } catch {
+        /* ignore */
+      }
+      console.warn(`[project-store] ${GRAPH_FILE} was unreadable; attempting backup recovery.`)
+    }
+  }
+  if (!graph && existsSync(bakFile)) {
+    // graph.json was missing (possible crash in the save rename window) or corrupt
+    try {
+      graph = JSON.parse(await fs.readFile(bakFile, 'utf8')) as ProjectGraph
+      console.warn(`[project-store] recovered ${GRAPH_FILE} from ${GRAPH_FILE}.bak.`)
+    } catch {
+      /* .bak also bad — fall through to an empty graph */
+    }
+  }
+  if (graph) {
     // keep the project path current even if the folder moved
     graph.project = { path: projectPath, name: graph.project?.name || basename(projectPath) }
   } else {
