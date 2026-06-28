@@ -659,11 +659,9 @@ export function validateTeamBundle(
     if (Array.isArray(mm.skills)) { const s = mm.skills.filter((x): x is string => typeof x === 'string'); if (s.length) member.skills = s }
     members.push(member)
   }
-  const droppedEdges = (b.members as unknown[]).length
   const edges = (Array.isArray(b.edges) ? b.edges : [])
     .filter((e) => e && typeof e === 'object' && typeof (e as Record<string, unknown>).source === 'string' && typeof (e as Record<string, unknown>).target === 'string')
     .map((e) => ({ source: (e as Record<string, string>).source, target: (e as Record<string, string>).target }))
-  void droppedEdges
   const bundle: TeamBundle = {
     kind: 'ai-manager-team', version: 1, name: str(b.name, 'Imported team'),
     exportedAt: str(b.exportedAt), members, edges

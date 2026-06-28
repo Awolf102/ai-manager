@@ -96,8 +96,14 @@ export interface ProjectSettings {
   autoAssignModels: boolean
   /** auto pull the linked team brain before a run + push after (B2b) */
   autoSyncTeam: boolean
-  /** install-count floor for trusting a non-Anthropic plugin's skills */
+  /** @deprecated no longer consulted for trust (was a forgeable local cache); kept to avoid a settings migration */
   skillInstallThreshold: number
+  /** ON ⇒ auto-trust only plugins whose own author is Anthropic in a verified anthropics-owned repo (strict); OFF ⇒ any skill from a verified anthropics-owned marketplace */
+  trustAnthropicOnly: boolean
+  /** ON ⇒ exclude any discovered plugin that ships hooks (hooks run code) */
+  blockPluginHooks: boolean
+  /** ON ⇒ clamp any bypassPermissions run down to acceptEdits, engine-wide */
+  lockBypassPermissions: boolean
   /** load the always-available curated skills pack for every agent */
   skillsPackEnabled: boolean
   /** override the skills-pack dir; empty = ~/.ai-manager/skills-pack */
@@ -119,6 +125,9 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   autoAssignModels: false,
   autoSyncTeam: false,
   skillInstallThreshold: 100000,
+  trustAnthropicOnly: true,
+  blockPluginHooks: true,
+  lockBypassPermissions: false,
   skillsPackEnabled: true,
   skillsPackPath: '',
   maxReplans: 0,
