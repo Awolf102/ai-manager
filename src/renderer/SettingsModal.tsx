@@ -10,11 +10,25 @@ const MODES: { id: ReviewMode; label: string; desc: string }[] = [
 export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const graph = useStore((s) => s.graph)
   const setGraph = useStore((s) => s.setGraph)
+  const requestConfirm = useStore((st) => st.requestConfirm)
   if (!graph) return null
   const s = graph.settings
 
   const update = async (patch: Partial<ProjectSettings>): Promise<void> => {
     setGraph(await window.api.updateSettings(patch))
+  }
+
+  const onAutonomyChange = async (next: Autonomy): Promise<void> => {
+    if (next === 'full' && s.autonomy !== 'full') {
+      const ok = await requestConfirm({
+        title: 'Enable Full auto?',
+        body: 'Agents will run with NO permission checks and are not sandboxed to this project — they can read or write anything your user account can (SSH keys, other projects, system files). Only use Full auto on a throwaway or git-committed project.',
+        confirmLabel: 'Enable Full auto',
+        danger: true
+      })
+      if (!ok) return // decline → leave the controlled <select> on its prior value
+    }
+    await update({ autonomy: next })
   }
 
   return (
@@ -198,18 +212,24 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           <label>Autonomy (acting steps)</label>
           <select
             value={s.autonomy}
-            onChange={(e) => void update({ autonomy: e.target.value as Autonomy })}
+            onChange={(e) => void onAutonomyChange(e.target.value as Autonomy)}
           >
             <option value="auto">Auto — run safe commands, deny risky ones</option>
-            <option value="full">Full auto — bypass all permission checks</option>
+            <option value="full">Full auto — no permission checks (not sandboxed)</option>
             <option value="cautious">Cautious — edits only, no command execution</option>
           </select>
           <div className="radio-desc" style={{ marginTop: 4 }}>
             {s.autonomy === 'auto' &&
               'Planning stays read-only; the review can run tests, and risky commands are blocked by a classifier.'}
-            {s.autonomy === 'full' && 'Nothing is gated during a run — keep the project under git.'}
+            {s.autonomy === 'full' && (
+              <span className="autonomy-danger">
+                ⚠ No permission checks and NOT sandboxed to this project — agents can read or write anything
+                your user account can (SSH keys, other projects, system files). Use only on a throwaway or
+                git-committed project.
+              </span>
+            )}
             {s.autonomy === 'cautious' &&
-              'Workers edit files, but commands (including the review’s tests) are blocked.'}
+              "Workers edit files, but commands (including the review's tests) are blocked."}
           </div>
         </div>
 

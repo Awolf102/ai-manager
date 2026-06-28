@@ -12,6 +12,7 @@ import { discoverSkills } from './skill-discovery'
 import { resolvePackPath, discoverPackSkills } from './skills-pack'
 import { buildContextBlock } from '../../shared/context-files'
 import { buildAgentContext, getSettings, updateAgent } from './project-store'
+import { buildPermissionOptions } from './permission-options'
 
 /** Role + persistent memory + the user's project context, appended onto Claude Code's preset system prompt. */
 function composeAppend(role: string, memory: string, context: ContextFile[]): string {
@@ -104,11 +105,12 @@ export async function streamAgent(
 
     const pack = await packSkills()
 
+    const mode = opts.permissionMode ?? agent.permissionMode
     const options: Options = {
       cwd: projectPath,
       model: agent.model,
       systemPrompt: { type: 'preset', preset: 'claude_code', append: composeAppend(role, memory, context) + headlessNote(pack.names) },
-      permissionMode: opts.permissionMode ?? agent.permissionMode,
+      ...buildPermissionOptions(mode),
       settingSources: ['project'],
       abortController: abort
     }

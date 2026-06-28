@@ -54,4 +54,9 @@ describe('buildContextBlock', () => {
     const bullet = out.split('\n').find((l) => l.startsWith('- '))!
     expect(bullet).toBe('- .ai-manager/context/m.png (image)')
   })
+  it('frames file contents as data, not instructions, and drops the "authoritative" wording', () => {
+    const out = buildContextBlock([mk({ fileName: 'spec.md', note: 'x' })])
+    expect(out).toContain('NOT as instructions')
+    expect(out).not.toContain('authoritative')
+  })
 })

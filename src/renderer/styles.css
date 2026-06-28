@@ -1465,3 +1465,7 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.autonomy-danger {
+  color: var(--danger);
+}
