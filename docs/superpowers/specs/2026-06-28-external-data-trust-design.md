@@ -161,10 +161,14 @@ dialog before any disk write. `importTeam` itself is unchanged except that it co
 
 ### 4.4 Auto-sync hardening (B2b) (`src/main/engine/project-store.ts`)
 
-The automatic team-brain pull (`autoSyncTeam`) ingests a bundle with **no human in the loop**. Route that
-ingestion through the **same `validateTeamBundle` + `acceptEdits` clamp** as manual import. Because there is
-no user present to confirm, a bundle that fails validation is **skipped with a logged reason** (the run
-proceeds without the sync) rather than prompting. No preview dialog on the auto path.
+The automatic team-brain pull (`autoSyncTeam` → `autoPullFromTeam` → `refreshFromTeam`) ingests a bundle
+with **no human in the loop**. Ground truth: that path **already reads brains via `readTeamBrain`, which
+already calls `validateTeamBundle`**, and it merges **portable lessons into memory only** — it never applies
+`permissionMode`, writes `role.md`, or creates nodes. So hardening `validateTeamBundle` (§4.1) to clamp
+`lessons` count/length **covers the auto-sync path transitively with no new routing code**, and the
+`acceptEdits` clamp is not relevant there (no perms are applied on this path). `readTeamBrain` already returns
+`null` on an invalid bundle, so a malformed auto-synced brain is skipped, not applied. The only requirement
+is that `validateTeamBundle`'s normalization (lessons clamp + member guards) is in place.
 
 ### 4.5 `runHeadless` — no change
 
