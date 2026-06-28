@@ -36,9 +36,10 @@ Together these add the requested capability and fix the badge mismatch at the so
 
 - **Model granularity:** per-worker, decided at team build. A worker keeps one model for the
   whole run; only effort varies per task. (Not per-task dynamic model override.)
-- **Tier policy:** 2-tier — Sonnet 4.6 baseline, Opus 4.8 for hard work. **Haiku 4.5 is NOT
-  auto-assigned to workers** (it has no thinking/effort, so effort would be a silent no-op and
-  quality on non-trivial coding drops). Managers/orchestrator stay Opus.
+- **Tier policy:** 2-tier — Sonnet 4.6 baseline, Opus 4.8 for hard work. **Haiku 4.5 is NEVER
+  auto-assigned to any member (worker or manager)** (it has no thinking/effort, so effort would
+  be a silent no-op; managers do reasoning-heavy review/QA work and default to Opus). The parser
+  rejects a proposed Haiku model regardless of kind.
 - **Badge when clamped:** show the clamped (actual) value only; a tooltip notes any downgrade.
 - **`autoAssignModels` setting:** default **off** = byte-for-byte unchanged (spawned workers
   keep today's static Sonnet default). On = orchestrator picks model tiers.
@@ -114,7 +115,7 @@ effort stay coherent:
 - **Opus 4.8** — hard, ambiguous, or wide-reaching workers (headroom for xhigh/max)
 - **Sonnet 4.6** — standard coding workers (default)
 - Managers / orchestrator — Opus (unchanged)
-- **Haiku 4.5 — not offered for workers**
+- **Haiku 4.5 — never auto-assigned (parser rejects it for any member)**
 
 Parsing: read the `model` field from the proposal, validate against `MODELS` (`types.ts:418`),
 fall back to `DEFAULT_MODEL_BY_KIND[kind]` when missing/invalid. Gated by `autoAssignModels`
@@ -152,7 +153,7 @@ no-op when effort is off).
   Sonnet `xhigh`→`max`, Sonnet `max`→`max`, Haiku (any)→`undefined`, `undefined` in→`undefined`
   out, unknown model→passthrough.
 - **Proposal parser tests:** worker `model` valid → applied; missing/invalid → `DEFAULT_MODEL_BY_KIND`
-  fallback; Haiku proposed for a worker → rejected to fallback.
+  fallback; Haiku proposed for any member (worker or manager) → rejected to fallback.
 - **Engine test:** a Sonnet worker assigned an `xhigh` task reaches `agent-runner` with
   `effort = max`; a Haiku worker reaches it with `effort = undefined`.
 - **Off-parity tests:** `adaptiveEffort` off → no effort, unchanged; `autoAssignModels` off →
@@ -173,6 +174,6 @@ no-op when effort is off).
 ## Out of scope
 
 - Per-task dynamic model selection / per-dispatch model override.
-- Auto-assigning Haiku to workers.
+- Auto-assigning Haiku to any member (worker or manager).
 - Querying SDK `ModelInfo` for capabilities (static map suffices for 3 models).
 - Changing manually-created agents' models.

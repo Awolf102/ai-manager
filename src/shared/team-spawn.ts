@@ -65,7 +65,7 @@ export function parseSpawnedTeam(text: string, validSkillIds: string[] = []): Sp
     const model =
       typeof o.model === 'string' &&
       MODELS.some((m) => m.id === o.model) &&
-      !(kind === 'worker' && o.model === 'claude-haiku-4-5')
+      o.model !== 'claude-haiku-4-5' // Haiku is never an auto-assigned tier (no effort param); managers default to Opus, workers to Sonnet
         ? (o.model as string)
         : undefined
     const member: SpawnedMember = { id, name, kind, role, reportsTo: String(o.reportsTo ?? 'orchestrator').trim() || 'orchestrator' }
