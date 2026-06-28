@@ -360,6 +360,44 @@ describe('context files', () => {
   })
 })
 
+describe('crash-safe graph.json', () => {
+  it('keeps a graph.json.bak after a mutating save', async () => {
+    const proj = await tmpProject()
+    await openProject(proj)
+    await createAgent({ name: 'Dana', kind: 'worker' })
+    expect(existsSync(join(proj, '.ai-manager', 'graph.json.bak'))).toBe(true)
+  })
+
+  it('recovers from .bak when graph.json is corrupt, preserving the corrupt file', async () => {
+    const proj = await tmpProject()
+    await openProject(proj)
+    await createAgent({ name: 'Dana', kind: 'worker' }) // creates .bak (=empty), graph.json (=Dana)
+    await createAgent({ name: 'Quinn', kind: 'worker' }) // .bak (=Dana), graph.json (=Dana,Quinn)
+    await fs.writeFile(join(proj, '.ai-manager', 'graph.json'), '{ broken', 'utf8')
+
+    const recovered = await openProject(proj)
+    expect(recovered.nodes.some((n) => n.name === 'Dana')).toBe(true) // from .bak
+    const entries = await fs.readdir(join(proj, '.ai-manager'))
+    expect(entries.some((e) => e.startsWith('graph.json.corrupt-'))).toBe(true)
+  })
+
+  it('opens an empty graph when graph.json is corrupt and there is no backup', async () => {
+    const proj = await tmpProject()
+    await fs.mkdir(join(proj, '.ai-manager'), { recursive: true })
+    await fs.writeFile(join(proj, '.ai-manager', 'graph.json'), 'not json', 'utf8')
+    const g = await openProject(proj)
+    expect(g.nodes).toEqual([])
+  })
+
+  it('opens a fresh project to an empty graph without creating a .corrupt file', async () => {
+    const proj = await tmpProject()
+    const g = await openProject(proj)
+    expect(g.nodes).toEqual([])
+    const entries = await fs.readdir(join(proj, '.ai-manager'))
+    expect(entries.some((e) => e.includes('.corrupt-'))).toBe(false)
+  })
+})
+
 describe('deleteAgent soft-delete', () => {
   it('moves the agent folder to .trash (preserving memory.md) and drops the node + its edges', async () => {
     const proj = await tmpProject()

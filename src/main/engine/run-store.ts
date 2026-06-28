@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import type { RunState } from '../../shared/types'
+import { atomicWrite } from './atomic-write'
 
 /**
  * Durable checkpoint store for in-flight orchestration runs. Each run is written
@@ -23,16 +24,25 @@ export interface RunStore {
 
 const RESUMABLE = new Set(['running', 'interrupted'])
 
+/** Best-effort removal of orphaned temp files left by a crash mid-write. */
+export async function sweepTmpFiles(dir: string): Promise<void> {
+  let files: string[]
+  try {
+    files = await fs.readdir(dir)
+  } catch {
+    return // dir not created yet
+  }
+  await Promise.all(
+    files.filter((f) => f.endsWith('.tmp')).map((f) => fs.rm(join(dir, f), { force: true }))
+  )
+}
+
 export function createRunStore(dir: string): RunStore {
   const fileFor = (runId: string): string => join(dir, `${runId}.json`)
-  let seq = 0 // unique-tmp counter so concurrent puts for one run don't collide
 
   async function put(state: RunState): Promise<void> {
     await fs.mkdir(dir, { recursive: true })
-    const target = fileFor(state.runId)
-    const tmp = `${target}.${process.pid}.${seq++}.tmp`
-    await fs.writeFile(tmp, JSON.stringify(state, null, 2), 'utf8')
-    await fs.rename(tmp, target) // atomic swap — readers never see a partial file
+    await atomicWrite(fileFor(state.runId), JSON.stringify(state, null, 2))
   }
 
   async function get(runId: string): Promise<RunState | null> {
@@ -67,5 +77,6 @@ export function createRunStore(dir: string): RunStore {
     return out
   }
 
+  void sweepTmpFiles(dir) // clean up temp files orphaned by a prior crash (init-time, before any run)
   return { put, get, remove, listResumable }
 }
