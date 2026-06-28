@@ -166,13 +166,12 @@ Empty (`resumable.length === 0`) ⇒ no banner, no badge, no section.
   preserves order.
 - `listResumable` (existing) still returns running/interrupted only — unchanged.
 
-**Renderer store (`src/renderer/store.test.ts` or sibling):**
-- `refreshResumable` populates `resumable` from a mocked `window.api.listResumable`.
-- `resumeResumable` calls `window.api.resumeRun(runId)` with **no second arg** and drops the id locally.
-- `discardResumable` calls `discardRun` then re-fetches.
-
-**Wiring (light):** the `openProject` IPC handler invokes `gcCheckpoints` (verify it's called); `resumeRun`
-preload/handler accept a missing answer (typecheck + a no-answer call).
+**Renderer store + UI:** verified by **`tsc` (node+web) + `build`**, matching the codebase convention — there
+are **no renderer unit tests** (vitest runs in a node env; only pure helpers are unit-tested, and prior cycles
+verified renderer/store changes via tsc+build+live-smoke). The renderer actions are thin pass-throughs over
+`window.api`; their correctness is carried by the typed IPC contract. The **no-answer resume path** itself
+(`resumeRun(runId, undefined)` → crash recovery) is already covered by the existing engine tests
+(`graph.test.ts` resume cases) — this cycle only makes the renderer-facing arg optional.
 
 **Off/empty byte-for-byte:** no checkpoints ⇒ `listResumable` returns `[]` ⇒ no banner/badge/section; the
 on-open GC over an empty/absent dir is a no-op. Existing run/resume flows unchanged. Full suite stays green
