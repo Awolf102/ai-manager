@@ -37,7 +37,8 @@ export default function HitlModal() {
             onChange={(e) => setText(e.target.value)}
           />
           <div className="radio-desc" style={{ marginTop: 4 }}>
-            Your answer is sent to the agent and may appear in its output — don't paste secrets.
+            Your answer is sent to the agent and saved in its session transcript (like any prompt). We redact it
+            from the run history — but don't paste true secrets (API keys, passwords).
           </div>
         </div>
         <div className="modal-actions">

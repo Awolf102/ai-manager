@@ -1277,12 +1277,12 @@ describe('HITL user requests (Stage 3)', () => {
 
   // A worker (w1) asks once on its first work call, then completes on resume.
   // Plan→route reuse the canned shapes; only the work/resume calls are bespoke.
-  function askingAgent() {
+  function askingAgent(opts?: { echoAnswerOnResume?: boolean }) {
     const calls: { agentId: string; kind: string; prompt: string }[] = []
     let w1Asked = false
-    const runAgent: AgentRunner = async (opts) => {
-      const p = opts.prompt
-      const id = opts.agentId
+    const runAgent: AgentRunner = async (agentOpts) => {
+      const p = agentOpts.prompt
+      const id = agentOpts.agentId
       if (p.includes('Produce a concise, ordered list')) {
         return {
           text: '```json\n{"tasks":[{"id":"t1","title":"T1","description":"do t1"},{"id":"t2","title":"T2","description":"do t2"}]}\n```',
@@ -1299,7 +1299,8 @@ describe('HITL user requests (Stage 3)', () => {
       }
       if (p.includes('The user answered') || p.includes('did not provide an answer')) {
         calls.push({ agentId: id, kind: 'resume', prompt: p })
-        return { text: `resumed ${id}`, sessionId: 's2-' + id }
+        const text = opts?.echoAnswerOnResume ? `resumed ${id}: ${p}` : `resumed ${id}`
+        return { text, sessionId: 's2-' + id }
       }
       if (p.includes('You have been assigned the following task')) {
         if (id === 'w1' && !w1Asked) {
@@ -1384,8 +1385,30 @@ describe('HITL user requests (Stage 3)', () => {
     expect(resume).toBeTruthy()
     expect(resume!.prompt).toContain('Use teal')
     // the raw answer never lands in persisted run state (questions are fine; answers are not)
-    const persisted = JSON.stringify({ ...final, steps: undefined })  // steps.output may echo; exclude
+    const persisted = JSON.stringify(final) // includes steps[].output — redacted as of S5
     expect(persisted).not.toContain('Use teal')
+  })
+
+  it('redacts an echoed answer from the asking worker\'s persisted output', async () => {
+    h.settings.maxUserRequests = 2
+    const { runAgent } = askingAgent({ echoAnswerOnResume: true })
+    const e = eng(runAgent)
+    const store = fakeStore()
+    const io = makeIO(e.abort.signal, store)
+    await runGraph(
+      buildOrchestratorGraph(e),
+      seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' }),
+      store,
+      io
+    )
+    const secret = 'TealSecret123' // >= 6 chars, unique
+    const final = await resumeGraph(buildOrchestratorGraph(e), 'run1', store, io, secret)
+    expect(final.status).toBe('completed')
+    // the worker echoed the answer, but the persisted output is redacted
+    expect(final.tasks['t1'].output).toContain('[user answer redacted]')
+    expect(final.tasks['t1'].output).not.toContain(secret)
+    // the raw answer appears NOWHERE in persisted state — INCLUDING steps[].output
+    expect(JSON.stringify(final)).not.toContain(secret)
   })
 
   it('skip (empty answer) resumes best-effort and finishes', async () => {

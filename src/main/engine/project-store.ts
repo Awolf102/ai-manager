@@ -855,12 +855,16 @@ function recentsFile(): string {
 }
 
 export async function getRecentProjects(): Promise<ProjectMeta[]> {
-  return JSON.parse(await readFileOr(recentsFile(), '[]')) as ProjectMeta[]
+  try {
+    return JSON.parse(await readFileOr(recentsFile(), '[]')) as ProjectMeta[]
+  } catch {
+    return [] // corrupt recents file → start fresh (mirrors openProject's corrupt-graph recovery)
+  }
 }
 
 async function addRecent(meta: ProjectMeta): Promise<void> {
   const list = await getRecentProjects()
   const next = [meta, ...list.filter((m) => m.path !== meta.path)].slice(0, 10)
   await fs.mkdir(app.getPath('userData'), { recursive: true })
-  await fs.writeFile(recentsFile(), JSON.stringify(next, null, 2), 'utf8')
+  await atomicWrite(recentsFile(), JSON.stringify(next, null, 2)) // atomic: concurrent writers never interleave
 }

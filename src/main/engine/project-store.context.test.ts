@@ -4,8 +4,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 // project-store.ts imports `app` from electron at module top; mock it so the module
-// loads in plain Node.
-vi.mock('electron', () => ({ app: { getPath: () => '/tmp' } }))
+// loads in plain Node. Unique userData dir per test file so the recents file isn't
+// shared with the other test files running in parallel (sharing one '/tmp' raced it).
+const USERDATA = vi.hoisted(() => `/tmp/aim-userdata-${Math.random().toString(36).slice(2)}`)
+vi.mock('electron', () => ({ app: { getPath: () => USERDATA } }))
 
 import { openProject, addContextFiles } from './project-store'
 

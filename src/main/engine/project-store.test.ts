@@ -5,8 +5,11 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
 // project-store.ts imports `app` from electron at module top; mock it so the module
-// loads in plain Node. mergeMemory itself touches neither electron nor the fs.
-vi.mock('electron', () => ({ app: { getPath: () => '/tmp' } }))
+// loads in plain Node. Use a UNIQUE userData dir per test file so the recents file
+// (app.getPath('userData')/recent-projects.json) isn't shared with the other test files
+// running in parallel — sharing one '/tmp' path raced + corrupted it across files.
+const USERDATA = vi.hoisted(() => `/tmp/aim-userdata-${Math.random().toString(36).slice(2)}`)
+vi.mock('electron', () => ({ app: { getPath: () => USERDATA } }))
 
 import {
   openProject,
@@ -38,6 +41,7 @@ import {
   deleteAgent,
   updateAgent,
   applyReflection,
+  getRecentProjects,
 } from './project-store'
 
 async function tmpProject(): Promise<string> {
@@ -45,6 +49,19 @@ async function tmpProject(): Promise<string> {
   await fs.mkdir(dir, { recursive: true })
   return dir
 }
+
+describe('recents file resilience', () => {
+  it('getRecentProjects returns [] for a corrupt recents file instead of throwing', async () => {
+    // Regression: addRecent wrote recent-projects.json non-atomically; concurrent opens
+    // interleaved bytes (garbled JSON), then every later openProject -> addRecent ->
+    // getRecentProjects threw on JSON.parse and cascaded. Fixed two ways: addRecent now
+    // uses atomicWrite (temp + rename, never interleaves), and getRecentProjects tolerates
+    // a corrupt file (returns [], matching openProject's corrupt-graph recovery).
+    await openProject(await tmpProject()) // ensures the userData dir exists
+    await fs.writeFile(join(USERDATA, 'recent-projects.json'), '[{"path":"a","name":"a"}]EXTRA', 'utf8')
+    await expect(getRecentProjects()).resolves.toEqual([])
+  })
+})
 
 describe('team export/import round-trip', () => {
   it('exports portable lessons only and re-imports the team into a fresh project', async () => {
