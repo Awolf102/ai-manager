@@ -19,6 +19,11 @@ export default function HistoryView() {
   const [runs, setRuns] = useState<RunSummary[]>([])
   const [selected, setSelected] = useState<string | null>(null)
   const [record, setRecord] = useState<RunRecord | null>(null)
+  const resumable = useStore((s) => s.resumable)
+  const resumeResumable = useStore((s) => s.resumeResumable)
+  const discardResumable = useStore((s) => s.discardResumable)
+  const requestConfirm = useStore((s) => s.requestConfirm)
+  const setShowRunView = useStore((s) => s.setShowRunView)
 
   const refresh = (): void => {
     void window.api.listRuns().then(setRuns)
@@ -35,6 +40,31 @@ export default function HistoryView() {
 
   return (
     <div className="history">
+      {resumable.length > 0 && (
+        <div className="hist-list resumable">
+          <div className="hist-list-head"><span>Resumable ({resumable.length})</span></div>
+          {resumable.map((r) => (
+            <div key={r.runId} className="hist-row">
+              <div className="hist-goal">{r.goal || '(no goal)'}</div>
+              <div className="hist-meta">
+                <span className={`run-pill ${r.status === 'interrupted' ? 'st-skipped' : 'st-error'}`}>
+                  {r.status === 'interrupted' ? 'Paused' : 'Crashed'}
+                </span>
+                <span>{fmt(r.startedAt)}</span>
+                <span>· {r.taskCount} tasks</span>
+                <button className="btn tiny" onClick={() => { resumeResumable(r.runId); setShowRunView(true) }}>Resume</button>
+                <button
+                  className="btn tiny"
+                  onClick={async () => {
+                    const ok = await requestConfirm({ title: 'Discard this run?', body: 'Its recovery checkpoint is deleted permanently.', confirmLabel: 'Discard', danger: true })
+                    if (ok) void discardResumable(r.runId)
+                  }}
+                >Discard</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="hist-list">
         <div className="hist-list-head">
           <span>Runs ({runs.length})</span>
