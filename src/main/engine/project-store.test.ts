@@ -36,6 +36,8 @@ import {
   removeContextFile,
   contextThumbnail,
   deleteAgent,
+  updateAgent,
+  applyReflection,
 } from './project-store'
 
 async function tmpProject(): Promise<string> {
@@ -424,5 +426,42 @@ describe('deleteAgent soft-delete', () => {
     expect(moved).toBeDefined()
     const mem = await fs.readFile(join(trash, moved!, 'memory.md'), 'utf8')
     expect(mem).toContain('[portable] keep this')
+  })
+})
+
+describe('race-safe memory writes', () => {
+  it('does not lose lessons when reflections run concurrently on one agent', async () => {
+    const proj = await tmpProject()
+    await openProject(proj)
+    const g = await createAgent({ name: 'Dana', kind: 'worker' })
+    const id = g.nodes[0].id
+    await Promise.all([
+      applyReflection(id, { win: '', loss: '', lessons: ['lesson alpha'], label: 't1' }),
+      applyReflection(id, { win: '', loss: '', lessons: ['lesson beta'], label: 't2' })
+    ])
+    const mem = await readMemory(id)
+    expect(mem).toContain('lesson alpha')
+    expect(mem).toContain('lesson beta')
+  })
+})
+
+describe('race-safe graph writes', () => {
+  it('does not lose sessionIds written concurrently across agents', async () => {
+    const proj = await tmpProject()
+    await openProject(proj)
+    await createAgent({ name: 'A', kind: 'worker' })
+    await createAgent({ name: 'B', kind: 'worker' })
+    const g = await createAgent({ name: 'C', kind: 'worker' })
+    const id = (n: string) => g.nodes.find((x) => x.name === n)!.id
+    await Promise.all([
+      updateAgent({ id: id('A'), sessionId: 'sa' }),
+      updateAgent({ id: id('B'), sessionId: 'sb' }),
+      updateAgent({ id: id('C'), sessionId: 'sc' })
+    ])
+    const reopened = await openProject(proj)
+    const sid = (n: string) => reopened.nodes.find((x) => x.name === n)!.sessionId
+    expect(sid('A')).toBe('sa')
+    expect(sid('B')).toBe('sb')
+    expect(sid('C')).toBe('sc')
   })
 })

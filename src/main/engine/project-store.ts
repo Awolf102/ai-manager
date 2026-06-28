@@ -22,7 +22,8 @@ import { slugify, uniqueSlug } from '../../shared/slug'
 import { isImageName, uniqueContextName } from '../../shared/context-files'
 import { parseLessonBullet } from '../../shared/lessons'
 import { buildTeamBundle, planTeamImport, validateTeamBundle, type TeamBundle } from '../../shared/team-bundle'
-import { atomicWriteWithBackup } from './atomic-write'
+import { atomicWriteWithBackup, atomicWrite } from './atomic-write'
+import { createMutex, createKeyedMutex } from './mutex'
 import { mergeBrainPush, planBrainPull, mergeLessons } from '../../shared/team-brain'
 import { pickSpawnModel } from '../../shared/team-spawn'
 import type { DraftRosterAgent } from '../../shared/role-draft'
@@ -151,11 +152,19 @@ task, record what worked and what didn't so you don't repeat mistakes.
 
 // ---------- graph io ----------
 
+const graphSaveMutex = createMutex()
+
 async function saveGraph(): Promise<ProjectGraph> {
+  // `graph` is the LIVE shared reference (not a snapshot) on purpose: the serialized
+  // write below stringifies it at its turn, so the last write reflects every in-memory
+  // assign made before it. Do NOT replace this with a structural snapshot — that would
+  // reintroduce the lost-update for any field assigned after the snapshot was taken.
   const { path, graph } = requireCurrent()
-  await fs.mkdir(aimPath(path), { recursive: true })
-  await atomicWriteWithBackup(aimPath(path, GRAPH_FILE), JSON.stringify(graph, null, 2))
-  return graph
+  return graphSaveMutex(async () => {
+    await fs.mkdir(aimPath(path), { recursive: true })
+    await atomicWriteWithBackup(aimPath(path, GRAPH_FILE), JSON.stringify(graph, null, 2))
+    return graph
+  })
 }
 
 async function ensureScaffold(projectPath: string): Promise<void> {
@@ -322,9 +331,17 @@ export async function readMemory(agentId: string): Promise<string> {
   return readFileOr(join(agentDir(agentId), 'memory.md'), '')
 }
 
+const memoryMutex = createKeyedMutex()
+
+// Private, lock-free, atomic memory write — only call INSIDE a memoryMutex section.
+async function writeMemoryRaw(agentId: string, content: string): Promise<void> {
+  const dir = agentDir(agentId)
+  await fs.mkdir(dir, { recursive: true })
+  await atomicWrite(join(dir, 'memory.md'), content)
+}
+
 export async function writeMemory(agentId: string, content: string): Promise<void> {
-  await fs.mkdir(agentDir(agentId), { recursive: true })
-  await fs.writeFile(join(agentDir(agentId), 'memory.md'), content, 'utf8')
+  await memoryMutex(agentId, () => writeMemoryRaw(agentId, content))
 }
 
 /** Read everything the runner/PTY need to launch an agent. */
@@ -544,12 +561,12 @@ export async function applyReflection(
   agentId: string,
   r: { win: string; loss: string; lessons: string[]; label: string }
 ): Promise<void> {
-  const dir = agentDir(agentId)
-  const file = join(dir, 'memory.md')
-  const content = await readFileOr(file, '')
-  const next = mergeMemory(content, r)
-  await fs.mkdir(dir, { recursive: true })
-  await fs.writeFile(file, next, 'utf8')
+  await memoryMutex(agentId, async () => {
+    const file = join(agentDir(agentId), 'memory.md')
+    const content = await readFileOr(file, '')
+    const next = mergeMemory(content, r)
+    await writeMemoryRaw(agentId, next)
+  })
 }
 
 function norm(s: string): string {
@@ -671,12 +688,14 @@ export async function refreshFromTeam(
   let updated = 0
   for (const p of planBrainPull(brain, graph.nodes)) {
     if (p.lessons.length === 0) continue
-    const memory = await readMemory(p.agentId)
-    const next = mergeLessons(memory, p.lessons)
-    if (next !== memory) {
-      await writeMemory(p.agentId, next)
-      updated++
-    }
+    const changed = await memoryMutex(p.agentId, async () => {
+      const memory = await readMemory(p.agentId)
+      const next = mergeLessons(memory, p.lessons)
+      if (next === memory) return false
+      await writeMemoryRaw(p.agentId, next)
+      return true
+    })
+    if (changed) updated++
   }
   graph.linkedTeam = { teamId, path: brainPath }
   const saved = await saveGraph()

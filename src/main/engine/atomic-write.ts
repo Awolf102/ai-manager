@@ -1,5 +1,4 @@
 import { promises as fs } from 'node:fs'
-import { existsSync } from 'node:fs'
 
 let seq = 0
 function tmpName(target: string): string {
@@ -19,12 +18,10 @@ export async function atomicWrite(target: string, data: string): Promise<void> {
 export async function atomicWriteWithBackup(target: string, data: string): Promise<void> {
   const tmp = tmpName(target)
   await fs.writeFile(tmp, data, 'utf8')
-  if (existsSync(target)) {
-    try {
-      await fs.rename(target, `${target}.bak`)
-    } catch {
-      // a concurrent writer may have already moved it; ignore
-    }
+  try {
+    await fs.rename(target, `${target}.bak`) // demote previous version; ENOENT (no prior file) is fine
+  } catch {
+    // no existing target, or a concurrent writer already moved it — ignore
   }
   await fs.rename(tmp, target)
 }
