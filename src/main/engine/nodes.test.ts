@@ -1385,7 +1385,7 @@ describe('HITL user requests (Stage 3)', () => {
     expect(resume).toBeTruthy()
     expect(resume!.prompt).toContain('Use teal')
     // the raw answer never lands in persisted run state (questions are fine; answers are not)
-    const persisted = JSON.stringify({ ...final, steps: undefined })  // steps.output may echo; exclude
+    const persisted = JSON.stringify(final) // includes steps[].output — redacted as of S5
     expect(persisted).not.toContain('Use teal')
   })
 
