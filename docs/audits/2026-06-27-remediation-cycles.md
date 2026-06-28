@@ -76,6 +76,6 @@ should be captured as overhaul acceptance criteria:
 
 - **2026-06-27** — Triage approved. UX-only Importants (#21, #28, #29, #32–34) **deferred to the Phase-2
   Orkestr overhaul** (recorded as overhaul acceptance criteria in the overhaul-plan memory).
-- **2026-06-27** — **Cycle S2 (Run-result launch hardening) STARTED** — brainstorm in progress.
+- **2026-06-27** — **Cycle S2 (Run-result launch hardening) ✅ MERGED to main** (merge `1ad5a9b`). `parseStartCommand` tokenizes the launch command into argv + rejects unquoted shell operators / leading `VAR=` / unbalanced quotes; `server-manager` spawns `shell:false` (injection sink closed); modal validates live. 293 tests, opus whole-branch review = ready-to-merge. 3 non-blocking Minors deferred. Audit Critical #1 resolved. Next recommended cycle: **U1 (destructive-action guardrails)**.
 
 Update this file's "Status" + check off cycles as they merge.
