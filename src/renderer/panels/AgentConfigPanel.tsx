@@ -9,6 +9,7 @@ export default function AgentConfigPanel() {
   const selectedId = useStore((s) => s.selectedAgentId)
   const setGraph = useStore((s) => s.setGraph)
   const select = useStore((s) => s.select)
+  const requestConfirm = useStore((s) => s.requestConfirm)
 
   const [catalog, setCatalog] = useState<DiscoveredPlugin[] | null>(null)
   useEffect(() => {
@@ -22,6 +23,13 @@ export default function AgentConfigPanel() {
     setGraph(await window.api.updateAgent({ id: agent.id, ...patch }))
   }
   const remove = async (): Promise<void> => {
+    const ok = await requestConfirm({
+      title: 'Delete agent?',
+      body: `"${agent.name}" and its saved memory will be moved to trash (.ai-manager/.trash) — recoverable from disk.`,
+      confirmLabel: 'Delete agent',
+      danger: true
+    })
+    if (!ok) return
     setGraph(await window.api.deleteAgent(agent.id))
     select(null)
   }

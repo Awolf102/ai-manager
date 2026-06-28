@@ -48,6 +48,7 @@ export default function OrgChart() {
   const setGraph = useStore((s) => s.setGraph)
   const patchPositions = useStore((s) => s.patchPositions)
   const select = useStore((s) => s.select)
+  const requestConfirm = useStore((s) => s.requestConfirm)
 
   const [nodes, setNodes, onNodesChange] = useNodesState<AgentFlowNode>(toNodes(graph))
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(toEdges(graph))
@@ -98,6 +99,20 @@ export default function OrgChart() {
       void persistEdges(graph.edges.filter((e) => !ids.has(e.id)))
     },
     [graph.edges, persistEdges]
+  )
+
+  const onBeforeDelete = useCallback(
+    async ({ nodes: del }: { nodes: AgentFlowNode[]; edges: Edge[] }): Promise<boolean> => {
+      if (del.length === 0) return true // edge-only deletion — no confirm
+      const names = del.map((n) => graph.nodes.find((g) => g.id === n.id)?.name ?? 'agent')
+      return requestConfirm({
+        title: del.length === 1 ? 'Delete agent?' : `Delete ${del.length} agents?`,
+        body: `${names.join(', ')} — saved memory will be moved to trash (.ai-manager/.trash), recoverable from disk.`,
+        confirmLabel: 'Delete',
+        danger: true
+      })
+    },
+    [graph.nodes, requestConfirm]
   )
 
   const onNodesDelete = useCallback(
@@ -154,6 +169,7 @@ export default function OrgChart() {
       onConnect={onConnect}
       onEdgesDelete={onEdgesDelete}
       onNodesDelete={onNodesDelete}
+      onBeforeDelete={onBeforeDelete}
       onNodeDragStop={onNodeDragStop}
       onNodeClick={(_, n) => select(n.id)}
       onEdgeClick={onEdgeClick}
