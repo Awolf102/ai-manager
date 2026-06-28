@@ -114,7 +114,7 @@ export async function streamAgent(
       cwd: projectPath,
       model: agent.model,
       systemPrompt: { type: 'preset', preset: 'claude_code', append: composeAppend(role, memory, context) + headlessNote(pack.names) },
-      ...buildPermissionOptions(mode),
+      ...buildPermissionOptions(mode, { lockBypass: getSettings().lockBypassPermissions }),
       settingSources: ['project'],
       abortController: abort
     }
