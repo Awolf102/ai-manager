@@ -11,6 +11,7 @@ import HistoryView from './run/HistoryView'
 import SettingsModal from './SettingsModal'
 import ContextModal from './ContextModal'
 import HitlModal from './HitlModal'
+import ConfirmDialog from './ConfirmDialog'
 import { AGENT_KINDS } from '../shared/types'
 import type { AgentKind, AuthStatus, ProjectGraph, ProjectMeta } from '../shared/types'
 
@@ -269,6 +270,7 @@ export default function App() {
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showContext && <ContextModal onClose={() => setShowContext(false)} />}
       <HitlModal />
+      <ConfirmDialog />
       {authBanner}
     </div>
   )

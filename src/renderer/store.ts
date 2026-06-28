@@ -11,6 +11,8 @@ import type {
 
 export type TerminalMode = 'interactive' | 'headless'
 
+export type ConfirmOpts = { title: string; body: string; confirmLabel?: string; danger?: boolean }
+
 export interface TerminalTab {
   id: string
   agentId: string
@@ -87,6 +89,10 @@ interface AppState {
   openHistory: () => void
 
   agentById: (id: string) => AgentNodeData | undefined
+
+  confirm: { opts: ConfirmOpts; resolve: (v: boolean) => void } | null
+  requestConfirm: (opts: ConfirmOpts) => Promise<boolean>
+  resolveConfirm: (v: boolean) => void
 }
 
 let counter = 0
@@ -230,5 +236,15 @@ export const useStore = create<AppState>((set, get) => ({
   setShowRunView: (v) => set({ showRunView: v }),
   openHistory: () => set({ showHistory: true, activeDockId: 'history' }),
 
-  agentById: (id) => get().graph?.nodes.find((n) => n.id === id)
+  agentById: (id) => get().graph?.nodes.find((n) => n.id === id),
+
+  confirm: null,
+  requestConfirm: (opts) => new Promise<boolean>((resolve) => set({ confirm: { opts, resolve } })),
+  resolveConfirm: (v) => {
+    const c = get().confirm
+    if (c) {
+      c.resolve(v)
+      set({ confirm: null })
+    }
+  },
 }))

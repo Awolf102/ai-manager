@@ -670,6 +670,12 @@ button {
   margin-top: 8px;
 }
 
+.confirm-body {
+  margin: 8px 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .seg {
   display: flex;
   gap: 0;
