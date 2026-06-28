@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createRunStore, sweepTmpFiles } from './run-store'
+import { createRunStore, sweepTmpFiles, toResumableSummaries } from './run-store'
 import type { LiveRunStatus, RunState } from '../../shared/types'
 
 function mkState(over: Partial<RunState> = {}): RunState {
@@ -130,5 +130,39 @@ describe('sweepTmpFiles', () => {
     const state = mkState({ runId: 'xyz', final: 'ok' })
     await store.put(state)
     expect(await store.get('xyz')).toEqual(state)
+  })
+})
+
+describe('gcCheckpoints', () => {
+  const NOW = Date.parse('2026-07-01T00:00:00.000Z')
+  it('removes terminal-status + old-resumable, keeps recent resumable', async () => {
+    const store = createRunStore(dir)
+    await store.put(mkState({ runId: 'done', status: 'completed' }))
+    await store.put(mkState({ runId: 'err', status: 'error' }))
+    await store.put(mkState({ runId: 'cancel', status: 'cancelled' }))
+    await store.put(mkState({ runId: 'live', status: 'running', updatedAt: '2026-06-30T00:00:00.000Z' }))
+    await store.put(mkState({ runId: 'paused', status: 'interrupted', updatedAt: '2026-06-29T00:00:00.000Z' }))
+    await store.put(mkState({ runId: 'stale', status: 'running', updatedAt: '2026-01-01T00:00:00.000Z' }))
+    const removed = await store.gcCheckpoints(NOW)
+    expect(removed).toBe(4) // done, err, cancel, stale
+    const kept = (await store.listResumable()).map((s) => s.runId).sort()
+    expect(kept).toEqual(['live', 'paused'])
+  })
+  it('leaves an unparseable checkpoint file alone', async () => {
+    const store = createRunStore(dir)
+    await fs.writeFile(join(dir, 'bad.json'), '{ not json', 'utf8')
+    expect(await store.gcCheckpoints(NOW)).toBe(0)
+  })
+})
+
+describe('toResumableSummaries', () => {
+  it('excludes active ids and maps fields (taskCount = plan.length)', () => {
+    const states = [
+      mkState({ runId: 'a', status: 'running' }),
+      mkState({ runId: 'b', status: 'interrupted' })
+    ]
+    expect(toResumableSummaries(states, new Set(['a']))).toEqual([
+      { runId: 'b', goal: 'ship it', status: 'interrupted', startedAt: '2026-06-24T00:00:00.000Z', updatedAt: '2026-06-24T00:01:00.000Z', taskCount: 1 }
+    ])
   })
 })

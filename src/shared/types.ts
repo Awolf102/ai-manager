@@ -314,6 +314,16 @@ export interface RunSummary {
   taskCount: number
 }
 
+/** A crashed ('running') or paused ('interrupted') run that can be resumed from its checkpoint. */
+export interface ResumableRun {
+  runId: string
+  goal: string
+  status: 'running' | 'interrupted'
+  startedAt: string
+  updatedAt: string
+  taskCount: number
+}
+
 /** How to launch + open the app the agents built. Produced by the detection
  *  agent, edited in the preview, replayed by the server runtime. */
 export interface RunManifest {

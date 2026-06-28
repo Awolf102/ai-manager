@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
-import type { RunState } from '../../shared/types'
+import type { ResumableRun, RunState } from '../../shared/types'
 import { atomicWrite } from './atomic-write'
 
 /**
@@ -20,9 +20,12 @@ export interface RunStore {
   remove(runId: string): Promise<void>
   /** Checkpoints still resumable (status running|interrupted), newest first. */
   listResumable(): Promise<RunState[]>
+  /** GC dead/stale checkpoints: terminal-status (any age) + resumable older than 30 days (by updatedAt). Returns count removed. */
+  gcCheckpoints(nowMs: number): Promise<number>
 }
 
 const RESUMABLE = new Set(['running', 'interrupted'])
+const MAX_RESUMABLE_AGE_MS = 30 * 24 * 60 * 60 * 1000 // prune resumable checkpoints abandoned > 30 days
 
 /** Best-effort removal of orphaned temp files left by a crash mid-write. */
 export async function sweepTmpFiles(dir: string): Promise<void> {
@@ -77,6 +80,46 @@ export function createRunStore(dir: string): RunStore {
     return out
   }
 
+  async function gcCheckpoints(nowMs: number): Promise<number> {
+    let files: string[]
+    try {
+      files = (await fs.readdir(dir)).filter((f) => f.endsWith('.json'))
+    } catch {
+      return 0 // dir not created yet
+    }
+    let removed = 0
+    for (const file of files) {
+      let s: RunState
+      try {
+        s = JSON.parse(await fs.readFile(join(dir, file), 'utf8')) as RunState
+      } catch {
+        continue // leave unparseable files (rare; listResumable skips them anyway)
+      }
+      const terminal = !RESUMABLE.has(s.status)
+      const staleResumable = !terminal && nowMs - Date.parse(s.updatedAt) > MAX_RESUMABLE_AGE_MS
+      if (terminal || staleResumable) {
+        await remove(s.runId)
+        removed++
+      }
+    }
+    return removed
+  }
+
   void sweepTmpFiles(dir) // clean up temp files orphaned by a prior crash (init-time, before any run)
-  return { put, get, remove, listResumable }
+  return { put, get, remove, listResumable, gcCheckpoints }
+}
+
+/** Map resumable RunStates to lightweight summaries, excluding any currently-active run.
+ *  Input is expected pre-filtered to running|interrupted (listResumable) and pre-sorted. */
+export function toResumableSummaries(states: RunState[], activeIds: ReadonlySet<string>): ResumableRun[] {
+  return states
+    .filter((s) => !activeIds.has(s.runId))
+    .map((s) => ({
+      runId: s.runId,
+      goal: s.goal,
+      status: s.status as 'running' | 'interrupted',
+      startedAt: s.startedAt,
+      updatedAt: s.updatedAt,
+      taskCount: s.plan.length
+    }))
 }
