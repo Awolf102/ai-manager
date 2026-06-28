@@ -40,6 +40,12 @@ describe('createKeyedMutex', () => {
     expect(order).toEqual(['x1', 'x2']) // x1 first despite more ticks (serialized by key)
   })
 
+  it('keeps a key chain alive after a rejected body', async () => {
+    const run = createKeyedMutex()
+    await expect(run('k', async () => { throw new Error('boom') })).rejects.toThrow('boom')
+    expect(await run('k', async () => 1)).toBe(1)
+  })
+
   it('runs different keys independently (they can overlap)', async () => {
     const run = createKeyedMutex()
     let aRunning = false

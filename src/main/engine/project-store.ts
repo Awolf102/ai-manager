@@ -155,7 +155,11 @@ task, record what worked and what didn't so you don't repeat mistakes.
 const graphSaveMutex = createMutex()
 
 async function saveGraph(): Promise<ProjectGraph> {
-  const { path, graph } = requireCurrent() // capture at call time (binds to the open project)
+  // `graph` is the LIVE shared reference (not a snapshot) on purpose: the serialized
+  // write below stringifies it at its turn, so the last write reflects every in-memory
+  // assign made before it. Do NOT replace this with a structural snapshot — that would
+  // reintroduce the lost-update for any field assigned after the snapshot was taken.
+  const { path, graph } = requireCurrent()
   return graphSaveMutex(async () => {
     await fs.mkdir(aimPath(path), { recursive: true })
     await atomicWriteWithBackup(aimPath(path, GRAPH_FILE), JSON.stringify(graph, null, 2))
