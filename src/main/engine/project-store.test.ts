@@ -37,6 +37,7 @@ import {
   contextThumbnail,
   deleteAgent,
   updateAgent,
+  applyReflection,
 } from './project-store'
 
 async function tmpProject(): Promise<string> {
@@ -425,6 +426,22 @@ describe('deleteAgent soft-delete', () => {
     expect(moved).toBeDefined()
     const mem = await fs.readFile(join(trash, moved!, 'memory.md'), 'utf8')
     expect(mem).toContain('[portable] keep this')
+  })
+})
+
+describe('race-safe memory writes', () => {
+  it('does not lose lessons when reflections run concurrently on one agent', async () => {
+    const proj = await tmpProject()
+    await openProject(proj)
+    const g = await createAgent({ name: 'Dana', kind: 'worker' })
+    const id = g.nodes[0].id
+    await Promise.all([
+      applyReflection(id, { win: '', loss: '', lessons: ['lesson alpha'], label: 't1' }),
+      applyReflection(id, { win: '', loss: '', lessons: ['lesson beta'], label: 't2' })
+    ])
+    const mem = await readMemory(id)
+    expect(mem).toContain('lesson alpha')
+    expect(mem).toContain('lesson beta')
   })
 })
 
