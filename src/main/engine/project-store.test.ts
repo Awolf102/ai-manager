@@ -358,7 +358,7 @@ describe('context files', () => {
     const { graph, skipped } = await addContextFiles([join(srcDir, 'good.md'), aDir, join(srcDir, 'missing.png')])
     expect(graph.context).toHaveLength(1)
     expect(graph.context![0].fileName).toBe('good.md')
-    expect(skipped.sort()).toEqual(['a-directory', 'missing.png'])
+    expect(skipped.sort()).toEqual(['a-directory (not a file)', 'missing.png (unreadable)'])
   })
 })
 

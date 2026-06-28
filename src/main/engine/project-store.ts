@@ -371,10 +371,13 @@ export async function addContextFiles(sourcePaths: string[]): Promise<{ graph: P
   await fs.mkdir(dir, { recursive: true })
   graph.context = graph.context ?? []
   const skipped: string[] = []
+  const MAX_CONTEXT_BYTES = 25 * 1024 * 1024
   for (const src of sourcePaths) {
     try {
-      const stat = await fs.stat(src)
-      if (!stat.isFile()) { skipped.push(basename(src)); continue }
+      const stat = await fs.lstat(src)
+      if (stat.isSymbolicLink()) { skipped.push(`${basename(src)} (symlink)`); continue }
+      if (!stat.isFile()) { skipped.push(`${basename(src)} (not a file)`); continue }
+      if (stat.size > MAX_CONTEXT_BYTES) { skipped.push(`${basename(src)} (too large)`); continue }
       const fileName = uniqueContextName(graph.context.map((c) => c.fileName), basename(src))
       await fs.copyFile(src, join(dir, fileName))
       graph.context.push({
@@ -386,7 +389,7 @@ export async function addContextFiles(sourcePaths: string[]): Promise<{ graph: P
         isImage: isImageName(fileName)
       })
     } catch {
-      skipped.push(basename(src))
+      skipped.push(`${basename(src)} (unreadable)`)
     }
   }
   return { graph: await saveGraph(), skipped }
