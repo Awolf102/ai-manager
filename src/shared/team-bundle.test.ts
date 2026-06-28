@@ -4,6 +4,7 @@ import {
   buildSeededMemory,
   validateTeamBundle,
   planTeamImport,
+  previewOf,
   type TeamBundle
 } from './team-bundle'
 import type { AgentNodeData, GraphEdge } from './types'
@@ -141,5 +142,15 @@ describe('planTeamImport (force safe mode)', () => {
     if (!v.ok) throw new Error('precondition')
     const plan = planTeamImport(v.bundle, [])
     expect(plan.members[0].permissionMode).toBe('acceptEdits')
+  })
+})
+
+describe('previewOf', () => {
+  it('summarizes members with their forced mode', () => {
+    const v = validateTeamBundle(rawBundle([{ memberId: 'm', name: 'A', kind: 'worker', icon: 'x', model: 'claude-sonnet-4-6', permissionMode: 'bypassPermissions', position: { x: 0, y: 0 }, role: 'do x', lessons: [] }]))
+    if (!v.ok) throw new Error('precondition')
+    const p = previewOf(v.bundle, v.warnings)
+    expect(p.members[0]).toEqual({ name: 'A', kind: 'worker', role: 'do x' })
+    expect(Array.isArray(p.warnings)).toBe(true)
   })
 })

@@ -485,6 +485,8 @@ export const IPC = {
   loadRun: 'runs:load',
   exportTeam: 'team:export',
   importTeam: 'team:import',
+  importTeamPreview: 'team:import-preview',
+  importTeamApply: 'team:import-apply',
   syncTeam: 'team:syncTo',
   refreshTeam: 'team:refreshFrom',
   draftRoles: 'roles:draft',
@@ -537,6 +539,12 @@ export interface RendererApi {
   loadRun: (file: string) => Promise<RunRecord | null>
   exportTeam: () => Promise<{ saved: boolean; path?: string }>
   importTeam: () => Promise<{ imported: boolean; graph?: ProjectGraph; error?: string }>
+  importTeamPreview: () => Promise<
+    | { status: 'canceled' }
+    | { status: 'error'; error: string }
+    | { status: 'ok'; bundle: unknown; path: string; preview: { members: { name: string; kind: AgentKind; role: string }[]; warnings: string[] } }
+  >
+  importTeamApply: (bundle: unknown, path: string) => Promise<{ graph: ProjectGraph } | { error: string }>
   syncToTeam: () => Promise<{ synced: boolean; graph?: ProjectGraph; teamPath?: string }>
   refreshFromTeam: () => Promise<{ refreshed: boolean; graph?: ProjectGraph; updated?: number; error?: string }>
   draftRoles: (input: { goal: string; orchestratorId: string }) => Promise<{

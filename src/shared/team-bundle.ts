@@ -151,6 +151,14 @@ export function validateTeamBundle(
   return { ok: true, bundle, warnings }
 }
 
+/** Renderer-facing preview of an import (members + validation warnings). Roles shown for review. */
+export function previewOf(bundle: TeamBundle, warnings: string[]): {
+  members: { name: string; kind: AgentKind; role: string }[]
+  warnings: string[]
+} {
+  return { members: bundle.members.map((m) => ({ name: m.name, kind: m.kind, role: m.role })), warnings }
+}
+
 export interface PlannedMember {
   memberId: string
   name: string
