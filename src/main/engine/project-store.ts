@@ -205,6 +205,9 @@ export async function openProject(projectPath: string): Promise<ProjectGraph> {
   graph.settings = { ...DEFAULT_SETTINGS, ...(graph.settings ?? {}) }
   graph.context = graph.context ?? []
   current = { path: projectPath, graph }
+  // Re-persist (applies settings/context defaults). After a .bak recovery the corrupt
+  // graph.json was already renamed to *.corrupt-<ts>, so atomicWriteWithBackup sees no
+  // target to demote and the recovered graph.json.bak is preserved — do not reorder this.
   await saveGraph()
   await addRecent(graph.project)
   return graph
