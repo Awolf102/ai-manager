@@ -27,7 +27,7 @@ export async function spawnTeam(
     blockHooks: s.blockPluginHooks
   })
   const offered = offeredSkills(discovered, 40)
-  const validIds = discovered.flatMap((p) => p.skills.map((s) => s.id))
+  const validIds = discovered.flatMap((p) => p.skills.map((sk) => sk.id))
   const base = spawnTeamPrompt(opts.goal, getAgent(opts.orchestratorId).name, agents, offered, getSettings().autoAssignModels)
   let last = ''
   for (let attempt = 0; attempt < 2; attempt++) {

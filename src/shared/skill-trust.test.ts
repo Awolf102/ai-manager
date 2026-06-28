@@ -59,6 +59,11 @@ describe('shapeCatalog', () => {
     const out = shapeCatalog(cache, markets, 'anthropic-marketplaces')
     expect(out.map((p) => p.id).sort()).toEqual(['fd', 'third'])
   })
+  it('tolerates null/garbage input', () => {
+    expect(shapeCatalog(null, null, 'anthropic-only')).toEqual([])
+    expect(shapeCatalog({ catalog: {} }, {}, 'anthropic-only')).toEqual([])
+    expect(shapeCatalog({ catalog: { plugins: {} } }, {}, 'anthropic-marketplaces')).toEqual([])
+  })
 })
 
 describe('skillOptionsFor', () => {

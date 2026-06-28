@@ -29,7 +29,7 @@ export async function draftRoles(
     blockHooks: s.blockPluginHooks
   })
   const offered = offeredSkills(discovered, 40)
-  const validIds = discovered.flatMap((p) => p.skills.map((s) => s.id))
+  const validIds = discovered.flatMap((p) => p.skills.map((sk) => sk.id))
   const base = draftRolesPrompt(opts.goal, agents, edges, offered)
   let last = ''
   for (let attempt = 0; attempt < 2; attempt++) {
