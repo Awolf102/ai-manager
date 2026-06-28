@@ -29,6 +29,7 @@ import type { DraftRosterAgent } from '../../shared/role-draft'
 const AIM_DIR = '.ai-manager'
 const GRAPH_FILE = 'graph.json'
 const AGENTS_DIR = 'agents'
+const TRASH_DIR = '.trash'
 const CONTEXT_DIR = 'context'
 
 let current: { path: string; graph: ProjectGraph } | null = null
@@ -239,8 +240,12 @@ export async function deleteAgent(agentId: string): Promise<ProjectGraph> {
   if (!node) return graph
   graph.nodes = graph.nodes.filter((n) => n.id !== agentId)
   graph.edges = graph.edges.filter((e) => e.source !== agentId && e.target !== agentId)
-  // remove the agent's app-managed folder
-  await fs.rm(aimPath(path, AGENTS_DIR, node.slug), { recursive: true, force: true })
+  // soft-delete: move the agent's folder to trash so role.md/memory.md stay recoverable
+  const src = aimPath(path, AGENTS_DIR, node.slug)
+  if (existsSync(src)) {
+    await fs.mkdir(aimPath(path, TRASH_DIR), { recursive: true })
+    await fs.rename(src, aimPath(path, TRASH_DIR, `${node.slug}-${Date.now()}`))
+  }
   return saveGraph()
 }
 

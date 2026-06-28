@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { promises as fs } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
@@ -33,7 +34,8 @@ import {
   addContextFiles,
   updateContextFile,
   removeContextFile,
-  contextThumbnail
+  contextThumbnail,
+  deleteAgent,
 } from './project-store'
 
 async function tmpProject(): Promise<string> {
@@ -355,5 +357,34 @@ describe('context files', () => {
     expect(graph.context).toHaveLength(1)
     expect(graph.context![0].fileName).toBe('good.md')
     expect(skipped.sort()).toEqual(['a-directory', 'missing.png'])
+  })
+})
+
+describe('deleteAgent soft-delete', () => {
+  it('moves the agent folder to .trash (preserving memory.md) and drops the node + its edges', async () => {
+    const proj = await tmpProject()
+    await openProject(proj)
+    await createAgent({ name: 'Boss', kind: 'orchestrator' })
+    const g0 = await createAgent({ name: 'Dana', kind: 'worker' })
+    const dana = g0.nodes.find((n) => n.name === 'Dana')!
+    const boss = g0.nodes.find((n) => n.name === 'Boss')!
+    await writeMemory(dana.id, '# Memory: Dana\n\n## Lessons\n- [portable] keep this\n\n## Task log\n')
+    await setEdges([{ id: 'e1', source: boss.id, target: dana.id }])
+
+    const agentDir = join(proj, '.ai-manager', 'agents', dana.slug)
+    expect(existsSync(agentDir)).toBe(true)
+
+    const after = await deleteAgent(dana.id)
+
+    expect(after.nodes.find((n) => n.id === dana.id)).toBeUndefined()
+    expect(after.edges).toHaveLength(0)
+    expect(existsSync(agentDir)).toBe(false)
+
+    const trash = join(proj, '.ai-manager', '.trash')
+    const entries = await fs.readdir(trash)
+    const moved = entries.find((e) => e.startsWith(`${dana.slug}-`))
+    expect(moved).toBeDefined()
+    const mem = await fs.readFile(join(trash, moved!, 'memory.md'), 'utf8')
+    expect(mem).toContain('[portable] keep this')
   })
 })
