@@ -151,6 +151,22 @@ describe('runGraph', () => {
     expect(store.puts.at(-1)?.status).toBe('error')
   })
 
+  it('scrubs resumeInput from the cancelled checkpoint when aborted after consuming an answer', async () => {
+    const store = fakeStore()
+    const ac = new AbortController()
+    ac.abort() // already aborted → driver hits the abort branch at the top of the loop
+    const graph: CompiledGraph = {
+      entry: 'a',
+      edges: { a: END },
+      nodes: { a: async () => ({}) }
+    }
+    const out = await runGraph(graph, mkState({ resumeInput: 'a-sensitive-answer' }), store, io(ac.signal, store))
+    expect(out.status).toBe('cancelled')
+    expect(out.resumeInput).toBeUndefined()
+    // the persisted checkpoint is scrubbed too
+    expect(store.puts.at(-1)?.resumeInput).toBeUndefined()
+  })
+
   it('pauses at an interrupting node without advancing the cursor', async () => {
     const ran: string[] = []
     const store = fakeStore()

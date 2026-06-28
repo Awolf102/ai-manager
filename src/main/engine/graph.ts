@@ -52,7 +52,7 @@ export async function runGraph(
 
   while (cursor !== END) {
     if (io.signal.aborted) {
-      state = { ...state, status: 'cancelled', updatedAt: now() }
+      state = { ...state, status: 'cancelled', resumeInput: undefined, updatedAt: now() }
       break
     }
     const node = graph.nodes[cursor]
