@@ -36,6 +36,7 @@ import {
   removeContextFile,
   contextThumbnail,
   deleteAgent,
+  updateAgent,
 } from './project-store'
 
 async function tmpProject(): Promise<string> {
@@ -424,5 +425,26 @@ describe('deleteAgent soft-delete', () => {
     expect(moved).toBeDefined()
     const mem = await fs.readFile(join(trash, moved!, 'memory.md'), 'utf8')
     expect(mem).toContain('[portable] keep this')
+  })
+})
+
+describe('race-safe graph writes', () => {
+  it('does not lose sessionIds written concurrently across agents', async () => {
+    const proj = await tmpProject()
+    await openProject(proj)
+    await createAgent({ name: 'A', kind: 'worker' })
+    await createAgent({ name: 'B', kind: 'worker' })
+    const g = await createAgent({ name: 'C', kind: 'worker' })
+    const id = (n: string) => g.nodes.find((x) => x.name === n)!.id
+    await Promise.all([
+      updateAgent({ id: id('A'), sessionId: 'sa' }),
+      updateAgent({ id: id('B'), sessionId: 'sb' }),
+      updateAgent({ id: id('C'), sessionId: 'sc' })
+    ])
+    const reopened = await openProject(proj)
+    const sid = (n: string) => reopened.nodes.find((x) => x.name === n)!.sessionId
+    expect(sid('A')).toBe('sa')
+    expect(sid('B')).toBe('sb')
+    expect(sid('C')).toBe('sc')
   })
 })

@@ -23,6 +23,7 @@ import { isImageName, uniqueContextName } from '../../shared/context-files'
 import { parseLessonBullet } from '../../shared/lessons'
 import { buildTeamBundle, planTeamImport, validateTeamBundle, type TeamBundle } from '../../shared/team-bundle'
 import { atomicWriteWithBackup } from './atomic-write'
+import { createMutex } from './mutex'
 import { mergeBrainPush, planBrainPull, mergeLessons } from '../../shared/team-brain'
 import { pickSpawnModel } from '../../shared/team-spawn'
 import type { DraftRosterAgent } from '../../shared/role-draft'
@@ -151,11 +152,15 @@ task, record what worked and what didn't so you don't repeat mistakes.
 
 // ---------- graph io ----------
 
+const graphSaveMutex = createMutex()
+
 async function saveGraph(): Promise<ProjectGraph> {
-  const { path, graph } = requireCurrent()
-  await fs.mkdir(aimPath(path), { recursive: true })
-  await atomicWriteWithBackup(aimPath(path, GRAPH_FILE), JSON.stringify(graph, null, 2))
-  return graph
+  const { path, graph } = requireCurrent() // capture at call time (binds to the open project)
+  return graphSaveMutex(async () => {
+    await fs.mkdir(aimPath(path), { recursive: true })
+    await atomicWriteWithBackup(aimPath(path, GRAPH_FILE), JSON.stringify(graph, null, 2))
+    return graph
+  })
 }
 
 async function ensureScaffold(projectPath: string): Promise<void> {
