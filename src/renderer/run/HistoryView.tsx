@@ -23,13 +23,13 @@ export default function HistoryView() {
   const resumeResumable = useStore((s) => s.resumeResumable)
   const discardResumable = useStore((s) => s.discardResumable)
   const requestConfirm = useStore((s) => s.requestConfirm)
-  const setShowRunView = useStore((s) => s.setShowRunView)
+  const refreshResumable = useStore((s) => s.refreshResumable)
 
   const refresh = (): void => {
     void window.api.listRuns().then(setRuns)
   }
   useEffect(() => {
-    if (showHistory) refresh()
+    if (showHistory) { refresh(); void refreshResumable() }
   }, [showHistory])
 
   const open = (file: string): void => {
@@ -52,7 +52,7 @@ export default function HistoryView() {
                 </span>
                 <span>{fmt(r.startedAt)}</span>
                 <span>· {r.taskCount} tasks</span>
-                <button className="btn tiny" onClick={() => { resumeResumable(r.runId); setShowRunView(true) }}>Resume</button>
+                <button className="btn tiny" onClick={() => resumeResumable(r.runId)}>Resume</button>
                 <button
                   className="btn tiny"
                   onClick={async () => {

@@ -97,7 +97,7 @@ interface AppState {
 
   resumable: ResumableRun[]
   resumableDismissed: boolean
-  refreshResumable: () => Promise<void>
+  refreshResumable: (resetDismissed?: boolean) => Promise<void>
   resumeResumable: (runId: string) => void
   discardResumable: (runId: string) => Promise<void>
   dismissResumableBanner: () => void
@@ -262,7 +262,10 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  refreshResumable: async () => set({ resumable: await window.api.listResumable() }),
+  refreshResumable: async (resetDismissed = false) => {
+    const resumable = await window.api.listResumable()
+    set(resetDismissed ? { resumable, resumableDismissed: false } : { resumable })
+  },
   resumeResumable: (runId) =>
     set((s) => {
       void window.api.resumeRun(runId) // no answer → crash-recovery resume

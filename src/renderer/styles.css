@@ -1479,4 +1479,4 @@ button {
 
 /* ---- resumable banner + badge ---- */
 .resume-banner { position: fixed; top: 48px; left: 0; right: 0; z-index: 50; display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: #2d2a1e; border-bottom: 1px solid #4a432a; font-size: 13px; }
-.badge { margin-left: 4px; background: #b54; color: #fff; border-radius: 8px; padding: 0 5px; font-size: 11px; }
+.resume-badge { margin-left: 4px; background: #b54; color: #fff; border-radius: 8px; padding: 0 5px; font-size: 11px; }

@@ -62,7 +62,7 @@ export default function App() {
 
   const onOpen = (g: ProjectGraph): void => {
     setGraph(g)
-    void refreshResumable()
+    void refreshResumable(true)
   }
 
   if (!graph) {
@@ -126,14 +126,14 @@ export default function App() {
           className="btn"
           onClick={async () => {
             const g = await window.api.pickProjectFolder()
-            if (g) { setGraph(g); void refreshResumable() }
+            if (g) { setGraph(g); void refreshResumable(true) }
           }}
         >
           <FolderOpen size={14} /> Switch project
         </button>
         <button className="btn" title="Run history" onClick={() => openHistory()}>
           <Clock size={14} />
-          {resumable.length > 0 && <span className="badge">{resumable.length}</span>}
+          {resumable.length > 0 && <span className="resume-badge">{resumable.length}</span>}
         </button>
         <button
           className="btn"
