@@ -262,5 +262,11 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.contextThumbnail, (_e, id: string) => store.contextThumbnail(id))
 
   // ---- skills ----
-  ipcMain.handle(IPC.listSkills, () => discoverSkills(store.getSettings().skillInstallThreshold ?? 100000))
+  ipcMain.handle(IPC.listSkills, () => {
+    const s = store.getSettings()
+    return discoverSkills({
+      mode: s.trustAnthropicOnly ? 'anthropic-only' : 'anthropic-marketplaces',
+      blockHooks: s.blockPluginHooks
+    })
+  })
 }

@@ -7,7 +7,7 @@ import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { DiscoveredPlugin, DiscoveredSkill } from '../../shared/types'
-import { shapeCatalog, isTrusted } from '../../shared/skill-trust'
+import { shapeCatalog, isAnthropicOwnedRepo, pluginShipsHooks, type SkillTrustMode } from '../../shared/skill-trust'
 
 function pluginsDir(root?: string): string {
   return root ?? join(homedir(), '.claude', 'plugins')
@@ -37,17 +37,34 @@ function candidatePaths(
   return paths
 }
 
-export async function discoverSkills(threshold: number, root?: string): Promise<DiscoveredPlugin[]> {
+/** On-disk hook signals for a resolved plugin dir. */
+async function pluginHookSignals(path: string): Promise<Parameters<typeof pluginShipsHooks>[0]> {
+  const hasHooksJson = existsSync(join(path, 'hooks', 'hooks.json'))
+  let hasPluginJsonHooksKey = false
+  try {
+    const pj = JSON.parse(await fs.readFile(join(path, '.claude-plugin', 'plugin.json'), 'utf8'))
+    hasPluginJsonHooksKey = !!pj && typeof pj === 'object' && 'hooks' in pj
+  } catch { /* no/invalid plugin.json */ }
+  let hooksDirNonEmpty = false
+  try { hooksDirNonEmpty = (await fs.readdir(join(path, 'hooks'))).length > 0 } catch { /* no hooks dir */ }
+  return { hasHooksJson, hasPluginJsonHooksKey, hooksDirNonEmpty }
+}
+
+export async function discoverSkills(opts: {
+  mode: SkillTrustMode
+  blockHooks: boolean
+  root?: string
+}): Promise<DiscoveredPlugin[]> {
+  const { mode, blockHooks, root } = opts
   const dir = pluginsDir(root)
   if (!existsSync(dir)) return []
   const marketplacesJson = (await readJson(join(dir, 'known_marketplaces.json'))) as Record<
     string,
-    { source?: { repo?: string }; installLocation?: string }
+    { source?: { source?: string; repo?: string }; installLocation?: string }
   > | null
   const cacheJson = await readJson(join(dir, 'plugin-catalog-cache.json'))
 
-  // Fallback: no catalog cache → scan marketplaces, Anthropic-only.
-  if (!cacheJson) return fallbackScan(marketplacesJson)
+  if (!cacheJson) return fallbackScan(marketplacesJson, mode, blockHooks)
 
   const installed = (await readJson(join(dir, 'installed_plugins.json'))) as {
     plugins?: Record<string, { installPath?: string }[]>
@@ -58,7 +75,7 @@ export async function discoverSkills(threshold: number, root?: string): Promise<
     if (ip) installPathByKey.set(key, ip)
   }
 
-  const candidates = shapeCatalog(cacheJson, marketplacesJson, threshold)
+  const candidates = shapeCatalog(cacheJson, marketplacesJson, mode)
   const out: DiscoveredPlugin[] = []
   for (const c of candidates) {
     const installLocation = marketplacesJson?.[c.marketplace]?.installLocation
@@ -67,31 +84,31 @@ export async function discoverSkills(threshold: number, root?: string): Promise<
       existsSync(join(p, 'skills'))
     )
     if (!path) continue
+    if (blockHooks && pluginShipsHooks(await pluginHookSignals(path))) continue
     out.push({ ...c, path })
   }
   return out
 }
 
-/** Anthropic-only filesystem fallback when the catalog cache is unavailable. */
+/** Anthropic-marketplace filesystem fallback when the catalog cache is unavailable.
+ *  In 'anthropic-only' mode we cannot establish per-plugin authorship → trust nothing. */
 async function fallbackScan(
-  marketplaces: Record<string, { source?: { repo?: string }; installLocation?: string }> | null
+  marketplaces: Record<string, { source?: { source?: string; repo?: string }; installLocation?: string }> | null,
+  mode: SkillTrustMode,
+  blockHooks: boolean
 ): Promise<DiscoveredPlugin[]> {
+  if (mode === 'anthropic-only') return []
   const out: DiscoveredPlugin[] = []
   const seen = new Set<string>()
   for (const [marketplace, m] of Object.entries(marketplaces ?? {})) {
+    if (!isAnthropicOwnedRepo(m.source)) continue
     const repo = String(m.source?.repo ?? '')
-    if (!isTrusted({ marketplaceRepo: repo }, Number.POSITIVE_INFINITY)) continue // anthropics/* only
     const loc = m.installLocation
     if (!loc) continue
-    // plugins are either top-level subdirs or under plugins/<name>
     for (const baseRel of ['', 'plugins']) {
       const base = baseRel ? join(loc, baseRel) : loc
       let entries: { name: string; isDirectory: () => boolean }[]
-      try {
-        entries = await fs.readdir(base, { withFileTypes: true })
-      } catch {
-        continue
-      }
+      try { entries = await fs.readdir(base, { withFileTypes: true }) } catch { continue }
       for (const ent of entries) {
         if (!ent.isDirectory()) continue
         const pluginPath = join(base, ent.name)
@@ -100,13 +117,12 @@ async function fallbackScan(
         let names: string[]
         try {
           names = (await fs.readdir(skillsDir, { withFileTypes: true })).filter((d) => d.isDirectory()).map((d) => d.name)
-        } catch {
-          continue
-        }
+        } catch { continue }
         if (names.length === 0) continue
-        const skills: DiscoveredSkill[] = names.map((name) => ({ id: `${ent.name}:${name}`, name, description: '' }))
         if (seen.has(ent.name)) continue
+        if (blockHooks && pluginShipsHooks(await pluginHookSignals(pluginPath))) continue
         seen.add(ent.name)
+        const skills: DiscoveredSkill[] = names.map((name) => ({ id: `${ent.name}:${name}`, name, description: '' }))
         out.push({
           id: ent.name, marketplace, marketplaceRepo: repo, author: 'Anthropic',
           uniqueInstalls: 0, trusted: true, path: pluginPath, skills

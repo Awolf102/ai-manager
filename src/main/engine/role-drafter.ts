@@ -23,7 +23,11 @@ export async function draftRoles(
   if (agents.length === 0) return []
   const knownIds = agents.map((a) => a.id)
   const nameById = new Map(agents.map((a) => [a.id, a.name]))
-  const discovered = await discoverSkills(getSettings().skillInstallThreshold ?? 100000)
+  const s = getSettings()
+  const discovered = await discoverSkills({
+    mode: s.trustAnthropicOnly ? 'anthropic-only' : 'anthropic-marketplaces',
+    blockHooks: s.blockPluginHooks
+  })
   const offered = offeredSkills(discovered, 40)
   const validIds = discovered.flatMap((p) => p.skills.map((s) => s.id))
   const base = draftRolesPrompt(opts.goal, agents, edges, offered)
