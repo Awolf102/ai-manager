@@ -103,7 +103,7 @@ export default function App() {
 
   return (
     <div
-      className="app"
+      className={`app ${resumable.length > 0 && !resumableDismissed ? 'has-resume-banner' : ''}`}
       onDragEnter={onDragEnter}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
