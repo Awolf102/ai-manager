@@ -4,6 +4,7 @@ import type {
   Assignment,
   OrchestrationEvent,
   ProjectGraph,
+  ResumableRun,
   RunTask,
   StepStatus,
   TaskVerdict
@@ -93,6 +94,13 @@ interface AppState {
   confirm: { opts: ConfirmOpts; resolve: (v: boolean) => void } | null
   requestConfirm: (opts: ConfirmOpts) => Promise<boolean>
   resolveConfirm: (v: boolean) => void
+
+  resumable: ResumableRun[]
+  resumableDismissed: boolean
+  refreshResumable: () => Promise<void>
+  resumeResumable: (runId: string) => void
+  discardResumable: (runId: string) => Promise<void>
+  dismissResumableBanner: () => void
 }
 
 let counter = 0
@@ -105,6 +113,8 @@ export const useStore = create<AppState>((set, get) => ({
   run: emptyRun,
   showRunView: false,
   showHistory: false,
+  resumable: [],
+  resumableDismissed: false,
 
   setGraph: (g) => set({ graph: g }),
 
@@ -251,4 +261,21 @@ export const useStore = create<AppState>((set, get) => ({
       set({ confirm: null })
     }
   },
+
+  refreshResumable: async () => set({ resumable: await window.api.listResumable() }),
+  resumeResumable: (runId) =>
+    set((s) => {
+      void window.api.resumeRun(runId) // no answer → crash-recovery resume
+      return {
+        resumable: s.resumable.filter((r) => r.runId !== runId),
+        showRunView: true,
+        showHistory: false,
+        activeDockId: 'run'
+      }
+    }),
+  discardResumable: async (runId) => {
+    await window.api.discardRun(runId)
+    set({ resumable: await window.api.listResumable() })
+  },
+  dismissResumableBanner: () => set({ resumableDismissed: true }),
 }))
