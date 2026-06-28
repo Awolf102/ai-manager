@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseAskUser } from './ask-user'
+import { parseAskUser, redactUserAnswer } from './ask-user'
 
 describe('parseAskUser', () => {
   it('parses an ```ask block', () => {
@@ -36,5 +36,27 @@ describe('parseAskUser', () => {
   it('does not end the block early on a ``` inside the JSON value', () => {
     const text = '```ask\n{ "question": "use ``` fences?" }\n```'
     expect(parseAskUser(text)).toEqual({ question: 'use ``` fences?' })
+  })
+})
+
+describe('redactUserAnswer', () => {
+  it('redacts every verbatim occurrence of a >=6-char answer', () => {
+    expect(redactUserAnswer('I used TealSecret123 then TealSecret123 again', 'TealSecret123'))
+      .toBe('I used [user answer redacted] then [user answer redacted] again')
+  })
+  it('trims the answer before matching and gating', () => {
+    expect(redactUserAnswer('set to hunter2secret done', '  hunter2secret  '))
+      .toBe('set to [user answer redacted] done')
+  })
+  it('leaves text unchanged when the trimmed answer is shorter than 6 chars', () => {
+    // also proves no substring carnage: "no" must not blank out "node"
+    expect(redactUserAnswer('the node said no', 'no')).toBe('the node said no')
+  })
+  it('leaves text unchanged for an empty/whitespace answer', () => {
+    expect(redactUserAnswer('anything here', '')).toBe('anything here')
+    expect(redactUserAnswer('anything here', '   ')).toBe('anything here')
+  })
+  it('leaves text unchanged when the answer does not appear', () => {
+    expect(redactUserAnswer('no secret here', 'TealSecret123')).toBe('no secret here')
   })
 })

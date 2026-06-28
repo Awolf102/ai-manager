@@ -40,3 +40,20 @@ function tryParseObject(s: string): { question?: unknown } | null {
     return null
   }
 }
+
+/** Minimum trimmed-answer length to redact. Short answers (decisions like "yes",
+ *  "no", "B") are not secrets and a literal replace of them would mangle normal
+ *  prose (e.g. "no" inside "node"); secrets (keys, passwords, tokens, URLs) are long. */
+export const MIN_REDACT_LEN = 6
+
+/**
+ * Redact a user's HITL answer from text the app will persist (e.g. an agent's echoed
+ * output). Replaces every verbatim occurrence of the TRIMMED answer with a placeholder,
+ * but only when the trimmed answer is at least MIN_REDACT_LEN chars. Verbatim only — a
+ * paraphrase is not caught (documented limitation). Literal string replace, no RegExp.
+ */
+export function redactUserAnswer(text: string, answer: string): string {
+  const a = answer.trim()
+  if (a.length < MIN_REDACT_LEN) return text
+  return text.split(a).join('[user answer redacted]')
+}
