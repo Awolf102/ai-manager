@@ -314,6 +314,16 @@ export interface RunSummary {
   taskCount: number
 }
 
+/** A crashed ('running') or paused ('interrupted') run that can be resumed from its checkpoint. */
+export interface ResumableRun {
+  runId: string
+  goal: string
+  status: 'running' | 'interrupted'
+  startedAt: string
+  updatedAt: string
+  taskCount: number
+}
+
 /** How to launch + open the app the agents built. Produced by the detection
  *  agent, edited in the preview, replayed by the server runtime. */
 export interface RunManifest {
@@ -502,7 +512,9 @@ export const IPC = {
   updateContext: 'context:update',
   removeContext: 'context:remove',
   contextThumbnail: 'context:thumbnail',
-  listSkills: 'skills:list'
+  listSkills: 'skills:list',
+  listResumable: 'run:list-resumable',
+  discardRun: 'run:discard'
 } as const
 
 /** The typed API the preload bridge exposes on window.api. */
@@ -531,7 +543,9 @@ export interface RendererApi {
   onPtyExit: (cb: (e: PtyExitEvent) => void) => () => void
   startRun: (input: StartRunInput) => Promise<{ runId: string }>
   stopRun: (runId: string) => Promise<void>
-  resumeRun: (runId: string, answer: string) => Promise<void>
+  resumeRun: (runId: string, answer?: string) => Promise<void>
+  listResumable: () => Promise<ResumableRun[]>
+  discardRun: (runId: string) => Promise<void>
   onOrchestration: (cb: (e: OrchestrationEvent) => void) => () => void
   checkAuth: () => Promise<AuthStatus>
   listRuns: () => Promise<RunSummary[]>

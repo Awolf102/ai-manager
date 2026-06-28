@@ -4,13 +4,13 @@
 
 import { randomUUID } from 'node:crypto'
 import type { WebContents } from 'electron'
-import type { OrchestrationEvent, RunState, StartRunInput } from '../../shared/types'
+import type { OrchestrationEvent, ResumableRun, RunState, StartRunInput } from '../../shared/types'
 import { IPC } from '../../shared/types'
 import { toRunRecord, toRunStatus } from '../../shared/run-state'
 import { streamAgent } from './agent-runner'
 import { runGraph, resumeGraph, type NodeIO } from './graph'
 import { actingModeFor, buildOrchestratorGraph, seedRunState, type Eng } from './nodes'
-import { createRunStore, type RunStore } from './run-store'
+import { createRunStore, toResumableSummaries, type RunStore } from './run-store'
 import {
   autoPullFromTeam,
   autoPushToTeam,
@@ -49,6 +49,23 @@ export function resumeRun(wc: WebContents, runId: string, resumeInput?: unknown)
 
 export function stopRun(runId: string): void {
   active.get(runId)?.abort()
+}
+
+export async function listResumable(): Promise<ResumableRun[]> {
+  const store = createRunStore(getCheckpointDir())
+  return toResumableSummaries(await store.listResumable(), new Set(active.keys()))
+}
+
+export async function discardRun(runId: string): Promise<void> {
+  await createRunStore(getCheckpointDir()).remove(runId)
+}
+
+export async function gcCheckpoints(): Promise<void> {
+  try {
+    await createRunStore(getCheckpointDir()).gcCheckpoints(Date.now())
+  } catch {
+    // GC is best-effort — never block project open
+  }
 }
 
 // ---------- drivers ----------

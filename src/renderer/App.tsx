@@ -29,6 +29,10 @@ export default function App() {
   const openHistory = useStore((s) => s.openHistory)
   const applyOrchestration = useStore((s) => s.applyOrchestration)
   const requestConfirm = useStore((s) => s.requestConfirm)
+  const resumable = useStore((s) => s.resumable)
+  const resumableDismissed = useStore((s) => s.resumableDismissed)
+  const refreshResumable = useStore((s) => s.refreshResumable)
+  const dismissResumableBanner = useStore((s) => s.dismissResumableBanner)
   const [showAdd, setShowAdd] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showContext, setShowContext] = useState(false)
@@ -56,10 +60,15 @@ export default function App() {
       <AuthBanner status={auth} onRecheck={() => void recheckAuth()} />
     ) : null
 
+  const onOpen = (g: ProjectGraph): void => {
+    setGraph(g)
+    void refreshResumable(true)
+  }
+
   if (!graph) {
     return (
       <>
-        <ProjectPicker onOpen={setGraph} />
+        <ProjectPicker onOpen={onOpen} />
         {authBanner}
       </>
     )
@@ -101,6 +110,13 @@ export default function App() {
       onDrop={(e) => void onDrop(e)}
     >
       {dragDepth > 0 && <div className="ctx-drop-overlay">Drop files to add as project context</div>}
+      {resumable.length > 0 && !resumableDismissed && (
+        <div className="resume-banner">
+          <span>{resumable.length} run{resumable.length > 1 ? 's' : ''} can be resumed.</span>
+          <button className="btn tiny" onClick={() => openHistory()}>View</button>
+          <button className="btn tiny" onClick={() => dismissResumableBanner()}>Dismiss</button>
+        </div>
+      )}
       <div className="topbar">
         <span className="brand">AI Manager</span>
         <span className="project">{graph.project.name}</span>
@@ -110,13 +126,14 @@ export default function App() {
           className="btn"
           onClick={async () => {
             const g = await window.api.pickProjectFolder()
-            if (g) setGraph(g)
+            if (g) { setGraph(g); void refreshResumable(true) }
           }}
         >
           <FolderOpen size={14} /> Switch project
         </button>
         <button className="btn" title="Run history" onClick={() => openHistory()}>
           <Clock size={14} />
+          {resumable.length > 0 && <span className="resume-badge">{resumable.length}</span>}
         </button>
         <button
           className="btn"
