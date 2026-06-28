@@ -110,25 +110,6 @@ export function registerIpc(): void {
     await fs.writeFile(r.filePath, JSON.stringify(bundle, null, 2), 'utf8')
     return { saved: true, path: r.filePath }
   })
-  ipcMain.handle(IPC.importTeam, async () => {
-    const r = await dialog.showOpenDialog({
-      title: 'Import team',
-      properties: ['openFile'],
-      filters: [{ name: 'AI Manager team', extensions: ['json'] }]
-    })
-    if (r.canceled || r.filePaths.length === 0) return { imported: false }
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(await fs.readFile(r.filePaths[0], 'utf8'))
-    } catch {
-      return { imported: false, error: 'That file is not valid JSON.' }
-    }
-    const v = validateTeamBundle(parsed)
-    if (!v.ok) return { imported: false, error: v.error }
-    const graph = await store.importTeam(v.bundle, r.filePaths[0])
-    return { imported: true, graph }
-  })
-
   ipcMain.handle(IPC.importTeamPreview, async () => {
     const r = await dialog.showOpenDialog({
       title: 'Import team',

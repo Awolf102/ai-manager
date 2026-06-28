@@ -484,7 +484,6 @@ export const IPC = {
   listRuns: 'runs:list',
   loadRun: 'runs:load',
   exportTeam: 'team:export',
-  importTeam: 'team:import',
   importTeamPreview: 'team:import-preview',
   importTeamApply: 'team:import-apply',
   syncTeam: 'team:syncTo',
@@ -538,7 +537,6 @@ export interface RendererApi {
   listRuns: () => Promise<RunSummary[]>
   loadRun: (file: string) => Promise<RunRecord | null>
   exportTeam: () => Promise<{ saved: boolean; path?: string }>
-  importTeam: () => Promise<{ imported: boolean; graph?: ProjectGraph; error?: string }>
   importTeamPreview: () => Promise<
     | { status: 'canceled' }
     | { status: 'error'; error: string }

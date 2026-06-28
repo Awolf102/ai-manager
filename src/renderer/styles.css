@@ -674,6 +674,7 @@ button {
   margin: 8px 0;
   font-size: 13px;
   line-height: 1.45;
+  white-space: pre-wrap;
 }
 
 .seg {
