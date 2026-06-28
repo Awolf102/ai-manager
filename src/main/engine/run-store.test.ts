@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createRunStore } from './run-store'
+import { createRunStore, sweepTmpFiles } from './run-store'
 import type { LiveRunStatus, RunState } from '../../shared/types'
 
 function mkState(over: Partial<RunState> = {}): RunState {
@@ -112,5 +112,23 @@ describe('createRunStore', () => {
     const final = await store.get('abc') // file is a complete, parseable state
     expect(final).not.toBeNull()
     expect(phases).toContain(final!.phase as (typeof phases)[number])
+  })
+})
+
+describe('sweepTmpFiles', () => {
+  it('removes orphan .tmp files but leaves .json checkpoints', async () => {
+    await fs.writeFile(join(dir, 'run-1.json'), '{}', 'utf8')
+    await fs.writeFile(join(dir, 'run-1.json.99.0.tmp'), 'partial', 'utf8')
+    await sweepTmpFiles(dir)
+    const entries = await fs.readdir(dir)
+    expect(entries).toContain('run-1.json')
+    expect(entries.some((e) => e.endsWith('.tmp'))).toBe(false)
+  })
+
+  it('round-trips put/get after the helper refactor', async () => {
+    const store = createRunStore(dir)
+    const state = mkState({ runId: 'xyz', final: 'ok' })
+    await store.put(state)
+    expect(await store.get('xyz')).toEqual(state)
   })
 })
