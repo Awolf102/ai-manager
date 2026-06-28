@@ -39,7 +39,7 @@ import {
   updateAgent
 } from './project-store'
 import { parseHandoff } from '../../shared/handoff'
-import { parseAskUser } from '../../shared/ask-user'
+import { parseAskUser, redactUserAnswer } from '../../shared/ask-user'
 import { clampEffort } from '../../shared/model-caps'
 
 export const MAX_PARALLEL = 3
@@ -254,7 +254,7 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
         abort: eng.abort
       })
       if (r.sessionId) await updateAgent({ id: ask.ownerId, sessionId: r.sessionId })
-      const out = r.text || '(no output)'
+      const out = redactUserAnswer(r.text || '(no output)', answer)
       for (const t of owned) {
         t.status = 'done'
         t.output = out
