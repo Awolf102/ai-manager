@@ -23,6 +23,7 @@ import { isImageName, uniqueContextName } from '../../shared/context-files'
 import { parseLessonBullet } from '../../shared/lessons'
 import { buildTeamBundle, planTeamImport, validateTeamBundle, type TeamBundle } from '../../shared/team-bundle'
 import { mergeBrainPush, planBrainPull, mergeLessons } from '../../shared/team-brain'
+import { pickSpawnModel } from '../../shared/team-spawn'
 import type { DraftRosterAgent } from '../../shared/role-draft'
 
 const AIM_DIR = '.ai-manager'
@@ -778,7 +779,7 @@ export async function applySpawnedTeam(
       slug,
       kind: m.kind,
       icon: iconForName(m.name, m.kind),
-      model: DEFAULT_MODEL_BY_KIND[m.kind],
+      model: pickSpawnModel(m, getSettings().autoAssignModels),
       permissionMode: 'acceptEdits',
       position: { x: base.x + col * 220, y: base.y + d * 150 }
     }

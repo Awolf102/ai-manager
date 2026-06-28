@@ -82,6 +82,17 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="field">
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={s.autoAssignModels}
+              onChange={(e) => void update({ autoAssignModels: e.target.checked })}
+            />
+            Auto-assign worker models — orchestrator picks Sonnet/Opus per worker when building a team
+          </label>
+        </div>
+
+        <div className="field">
           <label>Max mid-run re-plans (0 = off)</label>
           <input
             type="number"

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { effortOfWorker, effortByTask } from './effort'
+import { effortOfWorker, effortByTask, cappedFrom } from './effort'
 import type { Assignment } from './types'
 
 const a = (taskId: string, childId: string | null, effort?: Assignment['effort']): Assignment => ({
@@ -8,6 +8,8 @@ const a = (taskId: string, childId: string | null, effort?: Assignment['effort']
   effort,
   reason: ''
 })
+
+const ac = (over: Partial<Assignment>): Assignment => ({ taskId: 't', childId: 'w', effort: 'max', reason: '', ...over })
 
 describe('effortOfWorker', () => {
   it('returns undefined when no assignment targets the worker', () => {
@@ -43,5 +45,14 @@ describe('effortByTask', () => {
     // o assigns t1→m at 'low'; m re-assigns t1→w at 'max' (steps are parent-before-child)
     const steps = [{ assignments: [a('t1', 'm', 'low')] }, { assignments: [a('t1', 'w', 'max')] }]
     expect(effortByTask(steps).t1).toBe('max')
+  })
+})
+
+describe('cappedFrom', () => {
+  it('returns the original requested effort when a worker task was capped', () => {
+    expect(cappedFrom([ac({ effort: 'max', assignedEffort: 'xhigh' })], 'w')).toBe('xhigh')
+  })
+  it('returns undefined when nothing was capped', () => {
+    expect(cappedFrom([ac({ effort: 'high' })], 'w')).toBeUndefined()
   })
 })

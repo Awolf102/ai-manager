@@ -18,6 +18,17 @@ export function effortOfWorker(assignments: Assignment[], workerId: string): Eff
   return best
 }
 
+/** If any of a worker's tasks had its effort capped to the model, the highest
+ *  pre-clamp effort that was requested; otherwise undefined. */
+export function cappedFrom(assignments: Assignment[], workerId: string): Effort | undefined {
+  let best: Effort | undefined
+  for (const a of assignments) {
+    if (a.childId !== workerId || !a.assignedEffort) continue
+    if (!best || EFFORT_LEVELS.indexOf(a.assignedEffort) > EFFORT_LEVELS.indexOf(best)) best = a.assignedEffort
+  }
+  return best
+}
+
 /**
  * Map each task id to the effort assigned for it, gathered from per-step
  * assignments. Steps are stored parent-before-child, so a deeper router's
