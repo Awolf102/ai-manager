@@ -239,7 +239,11 @@ export const useStore = create<AppState>((set, get) => ({
   agentById: (id) => get().graph?.nodes.find((n) => n.id === id),
 
   confirm: null,
-  requestConfirm: (opts) => new Promise<boolean>((resolve) => set({ confirm: { opts, resolve } })),
+  requestConfirm: (opts) =>
+    new Promise<boolean>((resolve) => {
+      get().confirm?.resolve(false) // cancel any already-pending confirm before replacing it
+      set({ confirm: { opts, resolve } })
+    }),
   resolveConfirm: (v) => {
     const c = get().confirm
     if (c) {
