@@ -112,11 +112,14 @@ export function validateTeamBundle(
 
   const warnings: string[] = []
   const members: TeamMember[] = []
+  const seenIds = new Set<string>()
   for (const m of b.members) {
     const mm = (m && typeof m === 'object' ? m : {}) as Record<string, unknown>
     if (typeof mm.memberId !== 'string' || typeof mm.name !== 'string') {
       return { ok: false, error: 'Team bundle has a member missing memberId/name.' }
     }
+    if (seenIds.has(mm.memberId)) { warnings.push(`${mm.name}: duplicate memberId dropped`); continue }
+    seenIds.add(mm.memberId)
     if (!AGENT_KINDS.includes(mm.kind as AgentKind)) {
       return { ok: false, error: `Team bundle member "${mm.name}" has an invalid kind.` }
     }

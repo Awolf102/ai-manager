@@ -419,10 +419,11 @@ export async function contextThumbnail(id: string): Promise<string | null> {
   const { path, graph } = requireCurrent()
   const entry = (graph.context ?? []).find((c) => c.id === id)
   if (!entry || !entry.isImage || entry.bytes > 5_000_000) return null
+  const ext = entry.fileName.slice(entry.fileName.lastIndexOf('.') + 1).toLowerCase()
+  if (ext === 'svg') return null // never hand an attacker-influenced SVG to the renderer as an <img src>
   try {
     const buf = await fs.readFile(aimPath(path, CONTEXT_DIR, entry.fileName))
-    const ext = entry.fileName.slice(entry.fileName.lastIndexOf('.') + 1).toLowerCase()
-    const mime = ext === 'svg' ? 'image/svg+xml' : ext === 'jpg' ? 'image/jpeg' : `image/${ext}`
+    const mime = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`
     return `data:${mime};base64,${buf.toString('base64')}`
   } catch {
     return null
@@ -715,12 +716,23 @@ export async function readTeamBrain(path: string): Promise<TeamBundle | null> {
   }
 }
 
+/** True when `p` is an existing regular .json file — guards auto-sync against a moved/redirected link. */
+export async function isValidBrainPath(p: string): Promise<boolean> {
+  if (!p.toLowerCase().endsWith('.json')) return false
+  try {
+    return (await fs.stat(p)).isFile()
+  } catch {
+    return false
+  }
+}
+
 /** Auto PULL (B2b): if enabled + linked, refresh agents from the linked brain.
  * Returns agents updated (0 when off / unlinked / unreadable / failed). Best-effort. */
 export async function autoPullFromTeam(): Promise<number> {
   try {
     const link = getLinkedTeam()
     if (!getSettings().autoSyncTeam || !link) return 0
+    if (!(await isValidBrainPath(link.path))) return 0
     const brain = await readTeamBrain(link.path)
     if (!brain) return 0
     const { updated } = await refreshFromTeam(brain, link.path)
@@ -735,6 +747,7 @@ export async function autoPushToTeam(): Promise<void> {
   try {
     const link = getLinkedTeam()
     if (!getSettings().autoSyncTeam || !link) return
+    if (!(await isValidBrainPath(link.path))) return
     await syncToTeam(link.path, link.teamId)
   } catch {
     // best-effort: never let auto-sync surface an error

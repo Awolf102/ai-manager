@@ -17,8 +17,10 @@ export function uniqueContextName(existing: string[], original: string): string 
   const taken = new Set(existing)
   if (!taken.has(original)) return original
   const dot = original.lastIndexOf('.')
-  const stem = dot === -1 ? original : original.slice(0, dot)
-  const ext = dot === -1 ? '' : original.slice(dot)
+  // a leading-dot name (".env") has no real extension — treat the whole thing as the stem
+  const hasExt = dot > 0
+  const stem = hasExt ? original.slice(0, dot) : original
+  const ext = hasExt ? original.slice(dot) : ''
   let i = 2
   while (taken.has(`${stem}-${i}${ext}`)) i++
   return `${stem}-${i}${ext}`

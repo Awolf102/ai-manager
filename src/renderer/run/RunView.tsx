@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { useStore } from '../store'
-import { effortOfWorker, cappedFrom } from '../../shared/effort'
+import { effortOfWorker, cappedFromDisplay } from '../../shared/effort'
 import type { ProjectGraph } from '../../shared/types'
 import ActivityFeed from './ActivityFeed'
 
@@ -138,7 +138,7 @@ export default function RunView() {
           // only leaf workers actually execute tasks → show the effort they ran at
           const isLeaf = !graph?.edges.some((e) => e.source === id)
           const eff = isLeaf ? effortOfWorker(allAssignments, id) : undefined
-          const capped = isLeaf ? cappedFrom(allAssignments, id) : undefined
+          const capped = isLeaf ? cappedFromDisplay(allAssignments, id) : undefined
           return (
             <div
               key={id}

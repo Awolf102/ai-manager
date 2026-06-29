@@ -28,6 +28,17 @@ describe('mergeBrainPush', () => {
     )
     expect(out.edges).toEqual([{ source: 'a', target: 'b' }, { source: 'a', target: 'c' }])
   })
+  it('caps a brain member lessons union at 40 newest-first on push', () => {
+    const member = (id: string, lessons: string[]) => ({ memberId: id, name: id, kind: 'worker' as const, model: 'm', permissionMode: 'acceptEdits' as const, icon: '🤖', position: { x: 0, y: 0 }, role: '', lessons })
+    const brain = { kind: 'ai-manager-team' as const, version: 1 as const, name: 'b', exportedAt: 'E', members: [member('w', Array.from({ length: 30 }, (_, i) => `old ${i}`))], edges: [] }
+    const proj = { kind: 'ai-manager-team' as const, version: 1 as const, name: 'p', exportedAt: 'E', members: [member('w', Array.from({ length: 30 }, (_, i) => `new ${i}`))], edges: [] }
+    const out = mergeBrainPush(brain, proj)
+    const merged = out.members.find((m) => m.memberId === 'w')!
+    expect(merged.lessons).toHaveLength(40)              // capped (was 30+30=60)
+    expect(merged.lessons).toContain('new 29')          // a project lesson kept
+    expect(merged.lessons).toContain('old 0')           // NEWEST old lesson kept (index 30, within the 40-cap)
+    expect(merged.lessons).not.toContain('old 29')      // OLDEST old lesson dropped
+  })
 })
 
 describe('planBrainPull', () => {

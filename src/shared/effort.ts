@@ -29,6 +29,15 @@ export function cappedFrom(assignments: Assignment[], workerId: string): Effort 
   return best
 }
 
+/** The "capped from" effort to DISPLAY: the pre-clamp effort only when it is strictly above the effort the
+ *  worker actually ran at (so the badge never claims a cap down to a lower level). undefined otherwise. */
+export function cappedFromDisplay(assignments: Assignment[], workerId: string): Effort | undefined {
+  const eff = effortOfWorker(assignments, workerId)
+  const capped = cappedFrom(assignments, workerId)
+  if (!capped || !eff) return undefined
+  return EFFORT_LEVELS.indexOf(capped) > EFFORT_LEVELS.indexOf(eff) ? capped : undefined
+}
+
 /**
  * Map each task id to the effort assigned for it, gathered from per-step
  * assignments. Steps are stored parent-before-child, so a deeper router's

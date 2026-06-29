@@ -54,17 +54,19 @@ export function narrateTool(name: string, input: unknown): string {
   }
 }
 
-/** Last path segment (handles / and \), or '' for an empty string. */
+/** Last path segment (handles / and \ and a trailing separator), or '' for an empty string. */
 function basename(p: string): string {
   if (!p) return ''
-  const parts = p.split(/[\\/]/)
-  return parts[parts.length - 1] || p
+  const trimmed = p.replace(/[\\/]+$/, '')
+  if (!trimmed) return ''
+  return trimmed.split(/[\\/]/).pop() || trimmed
 }
 
-/** Best-effort host from a URL via regex (no URL/DOM dependency). Falls back to the input. */
+/** Best-effort host from a URL via regex (no URL/DOM dependency); drops any userinfo. Falls back to input. */
 function host(u: string): string {
   const m = u.match(/^[a-z][a-z0-9+.-]*:\/\/([^/]+)/i)
-  return m ? m[1] : u
+  const authority = m ? m[1] : u
+  return authority.includes('@') ? authority.slice(authority.lastIndexOf('@') + 1) : authority
 }
 
 /** Truncate with an ellipsis when longer than n. */

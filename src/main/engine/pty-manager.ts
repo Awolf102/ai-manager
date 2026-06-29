@@ -57,7 +57,11 @@ export async function spawnPty(
 }
 
 export function writePty(ptyId: string, data: string): void {
-  sessions.get(ptyId)?.proc.write(data)
+  try {
+    sessions.get(ptyId)?.proc.write(data)
+  } catch {
+    // pty may have exited between the keystroke and onExit deleting the session — drop it
+  }
 }
 
 export function resizePty(ptyId: string, cols: number, rows: number): void {
