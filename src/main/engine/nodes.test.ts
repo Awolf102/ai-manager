@@ -957,6 +957,20 @@ describe('orchestrator node graph — peer handoffs (worker site)', () => {
     expect(out.handoffs ?? []).toEqual([])
     expect('handoffs' in toRunRecord(out)).toBe(false)
   })
+
+  it('emits working + done status for the consulted peer', async () => {
+    h.edges = [{ source: 'w1', target: 'w2', kind: 'handoff' }]
+    h.settings.maxHandoffs = 1
+    try {
+      const events: { type: string; nodeId?: string; status?: string }[] = []
+      await run(fake([], {}, 'Use a teal/amber palette'), events as unknown[])
+      const peerStatuses = events.filter((e) => e.type === 'status' && e.nodeId === 'w2').map((e) => e.status)
+      expect(peerStatuses).toContain('working')
+      expect(peerStatuses).toContain('done')
+    } finally {
+      h.edges = []
+    }
+  })
 })
 
 describe('orchestrator node graph — peer handoffs (review site)', () => {

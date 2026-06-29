@@ -988,6 +988,7 @@ async function runWithHandoffs(
     const peer = consult.peers.find((p) => p.id === req.peerId)!
     eng.emit({ runId: eng.runId, type: 'handoff', askerId: consult.asker, peerId: peer.id, ask: req.ask })
     eng.handoffs.push({ askerId: consult.asker, peerId: peer.id, ask: req.ask })
+    eng.emit({ runId: eng.runId, type: 'status', nodeId: peer.id, status: 'working', taskTitles: [req.ask] })
     let answer: string
     try {
       const r = await eng.runAgent({
@@ -1001,8 +1002,10 @@ async function runWithHandoffs(
         abort: eng.abort
       })
       answer = r.text || '(no answer)'
+      eng.emit({ runId: eng.runId, type: 'status', nodeId: peer.id, status: 'done' })
     } catch (err) {
       answer = `ERROR: ${err instanceof Error ? err.message : String(err)}`
+      eng.emit({ runId: eng.runId, type: 'status', nodeId: peer.id, status: 'error' })
     }
     // resume the ASKER's in-run session with the peer's answer (peer sessionId is NOT persisted)
     result = await eng.runAgent({ ...base, prompt: resumePrompt(peer.name, answer), resume: true, resumeSessionId: result.sessionId })
