@@ -43,6 +43,7 @@ import {
   updateAgent,
   applyReflection,
   getRecentProjects,
+  isValidBrainPath,
 } from './project-store'
 
 async function tmpProject(): Promise<string> {
@@ -553,5 +554,45 @@ describe('team-write transactionality (#15)', () => {
     }
     const reopened = await openProject(proj)
     expect(reopened.nodes).toHaveLength(0) // nothing imported
+  })
+})
+
+describe('papercuts: project-store security', () => {
+  it('contextThumbnail returns null for an .svg (no inline svg data URL)', async () => {
+    const proj = await tmpProject()
+    await openProject(proj)
+    const svg = join(proj, 'logo.svg')
+    await fs.writeFile(svg, '<svg xmlns="http://www.w3.org/2000/svg"></svg>', 'utf8')
+    const g = await addContextFiles([svg])
+    const entry = g.graph.context!.find((c) => c.fileName.endsWith('.svg'))!
+    expect(await contextThumbnail(entry.id)).toBeNull()
+  })
+
+  it('isValidBrainPath: true for an existing regular .json file, false for missing or non-.json', async () => {
+    const dir = await tmpProject()
+    const validPath = join(dir, 'brain.json')
+    await fs.writeFile(validPath, '{}', 'utf8')
+    expect(await isValidBrainPath(validPath)).toBe(true)           // existing .json file → true
+
+    const missingPath = join(dir, 'nope.json')
+    expect(await isValidBrainPath(missingPath)).toBe(false)        // missing → false
+
+    const notJson = join(dir, 'brain.txt')
+    await fs.writeFile(notJson, '{}', 'utf8')
+    expect(await isValidBrainPath(notJson)).toBe(false)            // non-.json → false
+  })
+
+  it('autoPushToTeam skips writing when the linked brain path is deleted after linking', async () => {
+    const proj = await tmpProject()
+    await openProject(proj)
+    const brainPath = join(proj, 'brain.json')
+    await updateSettings({ autoSyncTeam: true })
+    // Link the project to a valid brain via syncToTeam
+    await syncToTeam(brainPath, 'team-x')
+    // Now delete the brain file to simulate a moved/deleted target
+    await fs.rm(brainPath)
+    // autoPushToTeam must NOT throw and must NOT recreate the file
+    await autoPushToTeam()
+    expect(existsSync(brainPath)).toBe(false)
   })
 })
