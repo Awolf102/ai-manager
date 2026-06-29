@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, shell, session } from 'electron'
 import { join } from 'node:path'
 import { ensureLoginPath } from './engine/env'
 import { killAllPtys } from './engine/pty-manager'
@@ -36,6 +36,14 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   ensureLoginPath()
+  // Production-only CSP (defense-in-depth). Skipped in dev so Vite HMR/websocket are untouched.
+  if (!process.env.ELECTRON_RENDERER_URL) {
+    const CSP =
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'"
+    session.defaultSession.webRequest.onHeadersReceived((details, cb) => {
+      cb({ responseHeaders: { ...details.responseHeaders, 'Content-Security-Policy': [CSP] } })
+    })
+  }
   registerIpc()
   createWindow()
 

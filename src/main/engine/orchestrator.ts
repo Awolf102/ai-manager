@@ -22,6 +22,14 @@ import {
 
 const active = new Map<string, AbortController>()
 
+/** Whether to print an agent's "▶ name · model" banner: once per agentId per run (or an explicit choice). */
+export function headerGate(seen: Set<string>, agentId: string, explicit?: boolean): boolean {
+  if (explicit !== undefined) return explicit
+  if (seen.has(agentId)) return false
+  seen.add(agentId)
+  return true
+}
+
 export function startRun(wc: WebContents, input: StartRunInput): { runId: string } {
   const runId = randomUUID()
   getAgent(input.orchestratorId) // validate up-front — throws cleanly if unknown
@@ -77,7 +85,10 @@ function makeDeps(
 ): { eng: Eng; io: NodeIO; store: RunStore } {
   const store = createRunStore(getCheckpointDir())
   const emitFn = (e: OrchestrationEvent): void => emit(wc, e)
-  const eng: Eng = { wc, abort, runId, runAgent: streamAgent, emit: emitFn, handoffs: [] }
+  const headersPrinted = new Set<string>()
+  const runAgent: Eng['runAgent'] = (opts) =>
+    streamAgent({ ...opts, header: headerGate(headersPrinted, opts.agentId, opts.header) })
+  const eng: Eng = { wc, abort, runId, runAgent, emit: emitFn, handoffs: [] }
   const io: NodeIO = {
     signal: abort.signal,
     emit: emitFn,
