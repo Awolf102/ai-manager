@@ -1562,6 +1562,7 @@ describe('HITL user requests (Stage 3)', () => {
     expect(final.tasks['t1'].output).toContain('Installed deps and wrote the CLI')
     expect(final.tasks['t1'].output).not.toContain('Which package manager?')
     // (b) synthesis was handed the consultation section (so it can report it resolved)
+    expect(synthPromptSeen).not.toBe('') // synth actually ran — guards the no-leak assert below
     expect(synthPromptSeen).toContain('## User consultations during this run')
     expect(synthPromptSeen).toContain('Which package manager?')
     // (c) the raw answer never reaches synthesis or any persisted state (S5)
