@@ -64,9 +64,13 @@ should be captured as overhaul acceptance criteria:
 
 ## Not a code cycle
 
-- **#35 Live-verification session** — run the four never-run-together "no" rows (escalation, mid-run re-plan,
-  peer handoff, HITL) once each against real Claude in a throwaway git project, confirming the Expected column
-  of the audit's Dimension-1 checklist. Needs real tokens + the GUI + the user. **Should precede R1/R2.**
+- **#35 Live-verification session — ✅ DONE 2026-06-29** (findings: `docs/audits/2026-06-28-live-verification-findings.md`).
+  Ran all four "no" rows against real Claude in `~/live-verify`. Results: **HITL** runs live + works (pause/
+  modal/answer/resume/apply) — **NEW bug:** resume→synthesis (resumed worker output not captured → final report
+  falsely says "unanswered"). **Peer handoff** runs live + works (engineered ephemeral-consult goal; natural
+  goals get sequenced) — **R2 confirmed:** handoff leaves no `handoffs` trace in the record. **Re-plan/escalation**
+  **won't fire naturally** (orchestrator plans well + adapts in-task) → **R1 un-gated** (its `mergeReplan` bugs are
+  unit-testable without a live repro). **P3 durable resume** full pass (bonus). The "never run live" gap is CLOSED.
 - The remaining ~30 Minors fold opportunistically into the nearest cycle above, or batch into one optional
   "papercuts" sweep after the must-fix tiers.
 
@@ -100,6 +104,6 @@ Update this file's "Status" + check off cycles as they merge.
 - **`nodes.ts` collision → keep the run-loop cluster SERIAL.** R1, R2, R3 (and the now-merged S5) all rewrite `nodes.ts` (the ~1,500-line run loop); `project-store.ts` (R3) and `run-state.ts` (R2) are shared. Do **not** parallel-branch these — they'd merge-conflict in the most interdependent file. Run R1 → R2 → R3 one at a time. (S5 done — its `nodes.ts` touch was a single-line redaction at the resume capture point, no conflict surface left for R-cycles.)
 - **Papercuts note:** S5 already absorbed a pre-existing non-S5 bug (non-atomic `recents` write + a shared-`/tmp` test-isolation flake). Other latent items may surface mid-cycle the same way — fold small discovered fixes in with user OK, or log to the papercuts sweep.
 - **Parallelism, if any, only via git worktrees** (never multiple terminals on one repo dir — that races `.git/index`/HEAD). The safe ceiling is ~2 file-disjoint cycles at once, e.g. **S3 (or S4)** in one worktree + **P3** (`run-store`/`orchestrator`/`ipc` — no `nodes.ts`) in another.
-- **Hard sequencing:** **R1 & R2 must follow the live-verification session** — their bugs live on code paths that have never run live against real Claude (escalation, mid-run re-plan, handoff); patching blind is risky. Run the live-verify "no" rows first.
+- **Hard sequencing — SATISFIED (live-verify done 2026-06-29).** R1 is **un-gated**: re-plan/escalation won't fire naturally, but its `mergeReplan` bugs (#6/#7/#13) are deterministic + unit-testable, so proceed via code fixes + tests. R2 is **confirmed live** (handoffs not persisted). The R-cluster + the **NEW HITL resume→synthesis bug** all touch `nodes.ts` → still run them SERIAL. The HITL bug + R2 are thematically related (a resumed/consulted sub-run's output not captured into the durable record/synthesis) — consider batching.
 - **Preferred speedup = BATCH, not parallelize.** Collapse related findings into fewer, larger cycles to cut per-cycle pipeline overhead: e.g. **S3 + S4 → one "external-data trust" cycle** (both validate untrusted external input), and the **~30 Minors → one "papercuts sweep"** cycle. Fewer design rounds + fewer branches, same per-branch agent throughput.
 - **Per-cycle execution defaults** (see the `ai-manager-cycle-workflow-prefs` memory): subagent-driven; auto-merge to main locally on a clean opus final review. Human gates = design + spec approval only.
