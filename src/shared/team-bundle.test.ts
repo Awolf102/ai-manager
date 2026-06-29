@@ -145,6 +145,25 @@ describe('planTeamImport (force safe mode)', () => {
   })
 })
 
+describe('validateTeamBundle (duplicate memberId)', () => {
+  it('drops a member with a duplicate memberId (keeps the first) with a warning', () => {
+    const raw = {
+      kind: 'ai-manager-team', version: 1, name: 't', exportedAt: 'E',
+      members: [
+        { memberId: 'x', name: 'First', kind: 'worker' },
+        { memberId: 'x', name: 'Second', kind: 'worker' }
+      ],
+      edges: []
+    }
+    const res = validateTeamBundle(raw)
+    expect(res.ok).toBe(true)
+    if (!res.ok) return
+    expect(res.bundle.members).toHaveLength(1)
+    expect(res.bundle.members[0].name).toBe('First')
+    expect(res.warnings.some((w) => w.toLowerCase().includes('duplicate'))).toBe(true)
+  })
+})
+
 describe('previewOf', () => {
   it('summarizes members with their forced mode', () => {
     const v = validateTeamBundle(rawBundle([{ memberId: 'm', name: 'A', kind: 'worker', icon: 'x', model: 'claude-sonnet-4-6', permissionMode: 'bypassPermissions', position: { x: 0, y: 0 }, role: 'do x', lessons: [] }]))
