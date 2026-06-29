@@ -1234,7 +1234,12 @@ export function formatUserRequests(state: RunState): string {
   const reqs = state.userRequests ?? []
   if (reqs.length === 0) return ''
   const lines = reqs.map((r) => {
-    const name = getAgent(r.askerId).name
+    let name: string
+    try {
+      name = getAgent(r.askerId).name
+    } catch {
+      name = r.askerId
+    }
     return `- ${name} paused to ask the user: "${r.question}". The user provided an answer, which ${name} incorporated into its work. (The answer itself is redacted from this record.)`
   })
   return `\n\n## User consultations during this run\n${lines.join('\n')}\nThese questions were answered by the user during the run and the answers were incorporated — report them as resolved, not as open questions or placeholder assumptions.`

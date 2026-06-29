@@ -971,6 +971,101 @@ describe('orchestrator node graph — peer handoffs (worker site)', () => {
       h.edges = []
     }
   })
+
+  it('combined: a worker consults a peer then pauses to ask the user; handoff persists across pause→resume with no double-count, answer never leaks', async () => {
+    // Scenario: w1 is assigned t1.
+    //   Call 1 (You have been assigned + You may CONSULT): emits handoff block → H1 dispatched, w2 answers.
+    //   Call 2 (resumed post-handoff, prompt has "responded to your request"): emits ask block → run pauses.
+    //   Call 3 (HITL resume, prompt has "The user answered"): w1 completes t1.
+    h.edges = [{ source: 'w1', target: 'w2', kind: 'handoff' }]
+    h.settings.maxHandoffs = 1
+    h.settings.maxUserRequests = 1
+    const SECRET = 'SecretAnswer42'
+    try {
+      const order: string[] = []
+      let w1FirstDone = false
+      const runAgent: AgentRunner = async (opts) => {
+        const p = opts.prompt
+        // plan
+        if (p.includes('Produce a concise, ordered list'))
+          return { text: '```json\n{"tasks":[{"id":"t1","title":"Build UI","description":"build the ui"}]}\n```' }
+        // route
+        if (p.includes('You route planned tasks'))
+          return { text: '```json\n{"assignments":[{"taskId":"t1","childId":"w1","effort":"high","reason":"r"}]}\n```' }
+        // w2 peer answer
+        if (p.includes('asked for your help')) {
+          order.push('w2-consult')
+          return { text: 'Use a teal palette' }
+        }
+        // w1 resumed with peer answer → emits ask block
+        if (p.includes('responded to your request')) {
+          order.push('w1-post-handoff')
+          return { text: '```ask\n{"question":"Which shade of teal?"}\n```', sessionId: 's-w1-resumed' }
+        }
+        // w1 resumed with HITL answer → finishes
+        if (p.includes('The user answered')) {
+          order.push('w1-hitl-resume')
+          return { text: `Done: used ${p.includes(SECRET) ? 'the answer' : 'unknown'}`, sessionId: 's-w1-final' }
+        }
+        // w1 first call → handoff request
+        if (p.includes('You have been assigned') && !w1FirstDone) {
+          w1FirstDone = true
+          order.push('w1-task')
+          return { text: '```handoff\n{"to":"W2","ask":"color palette ideas"}\n```', sessionId: 's-w1-1' }
+        }
+        if (p.includes('Judge each task'))
+          return { text: '```json\n{"tasks":[{"taskId":"t1","verdict":"pass","feedback":""}]}\n```' }
+        if (p.includes('Reflect on the work')) return { text: '```json\n{"win":"","loss":"","lessons":[]}\n```' }
+        if (p.includes('Write a clear final report')) return { text: 'DONE' }
+        return { text: '' }
+      }
+
+      // Build the eng+store manually so we can call resumeGraph on the same store.
+      const e = eng(runAgent)
+      ;(e as { emit: (ev: unknown) => void }).emit = (ev: unknown) => {}
+      const store = fakeStore()
+      const io: NodeIO = {
+        signal: e.abort.signal,
+        emit: () => {},
+        checkpoint: (s) => store.put(s),
+        collectExtras: () => (e.handoffs.length ? { handoffs: [...e.handoffs] } : {})
+      }
+
+      // Phase 1: run until paused for the user question.
+      const paused = await runGraph(
+        buildOrchestratorGraph(e),
+        seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' }),
+        store,
+        io
+      )
+
+      // The handoff fired and the ask block paused the run.
+      expect(order).toEqual(['w1-task', 'w2-consult', 'w1-post-handoff'])
+      expect(paused.status).toBe('interrupted')
+      expect(paused.pendingInterrupt?.kind).toBe('ask-user')
+      expect(paused.pendingInterrupt?.prompt).toBe('Which shade of teal?')
+
+      // The handoff is persisted into the paused checkpoint.
+      const saved = await store.get('run1')
+      expect(saved?.handoffs).toEqual([{ askerId: 'w1', peerId: 'w2', ask: 'color palette ideas' }])
+
+      // Phase 2: resume with the user's answer.
+      const final = await resumeGraph(buildOrchestratorGraph(e), 'run1', store, io, SECRET)
+
+      expect(order).toEqual(['w1-task', 'w2-consult', 'w1-post-handoff', 'w1-hitl-resume'])
+      expect(final.status).toBe('completed')
+
+      // Handoffs still exactly one entry — no double-count, no loss across pause→resume.
+      expect(final.handoffs).toEqual([{ askerId: 'w1', peerId: 'w2', ask: 'color palette ideas' }])
+
+      // The answer never appears in any persisted field.
+      expect(JSON.stringify(final)).not.toContain(SECRET)
+    } finally {
+      h.edges = []
+      h.settings.maxHandoffs = 0
+      h.settings.maxUserRequests = 0
+    }
+  })
 })
 
 describe('orchestrator node graph — peer handoffs (review site)', () => {
@@ -1608,5 +1703,14 @@ describe('formatUserRequests', () => {
       userRequests: [{ askerId: 'w1', question: 'pick a color' }]
     } as unknown as RunState)
     expect(out).not.toContain('teal') // no answer field exists to leak
+  })
+
+  it('falls back to the askerId when the agent is unknown (deleted/renamed)', () => {
+    // h.agents has no 'ghost' entry, so getAgent('ghost') returns undefined → .name throws
+    const out = formatUserRequests({
+      userRequests: [{ askerId: 'ghost', question: 'Q' }]
+    } as unknown as RunState)
+    expect(out).toContain('ghost')
+    expect(out).toContain('Q')
   })
 })
