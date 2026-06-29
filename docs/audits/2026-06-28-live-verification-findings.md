@@ -85,4 +85,38 @@ deps. So **R1 can proceed via code-level fixes + unit tests.** The "live-verify 
 (we tried; it doesn't fire naturally) — escalation/replan integrity is now an R1 code cycle, not a live gate.
 
 ## Test 4 — P3 durable resume
-_(pending)_
+
+**✅ FULL PASS — both paths (user-confirmed in GUI + disk-corroborated).**
+- **Part A (crash recovery):** force-quit mid-run → reopen → banner "N runs can be resumed" (and it **clears
+  the GoalBar** — the banner-overlap fix works) + History-button badge + History "Resumable" section (pill
+  **Crashed**) → **Resume** continues from checkpoint / **Discard** removes it. ✅
+- **Part B (paused recovery, #12):** pause a HITL run → reload renderer / force-quit → reopen → Resumable
+  (pill **Paused**) → **Resume re-shows the question** → answer → continues. ✅
+- **Disk corroboration:** after all resume/discard actions, `.ai-manager/runs/.checkpoints/` is **empty** —
+  no checkpoint leaks. GC + the resumable list behaved.
+
+**Status:** P3 durable resume verified end-to-end live. The banner-overlap fix (shipped mid-session) verified.
+
+---
+
+## SUMMARY — live-verification session complete (all 4 audit "no" rows exercised)
+
+| Path | Runs live? | Result |
+|---|---|---|
+| **HITL** (Test 1) | ✅ yes | Works (pause/modal/answer/resume/apply). 🐞 **Bug:** resume→synthesis — resumed worker output not captured → orchestrator's final report falsely says "unanswered". |
+| **Peer handoff** (Test 2) | ✅ yes (engineered goal) | Works (lateral consult fires, peer runs, asker resumes — no stale session). 🐞 **Bug:** not persisted — `handoffs` field absent from record (**R2 confirmed**). Natural goals get sequenced (handoff rarely hit). |
+| **Re-plan / escalation** (Test 3) | 🚫 won't fire naturally | Orchestrator plans well + adapts in-task; no drift, all tasks pass first review. **R1 un-gated** — its bugs are unit-testable code defects in `mergeReplan`, no live repro needed. |
+| **P3 durable resume** (Test 4) | ✅ yes | Full pass, both paths; no checkpoint leaks. |
+
+**Net for R1/R2/R3 (all `nodes.ts` → serial):**
+- **NEW bug (not in original audit):** HITL **resume→synthesis** — every HITL run produces a misleading
+  "you didn't answer / values are placeholders" final report even when the answer was applied. Most
+  user-visible of the confirmed-live bugs. → a HITL fix (nodes.ts; relate to R2 — both are "a resumed/consulted
+  sub-run's output isn't captured into the durable record/synthesis").
+- **R2** (#23/#27/#25 handoff persistence/observability): **confirmed live** — handoffs leave no record trace.
+- **R1** (#6/#7/#13 replan integrity): **un-gated**, unit-testable — proceed via code fixes + tests.
+- **R3** (#22/#26/#15 scheduling edge cases): not exercised; code-level.
+- **OS-sandbox spike** (S1 residual): separate.
+
+**The audit's "never run live" gap is CLOSED.** HITL + handoff verified working live (2 real bugs found);
+re-plan/escalation confirmed un-forceable (R1 → code cycle). Live-verify #35 = DONE.
