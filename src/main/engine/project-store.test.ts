@@ -12,6 +12,7 @@ const USERDATA = vi.hoisted(() => `/tmp/aim-userdata-${Math.random().toString(36
 vi.mock('electron', () => ({ app: { getPath: () => USERDATA } }))
 
 import {
+  getGraph,
   openProject,
   createAgent,
   writeMemory,
@@ -480,5 +481,77 @@ describe('race-safe graph writes', () => {
     expect(sid('A')).toBe('sa')
     expect(sid('B')).toBe('sb')
     expect(sid('C')).toBe('sc')
+  })
+})
+
+describe('team-write transactionality (#15)', () => {
+  it('applySpawnedTeam: a member file-write failure leaves no orphan dir and an unchanged graph', async () => {
+    const proj = await tmpProject()
+    await openProject(proj)
+    const g = await createAgent({ name: 'Boss', kind: 'orchestrator' })
+    const boss = g.nodes.find((n) => n.name === 'Boss')!
+    const realWrite = fs.writeFile
+    const spy = vi.spyOn(fs, 'writeFile').mockImplementation((async (p: any, ...rest: any[]) => {
+      if (String(p).includes('memory.md')) throw new Error('disk full')
+      return (realWrite as any)(p, ...rest)
+    }) as any)
+    try {
+      await expect(
+        applySpawnedTeam([{ id: 'm1', name: 'Lead', kind: 'manager', role: '# Role', reportsTo: 'orchestrator' }], boss.id)
+      ).rejects.toThrow('disk full')
+    } finally {
+      spy.mockRestore()
+    }
+    // no orphan dir for the would-be member, and the persisted graph still has only Boss
+    expect(existsSync(join(proj, '.ai-manager', 'agents', 'lead'))).toBe(false)
+    const reopened = await openProject(proj)
+    expect(reopened.nodes).toHaveLength(1)
+    expect(reopened.nodes[0].name).toBe('Boss')
+  })
+
+  it('applySpawnedTeam: a saveGraph failure rolls back created dirs and reverts the in-memory graph', async () => {
+    const proj = await tmpProject()
+    await openProject(proj)
+    const g = await createAgent({ name: 'Boss', kind: 'orchestrator' })
+    const boss = g.nodes.find((n) => n.name === 'Boss')!
+    const realWrite = fs.writeFile
+    const spy = vi.spyOn(fs, 'writeFile').mockImplementation((async (p: any, ...rest: any[]) => {
+      if (String(p).includes('graph.json')) throw new Error('graph save failed')
+      return (realWrite as any)(p, ...rest)
+    }) as any)
+    try {
+      await expect(
+        applySpawnedTeam([{ id: 'm1', name: 'Lead', kind: 'manager', role: '# Role', reportsTo: 'orchestrator' }], boss.id)
+      ).rejects.toThrow('graph save failed')
+    } finally {
+      spy.mockRestore()
+    }
+    expect(existsSync(join(proj, '.ai-manager', 'agents', 'lead'))).toBe(false) // dir rolled back
+    expect(getGraph().nodes).toHaveLength(1) // in-memory graph reverted, not just disk untouched
+    const reopened = await openProject(proj)
+    expect(reopened.nodes).toHaveLength(1) // graph reverted (only Boss persisted)
+  })
+
+  it('importTeam: a member file-write failure leaves no orphan dir and an unchanged graph', async () => {
+    // build a one-member bundle via export from a separate project
+    const src = await tmpProject()
+    await openProject(src)
+    await createAgent({ name: 'Dana', kind: 'worker' })
+    const bundle = await exportTeam()
+
+    const proj = await tmpProject()
+    await openProject(proj)
+    const realWrite = fs.writeFile
+    const spy = vi.spyOn(fs, 'writeFile').mockImplementation((async (p: any, ...rest: any[]) => {
+      if (String(p).includes('memory.md')) throw new Error('disk full')
+      return (realWrite as any)(p, ...rest)
+    }) as any)
+    try {
+      await expect(importTeam(bundle)).rejects.toThrow('disk full')
+    } finally {
+      spy.mockRestore()
+    }
+    const reopened = await openProject(proj)
+    expect(reopened.nodes).toHaveLength(0) // nothing imported
   })
 })

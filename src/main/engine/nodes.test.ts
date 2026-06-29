@@ -1666,6 +1666,80 @@ describe('HITL user requests (Stage 3)', () => {
   })
 })
 
+describe('orchestrator node graph — multiple same-wave askers (#22)', () => {
+  function twoAskers() {
+    const calls: { agentId: string; kind: string; sessionId?: string; prompt: string }[] = []
+    const asked = new Set<string>()
+    const runAgent: AgentRunner = async (o) => {
+      const p = o.prompt
+      const id = o.agentId
+      if (p.includes('Produce a concise, ordered list'))
+        return { text: '```json\n{"tasks":[{"id":"t1","title":"T1","description":"d1"},{"id":"t2","title":"T2","description":"d2"}]}\n```', sessionId: 's-' + id }
+      if (p.includes('You route planned tasks'))
+        return { text: '```json\n{"assignments":[{"taskId":"t1","childId":"w1","reason":"r"},{"taskId":"t2","childId":"w2","reason":"r"}]}\n```' }
+      if (p.includes('The user answered') || p.includes('did not provide an answer')) {
+        calls.push({ agentId: id, kind: 'resume', sessionId: o.resumeSessionId, prompt: p })
+        return { text: `resumed ${id}`, sessionId: 's2-' + id }
+      }
+      if (p.includes('You have been assigned')) {
+        if ((id === 'w1' || id === 'w2') && !asked.has(id)) {
+          asked.add(id)
+          calls.push({ agentId: id, kind: 'ask', prompt: p })
+          return { text: `\`\`\`ask\n{"question":"Q-${id}"}\n\`\`\``, sessionId: `sess-${id}` }
+        }
+        calls.push({ agentId: id, kind: 'work', prompt: p })
+        return { text: `worked ${id}`, sessionId: 's-' + id }
+      }
+      if (p.includes('Judge each task'))
+        return { text: '```json\n{"tasks":[{"taskId":"t1","verdict":"pass","feedback":""},{"taskId":"t2","verdict":"pass","feedback":""}]}\n```' }
+      if (p.includes('final INTEGRATION review'))
+        return { text: '```json\n{"tasks":[{"taskId":"t1","verdict":"pass","feedback":""},{"taskId":"t2","verdict":"pass","feedback":""}]}\n```' }
+      if (p.includes('Reflect on')) return { text: '```json\n{"win":"w","loss":"","lessons":[]}\n```' }
+      if (p.includes('Write a clear final report')) return { text: 'FINAL' }
+      return { text: 'unknown' }
+    }
+    return { runAgent, calls }
+  }
+
+  afterEach(() => {
+    h.settings.maxUserRequests = 0
+  })
+
+  it('budget 2: queues both askers, presents each, and resumes each via its OWN session', async () => {
+    h.settings.maxUserRequests = 2
+    const { runAgent, calls } = twoAskers()
+    const e = eng(runAgent)
+    const store = fakeStore()
+    const io = makeIO(e.abort.signal, store)
+    await runGraph(buildOrchestratorGraph(e), seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' }), store, io)
+    const mid = await resumeGraph(buildOrchestratorGraph(e), 'run1', store, io, 'answer-one')
+    expect(mid.status).toBe('interrupted') // paused again for the 2nd asker
+    const final = await resumeGraph(buildOrchestratorGraph(e), 'run1', store, io, 'answer-two')
+    expect(final.status).toBe('completed')
+    const resumes = calls.filter((c) => c.kind === 'resume')
+    expect(resumes.map((r) => r.sessionId).sort()).toEqual(['sess-w1', 'sess-w2']) // own sessions, not fresh
+    expect(resumes.find((r) => r.sessionId === 'sess-w1')!.prompt).toContain('answer-one')
+    expect(resumes.find((r) => r.sessionId === 'sess-w2')!.prompt).toContain('answer-two')
+    expect((final.userRequests ?? []).map((u) => u.askerId).sort()).toEqual(['w1', 'w2'])
+  })
+
+  it('budget 1: presents the first asker and auto-continues the overflow asker (no fresh re-run)', async () => {
+    h.settings.maxUserRequests = 1
+    const { runAgent, calls } = twoAskers()
+    const e = eng(runAgent)
+    const store = fakeStore()
+    const io = makeIO(e.abort.signal, store)
+    await runGraph(buildOrchestratorGraph(e), seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' }), store, io)
+    const final = await resumeGraph(buildOrchestratorGraph(e), 'run1', store, io, 'the-answer')
+    expect(final.status).toBe('completed') // no second pause
+    const resumes = calls.filter((c) => c.kind === 'resume')
+    expect(resumes.map((r) => r.sessionId).sort()).toEqual(['sess-w1', 'sess-w2']) // both resumed own session
+    expect(resumes.find((r) => r.sessionId === 'sess-w1')!.prompt).toContain('the-answer')
+    expect(resumes.find((r) => r.sessionId === 'sess-w2')!.prompt).toContain('did not provide an answer')
+    expect((final.userRequests ?? []).length).toBe(1) // only one question surfaced
+  })
+})
+
 describe('effortForModel', () => {
   it('clamps a requested effort to the worker model when adaptive is on', () => {
     expect(effortForModel('claude-sonnet-4-6', 'xhigh', true)).toBe('max')

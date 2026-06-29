@@ -224,6 +224,50 @@ async function routeTasks(
   if (!isRoot && !eng.abort.signal.aborted) setStatus(eng, steps, nodeId, 'done')
 }
 
+/** Resume one asking worker's session with `answer` (empty = "no answer; use judgment"); redact + capture
+ *  its output into its tasks/steps. Used by the HITL resume, the queue drain, and over-budget auto-continue. */
+async function resumeAsker(
+  eng: Eng,
+  ask: { ownerId: string; taskIds: string[]; sessionId?: string },
+  answer: string,
+  actingMode: PermissionMode,
+  tasks: Record<string, TaskState>,
+  steps: Record<string, RunStepRecord>
+): Promise<void> {
+  const owned = ask.taskIds.map((id) => tasks[id]).filter(Boolean)
+  const titles = owned.map((t) => t.task.title)
+  setStatus(eng, steps, ask.ownerId, 'working', titles)
+  try {
+    const r = await eng.runAgent({
+      wc: eng.wc,
+      agentId: ask.ownerId,
+      prompt: answerResumePrompt(answer),
+      runId: eng.runId,
+      stepId: ask.ownerId,
+      permissionMode: actingMode,
+      resume: true,
+      resumeSessionId: ask.sessionId,
+      abort: eng.abort
+    })
+    if (r.sessionId) await updateAgent({ id: ask.ownerId, sessionId: r.sessionId })
+    const out = redactUserAnswer(r.text || '(no output)', answer)
+    for (const t of owned) {
+      t.status = 'done'
+      t.output = out
+    }
+    steps[ask.ownerId] = { ...stepBase(ask.ownerId, steps), output: out }
+    setStatus(eng, steps, ask.ownerId, eng.abort.signal.aborted ? 'skipped' : 'done', titles)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    for (const t of owned) {
+      t.status = 'done'
+      t.output = `ERROR: ${msg}`
+    }
+    steps[ask.ownerId] = { ...stepBase(ask.ownerId, steps), output: `ERROR: ${msg}` }
+    setStatus(eng, steps, ask.ownerId, 'error', titles)
+  }
+}
+
 async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeResult> {
   const tasks = structuredClone(state.tasks)
   const steps = { ...state.steps }
@@ -234,46 +278,35 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
   const asks: { ownerId: string; taskIds: string[]; sessionId?: string; question: string }[] = []
   const asksAvailable = (): boolean => maxUserRequests > 0 && userRequestCount < maxUserRequests
   // cleared on EVERY return so a consumed answer never persists (sensitive)
-  const scrub = { resumeInput: undefined, pendingAsk: undefined } as Partial<RunState>
+  const scrub = { resumeInput: undefined, pendingAsk: undefined, askQueue: undefined } as Partial<RunState>
 
-  // ── RE-ENTRY: a human answered (or skipped). Resume the asking worker's session. ──
+  // ── RE-ENTRY: a human answered (or skipped). Resume the asking worker, then drain any queued asks. ──
   if (state.resumeInput !== undefined && state.pendingAsk) {
-    const ask = state.pendingAsk
-    const answer = String(state.resumeInput ?? '')
-    const owned = ask.taskIds.map((id) => tasks[id]).filter(Boolean)
-    const titles = owned.map((t) => t.task.title)
-    setStatus(eng, steps, ask.ownerId, 'working', titles)
-    try {
-      const r = await eng.runAgent({
-        wc: eng.wc,
-        agentId: ask.ownerId,
-        prompt: answerResumePrompt(answer),
-        runId: eng.runId,
-        stepId: ask.ownerId,
-        permissionMode: state.actingMode,
-        resume: true,
-        resumeSessionId: ask.sessionId,
-        abort: eng.abort
-      })
-      if (r.sessionId) await updateAgent({ id: ask.ownerId, sessionId: r.sessionId })
-      const out = redactUserAnswer(r.text || '(no output)', answer)
-      for (const t of owned) {
-        t.status = 'done'
-        t.output = out
-      }
-      steps[ask.ownerId] = { ...stepBase(ask.ownerId, steps), output: out }
-      setStatus(eng, steps, ask.ownerId, eng.abort.signal.aborted ? 'skipped' : 'done', titles)
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      for (const t of owned) {
-        t.status = 'done'
-        t.output = `ERROR: ${msg}`
-      }
-      steps[ask.ownerId] = { ...stepBase(ask.ownerId, steps), output: `ERROR: ${msg}` }
-      setStatus(eng, steps, ask.ownerId, 'error', titles)
-    }
+    await resumeAsker(eng, state.pendingAsk, String(state.resumeInput ?? ''), state.actingMode, tasks, steps)
     userRequestCount += 1
     await io.checkpoint({ ...state, ...scrub, tasks: structuredClone(tasks), steps: { ...steps }, userRequestCount, phase: 'executing', ...(io.collectExtras?.() ?? {}) })
+    const queue = state.askQueue ?? []
+    if (queue.length > 0) {
+      const [next, ...rest] = queue
+      userRequests.push({ askerId: next.ownerId, question: next.question })
+      return {
+        patch: {
+          resumeInput: undefined,
+          tasks,
+          steps,
+          userRequestCount,
+          ...(userRequests.length ? { userRequests } : {}),
+          pendingAsk: next,
+          askQueue: rest.length ? rest : undefined,
+          phase: 'executing'
+        },
+        interrupt: {
+          kind: 'ask-user',
+          prompt: next.question,
+          payload: { askerId: next.ownerId, askerName: getAgent(next.ownerId).name, question: next.question }
+        }
+      }
+    }
   }
 
   // Execute one worker's batch of ready tasks in a single agent call.
@@ -361,19 +394,32 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
     }
     await mapCapped([...byOwner.entries()], MAX_PARALLEL, ([ownerId, group]) => runGroup(ownerId, group))
 
-    // ── A worker asked during this wave → pause on the first (by plan order). ──
+    // ── Workers asked during this wave → queue them; present up to the user-request budget. ──
     if (asks.length > 0 && !eng.abort.signal.aborted) {
       asks.sort((a, b) => state.plan.findIndex((p) => p.id === a.taskIds[0]) - state.plan.findIndex((p) => p.id === b.taskIds[0]))
-      const chosen = asks[0]
-      userRequests.push({ askerId: chosen.ownerId, question: chosen.question })
-      const interrupt = {
-        kind: 'ask-user',
-        prompt: chosen.question,
-        payload: { askerId: chosen.ownerId, askerName: getAgent(chosen.ownerId).name, question: chosen.question }
-      }
+      const slots = Math.max(1, maxUserRequests - userRequestCount) // remaining budget (>=1 while asks fired)
+      const present = asks.slice(0, slots)
+      const overflow = asks.slice(slots)
+      // over-budget askers: resume their captured session with no answer — never re-run fresh, never lost
+      for (const ask of overflow) await resumeAsker(eng, ask, '', state.actingMode, tasks, steps)
+      const [head, ...rest] = present
+      userRequests.push({ askerId: head.ownerId, question: head.question })
       return {
-        patch: { resumeInput: undefined, tasks, steps, userRequestCount, ...(userRequests.length ? { userRequests } : {}), pendingAsk: chosen, phase: 'executing' },
-        interrupt
+        patch: {
+          resumeInput: undefined,
+          tasks,
+          steps,
+          userRequestCount,
+          ...(userRequests.length ? { userRequests } : {}),
+          pendingAsk: head,
+          askQueue: rest.length ? rest : undefined,
+          phase: 'executing'
+        },
+        interrupt: {
+          kind: 'ask-user',
+          prompt: head.question,
+          payload: { askerId: head.ownerId, askerName: getAgent(head.ownerId).name, question: head.question }
+        }
       }
     }
   }
