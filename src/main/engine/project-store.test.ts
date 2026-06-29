@@ -12,6 +12,7 @@ const USERDATA = vi.hoisted(() => `/tmp/aim-userdata-${Math.random().toString(36
 vi.mock('electron', () => ({ app: { getPath: () => USERDATA } }))
 
 import {
+  getGraph,
   openProject,
   createAgent,
   writeMemory,
@@ -526,6 +527,7 @@ describe('team-write transactionality (#15)', () => {
       spy.mockRestore()
     }
     expect(existsSync(join(proj, '.ai-manager', 'agents', 'lead'))).toBe(false) // dir rolled back
+    expect(getGraph().nodes).toHaveLength(1) // in-memory graph reverted, not just disk untouched
     const reopened = await openProject(proj)
     expect(reopened.nodes).toHaveLength(1) // graph reverted (only Boss persisted)
   })
