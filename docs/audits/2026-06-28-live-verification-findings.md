@@ -71,7 +71,18 @@ observability gap confirmed** (handoffs not recorded). Also: forcing a handoff r
 ephemeral-consult goal — natural goals get sequenced (Attempt 1), so the path is rarely hit in normal use.
 
 ## Test 3 — Mid-run re-plan + escalation
-_(pending)_
+
+**🚫 DID NOT FIRE** (engineered "re-plan if step-1 discovery doesn't match" goal). Run `2026-06-29T05-…Z`:
+`replans` key **absent**, plan = 3 tasks, **all passed review on attempt 1** (t1/t2/t3 → pass), no drift, no
+review failure → no proactive re-plan, no escalation. The orchestrator planned correctly upfront and the
+discovery matched its assumptions. (3rd "adaptive path rarely fires naturally" data point, after Test 2 att.1.)
+
+**Implication for R1 — un-blocks it rather than stalling:** the re-plan/escalation paths won't trigger on
+demand, BUT R1's bugs (#6/#7/#13 in `mergeReplan`/`replan.ts` — clobbered frozen tasks, duplicate plan ids,
+dangling `dependsOn`) are **deterministic, unit-testable code defects** that do NOT require a live repro: feed
+`mergeReplan` a replan decision and assert it preserves passed tasks / dedupes ids / repoints-or-drops orphan
+deps. So **R1 can proceed via code-level fixes + unit tests.** The "live-verify before R1" caveat is satisfied
+(we tried; it doesn't fire naturally) — escalation/replan integrity is now an R1 code cycle, not a live gate.
 
 ## Test 4 — P3 durable resume
 _(pending)_
