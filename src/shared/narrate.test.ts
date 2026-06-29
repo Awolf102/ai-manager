@@ -87,4 +87,12 @@ describe('narrateTool', () => {
     expect(narrateTool('Read', null)).toBe('Reading a file')
     expect(narrateTool('Edit', 42)).toBe('Editing a file')
   })
+
+  it('narrates the last segment for a trailing-slash path (not the whole path)', () => {
+    expect(narrateTool('Read', { file_path: '/a/b/c/' })).toBe('Reading c')
+  })
+
+  it('strips userinfo from a fetched host', () => {
+    expect(narrateTool('WebFetch', { url: 'https://user:pass@example.com/page' })).toBe('Fetching example.com')
+  })
 })

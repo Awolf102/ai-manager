@@ -37,6 +37,9 @@ describe('uniqueContextName', () => {
   it('handles names with no extension', () => {
     expect(uniqueContextName(['LICENSE'], 'LICENSE')).toBe('LICENSE-2')
   })
+  it('keeps the whole leading-dot name as the stem on collision', () => {
+    expect(uniqueContextName(['.env'], '.env')).toBe('.env-2')
+  })
 })
 
 describe('buildContextBlock', () => {

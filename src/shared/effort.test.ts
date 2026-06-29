@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { effortOfWorker, effortByTask, cappedFrom } from './effort'
+import { effortOfWorker, effortByTask, cappedFrom, cappedFromDisplay } from './effort'
 import type { Assignment } from './types'
 
 const a = (taskId: string, childId: string | null, effort?: Assignment['effort']): Assignment => ({
@@ -54,5 +54,20 @@ describe('cappedFrom', () => {
   })
   it('returns undefined when nothing was capped', () => {
     expect(cappedFrom([ac({ effort: 'high' })], 'w')).toBeUndefined()
+  })
+})
+
+describe('cappedFromDisplay', () => {
+  const A = (childId: string, effort?: string, assignedEffort?: string) =>
+    ({ taskId: 't', childId, reason: 'r', ...(effort ? { effort } : {}), ...(assignedEffort ? { assignedEffort } : {}) }) as unknown as Assignment
+  it('returns undefined when the pre-clamp effort is not above the actual effort', () => {
+    // task A ran at max (no cap), task B requested xhigh→clamped to max: cappedFrom=xhigh < max → hide
+    const as = [A('w', 'max'), A('w', 'max', 'xhigh')]
+    expect(cappedFromDisplay(as, 'w')).toBeUndefined()
+  })
+  it('returns the pre-clamp effort when it is strictly above the actual effort', () => {
+    // a genuine cap: ran at low, requested high
+    const as = [A('w', 'low', 'high')]
+    expect(cappedFromDisplay(as, 'w')).toBe('high')
   })
 })
