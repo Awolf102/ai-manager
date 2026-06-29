@@ -12,6 +12,8 @@ export interface NodeIO {
   emit: (e: OrchestrationEvent) => void
   /** mid-node durability (e.g. after each task in a parallel batch) */
   checkpoint: (state: RunState) => Promise<void>
+  /** engine-collected fields merged into state on every checkpoint (e.g. cumulative handoffs) */
+  collectExtras?: () => Partial<RunState>
 }
 
 export interface NodeResult {
@@ -74,6 +76,7 @@ export async function runGraph(
     }
 
     if (res.patch) state = { ...state, ...res.patch }
+    if (io.collectExtras) state = { ...state, ...io.collectExtras() }
     const next = res.goto ?? graph.edges[cursor] ?? END
 
     if (res.interrupt) {

@@ -277,3 +277,32 @@ describe('resumeGraph', () => {
     expect(JSON.stringify(persisted)).not.toContain('SECRET-ANSWER')
   })
 })
+
+describe('collectExtras', () => {
+  it('merges io.collectExtras() into state on every checkpoint', async () => {
+    const store = fakeStore()
+    const graph: CompiledGraph = {
+      entry: 'a',
+      nodes: {
+        a: async () => ({ goto: 'b', patch: { phase: 'executing' } }),
+        b: async () => ({ goto: END, patch: { phase: 'done' } })
+      },
+      edges: {}
+    }
+    const extrasIO: NodeIO = {
+      ...io(live, store),
+      collectExtras: () => ({ handoffs: [{ askerId: 'w1', peerId: 'w2', ask: 'q' }] })
+    }
+    const final = await runGraph(graph, mkState({ runId: 'r', cursor: 'a' }), store, extrasIO)
+    expect(final.handoffs).toEqual([{ askerId: 'w1', peerId: 'w2', ask: 'q' }])
+    // the last persisted checkpoint also carries it
+    expect((await store.get('r'))!.handoffs).toEqual([{ askerId: 'w1', peerId: 'w2', ask: 'q' }])
+  })
+
+  it('does not touch state when collectExtras is absent (off-path)', async () => {
+    const store = fakeStore()
+    const graph: CompiledGraph = { entry: 'a', nodes: { a: async () => ({ goto: END }) }, edges: {} }
+    const final = await runGraph(graph, mkState({ runId: 'r', cursor: 'a' }), store, io(live, store))
+    expect('handoffs' in final).toBe(false)
+  })
+})

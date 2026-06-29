@@ -57,6 +57,8 @@ export interface Eng {
   runId: string
   runAgent: AgentRunner
   emit: (e: OrchestrationEvent) => void
+  /** per-run cumulative record of peer handoffs (persisted via NodeIO.collectExtras) */
+  handoffs: { askerId: string; peerId: string; ask: string }[]
 }
 
 export function actingModeFor(autonomy: Autonomy): PermissionMode {
@@ -985,6 +987,7 @@ async function runWithHandoffs(
     if (!req) break
     const peer = consult.peers.find((p) => p.id === req.peerId)!
     eng.emit({ runId: eng.runId, type: 'handoff', askerId: consult.asker, peerId: peer.id, ask: req.ask })
+    eng.handoffs.push({ askerId: consult.asker, peerId: peer.id, ask: req.ask })
     let answer: string
     try {
       const r = await eng.runAgent({

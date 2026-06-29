@@ -15,6 +15,7 @@ import {
   type AgentRunner
 } from './nodes'
 import type { RunState, TaskState } from '../../shared/types'
+import { toRunRecord } from '../../shared/run-state'
 
 // Topology + settings live in a hoisted fake so vi.mock can close over them.
 const h = vi.hoisted(() => {
@@ -164,7 +165,8 @@ function eng(runAgent: AgentRunner): Eng {
     abort: new AbortController(),
     runId: 'run1',
     runAgent,
-    emit: () => {}
+    emit: () => {},
+    handoffs: []
   }
 }
 
@@ -808,11 +810,17 @@ describe('orchestrator node graph — peer handoffs (worker site)', () => {
     const e = eng(runAgent)
     ;(e as { emit: (ev: unknown) => void }).emit = (ev) => events.push(ev)
     const store = fakeStore()
+    const io: NodeIO = {
+      signal: e.abort.signal,
+      emit: (ev) => events.push(ev),
+      checkpoint: (s) => store.put(s),
+      collectExtras: () => (e.handoffs.length ? { handoffs: [...e.handoffs] } : {})
+    }
     return runGraph(
       buildOrchestratorGraph(e),
       seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' }),
       store,
-      makeIO(e.abort.signal, store)
+      io
     )
   }
 
@@ -928,6 +936,27 @@ describe('orchestrator node graph — peer handoffs (worker site)', () => {
       h.settings.maxHandoffs = 0
     }
   })
+
+  it('persists the handoff into run state + the run record', async () => {
+    h.edges = [{ source: 'w1', target: 'w2', kind: 'handoff' }]
+    h.settings.maxHandoffs = 1
+    try {
+      const events: unknown[] = []
+      const out = await run(fake([], {}, 'Use a teal/amber palette'), events)
+      expect(out.handoffs).toEqual([{ askerId: 'w1', peerId: 'w2', ask: 'expressive colorful UI ideas' }])
+      expect(toRunRecord(out).handoffs).toEqual([{ askerId: 'w1', peerId: 'w2', ask: 'expressive colorful UI ideas' }])
+    } finally {
+      h.edges = []
+    }
+  })
+
+  it('off (maxHandoffs=0): no handoffs key on the record', async () => {
+    h.settings.maxHandoffs = 0
+    const events: unknown[] = []
+    const out = await run(fake([], {}, 'x'), events)
+    expect(out.handoffs ?? []).toEqual([])
+    expect('handoffs' in toRunRecord(out)).toBe(false)
+  })
 })
 
 describe('orchestrator node graph — peer handoffs (review site)', () => {
@@ -983,6 +1012,56 @@ describe('orchestrator node graph — peer handoffs (review site)', () => {
         (ev) => ev.type === 'handoff'
       )
       expect(handoffs).toEqual([{ runId: 'run1', type: 'handoff', askerId: 'm', peerId: 'w2', ask: 'is this compliant?' }])
+    } finally {
+      h.children = { o: ['w1', 'w2'], w1: [], w2: [] }
+      h.edges = []
+      h.settings.maxHandoffs = 0
+    }
+  })
+
+  it('persists a review-site handoff into the record', async () => {
+    h.children = { o: ['m'], m: ['w1'], w1: [], w2: [] }
+    h.edges = [{ source: 'm', target: 'w2', kind: 'handoff' }]
+    h.settings.maxHandoffs = 1
+    try {
+      const runAgent: AgentRunner = async (opts) => {
+        const p = opts.prompt
+        if (p.includes('Produce a concise, ordered list'))
+          return { text: '```json\n{"tasks":[{"id":"t1","title":"T1","description":"d"}]}\n```' }
+        if (p.includes('You route planned tasks')) {
+          const childIds = [...p.matchAll(/- id: (\S+)\n\s+name:/g)].map((mm) => mm[1])
+          return { text: '```json\n{"assignments":[{"taskId":"t1","childId":"' + (childIds[0] ?? 'w1') + '","effort":"high","reason":"r"}]}\n```' }
+        }
+        if (p.includes('You have been assigned')) return { text: 'did t1', sessionId: 's-w1' }
+        if (p.includes('responded to your request'))
+          return { text: '```json\n{"tasks":[{"taskId":"t1","verdict":"pass","feedback":""}]}\n```' }
+        if (p.includes('Judge each task'))
+          return { text: '```handoff\n{"to":"W2","ask":"is this compliant?"}\n```' }
+        if (p.includes('asked for your help')) return { text: 'Yes, compliant.' }
+        if (p.includes('final INTEGRATION review'))
+          return { text: '```json\n{"tasks":[{"taskId":"t1","verdict":"pass","feedback":""}]}\n```' }
+        if (p.includes('Reflect on your REVIEW work')) return { text: '```json\n{"win":"","loss":"","lessons":[]}\n```' }
+        if (p.includes('Reflect on the work')) return { text: '```json\n{"win":"","loss":"","lessons":[]}\n```' }
+        if (p.includes('Write a clear final report')) return { text: 'DONE' }
+        return { text: '' }
+      }
+      const e = eng(runAgent)
+      const store = fakeStore()
+      const io: NodeIO = {
+        signal: e.abort.signal,
+        emit: () => {},
+        checkpoint: (s) => store.put(s),
+        collectExtras: () => (e.handoffs.length ? { handoffs: [...e.handoffs] } : {})
+      }
+      const out = await runGraph(
+        buildOrchestratorGraph(e),
+        seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' }),
+        store,
+        io
+      )
+      expect(out.handoffs?.length).toBeGreaterThan(0)
+      expect(toRunRecord(out).handoffs).toEqual(out.handoffs)
+      expect(out.handoffs).toEqual([{ askerId: 'm', peerId: 'w2', ask: 'is this compliant?' }])
     } finally {
       h.children = { o: ['w1', 'w2'], w1: [], w2: [] }
       h.edges = []
