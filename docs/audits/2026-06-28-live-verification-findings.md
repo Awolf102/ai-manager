@@ -39,7 +39,20 @@ re-test pending.
 ---
 
 ## Test 2 — Peer handoff
-_(pending)_
+
+**Attempt 1 (flipped goal: Builder→Docs, "Docs writes contract first, Builder implements to match"):**
+**🚫 DID NOT FIRE.** Run record `2026-06-29T05-26-30Z`: `handoffs` field = **null**, no ` ```handoff ``` `
+block (count 0), plan = two ordinary sequenced tasks (t1 Docs writes README contract, t2 Builder implements).
+The orchestrator **resolved the inter-worker dependency by task sequencing** — Builder just read the README
+Docs had already produced. Deliverable correct; **handoff code path NOT exercised.**
+
+**Finding (informs R2):** handoffs are hard to trigger naturally — the orchestrator **decomposes inter-worker
+dependencies into ordered tasks** rather than leaving them for a mid-run lateral handoff. A handoff only fires
+when a worker needs *ephemeral* info mid-task that planning can't pre-stage as a deliverable. So the handoff
+path (and R2's bugs on it) is rarely hit in normal use — worth noting before investing R2 effort.
+
+**Attempt 2 (engineered to force a mid-task ephemeral consult):** _(pending — Builder must hand off to Docs
+for a runtime-only "greeting word" that exists in no file)._
 
 ## Test 3 — Mid-run re-plan + escalation
 _(pending)_
