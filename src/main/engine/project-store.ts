@@ -757,19 +757,68 @@ export async function exportTeam(): Promise<TeamBundle> {
   })
 }
 
-/** Add a bundle's team into the open project: new agents (fresh ids, uniquified
- * slugs, seeded memory), remapped edges. Saves the graph LAST for atomicity. */
+/** Best-effort removal of dirs created during a failed team add (rollback). */
+async function rollbackDirs(dirs: string[]): Promise<void> {
+  for (const dir of dirs) {
+    try {
+      await fs.rm(dir, { recursive: true, force: true })
+    } catch {
+      // best-effort: a dir that can't be removed is no worse than the failure we're already handling
+    }
+  }
+}
+
+/** Transactional team add: write all member files, THEN commit nodes/edges + persist. On ANY error
+ *  (file write or saveGraph) remove the dirs created here and revert the in-memory graph, then rethrow.
+ *  Slugs are uniquified against the in-memory graph by callers, so each `dir` is new — safe to remove. */
+async function commitTeamAdditions(
+  graph: ProjectGraph,
+  writes: { dir: string; role: string; memory: string }[],
+  newNodes: AgentNodeData[],
+  newEdges: GraphEdge[],
+  linkedTeam?: { teamId: string; path: string }
+): Promise<ProjectGraph> {
+  const createdDirs: string[] = []
+  try {
+    for (const w of writes) {
+      await fs.mkdir(w.dir, { recursive: true })
+      createdDirs.push(w.dir)
+      await fs.writeFile(join(w.dir, 'role.md'), w.role, 'utf8')
+      await fs.writeFile(join(w.dir, 'memory.md'), w.memory, 'utf8')
+    }
+  } catch (err) {
+    await rollbackDirs(createdDirs)
+    throw err
+  }
+  const origNodeLen = graph.nodes.length
+  const origEdgeLen = graph.edges.length
+  const origLinked = graph.linkedTeam
+  graph.nodes.push(...newNodes)
+  graph.edges.push(...newEdges)
+  if (linkedTeam) graph.linkedTeam = linkedTeam
+  try {
+    return await saveGraph()
+  } catch (err) {
+    graph.nodes.length = origNodeLen // push-only → truncation reverts the mutation
+    graph.edges.length = origEdgeLen
+    graph.linkedTeam = origLinked
+    await rollbackDirs(createdDirs)
+    throw err
+  }
+}
+
+/** Add a bundle's team into the open project: new agents (fresh ids, uniquified slugs, seeded memory),
+ *  remapped edges. Writes member files first, then commits the graph; rolls everything back on any error. */
 export async function importTeam(bundle: TeamBundle, brainPath?: string): Promise<ProjectGraph> {
   const { path, graph } = requireCurrent()
   const plan = planTeamImport(bundle, graph.nodes.map((n) => n.slug))
   const idByMember = new Map<string, string>()
+  const writes: { dir: string; role: string; memory: string }[] = []
+  const newNodes: AgentNodeData[] = []
   for (const m of plan.members) {
     const id = randomUUID()
     idByMember.set(m.memberId, id)
-    const dir = aimPath(path, AGENTS_DIR, m.slug)
-    await fs.mkdir(dir, { recursive: true })
-    await fs.writeFile(join(dir, 'role.md'), m.role, 'utf8')
-    await fs.writeFile(join(dir, 'memory.md'), m.memory, 'utf8')
+    writes.push({ dir: aimPath(path, AGENTS_DIR, m.slug), role: m.role, memory: m.memory })
     const node: AgentNodeData = {
       id,
       name: m.name,
@@ -782,15 +831,16 @@ export async function importTeam(bundle: TeamBundle, brainPath?: string): Promis
       position: m.position
     }
     if (m.skills && m.skills.length) node.skills = m.skills
-    graph.nodes.push(node)
+    newNodes.push(node)
   }
+  const newEdges: GraphEdge[] = []
   for (const e of plan.edges) {
     const source = idByMember.get(e.source)
     const target = idByMember.get(e.target)
-    if (source && target) graph.edges.push({ id: `${source}->${target}`, source, target })
+    if (source && target) newEdges.push({ id: `${source}->${target}`, source, target })
   }
-  if (bundle.teamId && brainPath) graph.linkedTeam = { teamId: bundle.teamId, path: brainPath }
-  return saveGraph()
+  const linkedTeam = bundle.teamId && brainPath ? { teamId: bundle.teamId, path: brainPath } : undefined
+  return commitTeamAdditions(graph, writes, newNodes, newEdges, linkedTeam)
 }
 
 /** Create the orchestrator's proposed team: new agents (fresh ids, uniquified slugs,
@@ -812,9 +862,11 @@ export async function applySpawnedTeam(
     }
     return d
   }
+  const idByTemp = new Map<string, string>()
+  const writes: { dir: string; role: string; memory: string }[] = []
+  const newNodes: AgentNodeData[] = []
   const perDepth = new Map<number, number>()
   const taken = new Set(graph.nodes.map((n) => n.slug))
-  const idByTemp = new Map<string, string>()
   for (const m of members) {
     const id = randomUUID()
     idByTemp.set(m.id, id)
@@ -823,10 +875,7 @@ export async function applySpawnedTeam(
     const d = depthOf(m)
     const col = perDepth.get(d) ?? 0
     perDepth.set(d, col + 1)
-    const dir = aimPath(path, AGENTS_DIR, slug)
-    await fs.mkdir(dir, { recursive: true })
-    await fs.writeFile(join(dir, 'role.md'), m.role, 'utf8')
-    await fs.writeFile(join(dir, 'memory.md'), memoryTemplate(m.name), 'utf8')
+    writes.push({ dir: aimPath(path, AGENTS_DIR, slug), role: m.role, memory: memoryTemplate(m.name) })
     const node: AgentNodeData = {
       id,
       name: m.name,
@@ -838,14 +887,15 @@ export async function applySpawnedTeam(
       position: { x: base.x + col * 220, y: base.y + d * 150 }
     }
     if (m.skills && m.skills.length) node.skills = m.skills
-    graph.nodes.push(node)
+    newNodes.push(node)
   }
+  const newEdges: GraphEdge[] = []
   for (const m of members) {
     const childId = idByTemp.get(m.id)!
     const parentId = m.reportsTo === 'orchestrator' ? orchestratorId : idByTemp.get(m.reportsTo)
-    if (parentId) graph.edges.push({ id: `${parentId}->${childId}`, source: parentId, target: childId })
+    if (parentId) newEdges.push({ id: `${parentId}->${childId}`, source: parentId, target: childId })
   }
-  return saveGraph()
+  return commitTeamAdditions(graph, writes, newNodes, newEdges)
 }
 
 // ---------- recent projects ----------
