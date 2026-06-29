@@ -430,6 +430,8 @@ export interface RunState {
   userRequestCount: number
   /** the worker waiting on a user answer; carries its session id across resume (never the answer) */
   pendingAsk?: { ownerId: string; taskIds: string[]; sessionId?: string; question: string }
+  /** remaining same-wave asks to present after pendingAsk (queue); checkpoint-only, never in History */
+  askQueue?: { ownerId: string; taskIds: string[]; sessionId?: string; question: string }[]
   final: string
   error?: string
   /** set when the run paused for human input (Stage 3) */
