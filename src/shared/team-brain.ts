@@ -31,7 +31,7 @@ export function mergeBrainPush(brain: TeamBundle, projectBundle: TeamBundle): Te
   const byId = new Map(members.map((m) => [m.memberId, m]))
   for (const pm of projectBundle.members) {
     const existing = byId.get(pm.memberId)
-    if (existing) existing.lessons = unionLessons(pm.lessons, [...existing.lessons].reverse()).slice(0, 40)
+    if (existing) existing.lessons = unionLessons(pm.lessons, existing.lessons).slice(0, 40)
     else {
       const copy = { ...pm }
       members.push(copy)

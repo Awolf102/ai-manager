@@ -35,8 +35,9 @@ describe('mergeBrainPush', () => {
     const out = mergeBrainPush(brain, proj)
     const merged = out.members.find((m) => m.memberId === 'w')!
     expect(merged.lessons).toHaveLength(40)              // capped (was 30+30=60)
-    expect(merged.lessons).toContain('new 29')          // newest kept
-    expect(merged.lessons).not.toContain('old 0')       // oldest dropped
+    expect(merged.lessons).toContain('new 29')          // a project lesson kept
+    expect(merged.lessons).toContain('old 0')           // NEWEST old lesson kept (index 30, within the 40-cap)
+    expect(merged.lessons).not.toContain('old 29')      // OLDEST old lesson dropped
   })
 })
 
