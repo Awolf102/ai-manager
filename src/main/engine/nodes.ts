@@ -57,6 +57,8 @@ export interface Eng {
   runId: string
   runAgent: AgentRunner
   emit: (e: OrchestrationEvent) => void
+  /** per-run cumulative record of peer handoffs (persisted via NodeIO.collectExtras) */
+  handoffs: { askerId: string; peerId: string; ask: string }[]
 }
 
 export function actingModeFor(autonomy: Autonomy): PermissionMode {
@@ -271,7 +273,7 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
       setStatus(eng, steps, ask.ownerId, 'error', titles)
     }
     userRequestCount += 1
-    await io.checkpoint({ ...state, ...scrub, tasks: structuredClone(tasks), steps: { ...steps }, userRequestCount, phase: 'executing' })
+    await io.checkpoint({ ...state, ...scrub, tasks: structuredClone(tasks), steps: { ...steps }, userRequestCount, phase: 'executing', ...(io.collectExtras?.() ?? {}) })
   }
 
   // Execute one worker's batch of ready tasks in a single agent call.
@@ -327,7 +329,7 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
       steps[ownerId] = { ...stepBase(ownerId, steps), output: `ERROR: ${msg}` }
       setStatus(eng, steps, ownerId, 'error', titles)
     }
-    await io.checkpoint({ ...state, ...scrub, tasks: structuredClone(tasks), steps: { ...steps }, userRequestCount, phase: 'executing' })
+    await io.checkpoint({ ...state, ...scrub, tasks: structuredClone(tasks), steps: { ...steps }, userRequestCount, phase: 'executing', ...(io.collectExtras?.() ?? {}) })
   }
 
   // Wave loop: each wave runs the still-pending tasks whose dependencies have
@@ -540,7 +542,7 @@ async function repairNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeRe
     steps[ownerId] = { ...stepBase(ownerId, steps), output: tasks[t.task.id].output }
   })
 
-  await io.checkpoint({ ...state, tasks: structuredClone(tasks), steps: { ...steps }, phase: 'repairing' })
+  await io.checkpoint({ ...state, tasks: structuredClone(tasks), steps: { ...steps }, phase: 'repairing', ...(io.collectExtras?.() ?? {}) })
   return { patch: { tasks, steps, phase: 'reviewing', repairAttempts: state.repairAttempts + 1 }, goto: 'domainReview' }
 }
 
@@ -673,7 +675,9 @@ async function synthNode(state: RunState, _io: NodeIO, eng: Eng): Promise<NodeRe
   const steps = { ...state.steps }
   setStatus(eng, steps, state.orchestratorId, 'working')
   const owned = ownedTasks(state)
-  const results = owned.length > 0 ? formatResults(state) + formatVerdicts(state) : '(no work was assigned)'
+  const results =
+    (owned.length > 0 ? formatResults(state) + formatVerdicts(state) : '(no work was assigned)') +
+    formatUserRequests(state)
   const final = await synthesizeStep(eng, state.goal, state.actingMode, state.orchestratorId, state.plan, results)
   eng.emit({ runId: eng.runId, type: 'final', text: final })
   setStatus(eng, steps, state.orchestratorId, 'done')
@@ -983,6 +987,8 @@ async function runWithHandoffs(
     if (!req) break
     const peer = consult.peers.find((p) => p.id === req.peerId)!
     eng.emit({ runId: eng.runId, type: 'handoff', askerId: consult.asker, peerId: peer.id, ask: req.ask })
+    eng.handoffs.push({ askerId: consult.asker, peerId: peer.id, ask: req.ask })
+    eng.emit({ runId: eng.runId, type: 'status', nodeId: peer.id, status: 'working', taskTitles: [req.ask] })
     let answer: string
     try {
       const r = await eng.runAgent({
@@ -996,8 +1002,10 @@ async function runWithHandoffs(
         abort: eng.abort
       })
       answer = r.text || '(no answer)'
+      eng.emit({ runId: eng.runId, type: 'status', nodeId: peer.id, status: 'done' })
     } catch (err) {
       answer = `ERROR: ${err instanceof Error ? err.message : String(err)}`
+      eng.emit({ runId: eng.runId, type: 'status', nodeId: peer.id, status: 'error' })
     }
     // resume the ASKER's in-run session with the peer's answer (peer sessionId is NOT persisted)
     result = await eng.runAgent({ ...base, prompt: resumePrompt(peer.name, answer), resume: true, resumeSessionId: result.sessionId })
@@ -1219,6 +1227,22 @@ function formatVerdicts(state: RunState): string {
     })
     .filter((l): l is string => l !== null)
   return lines.length ? `\n\n## Review verdicts\n${lines.join('\n')}` : ''
+}
+
+/** Synthesis-visible summary of HITL consultations — questions only (S5-safe; never the answer). */
+export function formatUserRequests(state: RunState): string {
+  const reqs = state.userRequests ?? []
+  if (reqs.length === 0) return ''
+  const lines = reqs.map((r) => {
+    let name: string
+    try {
+      name = getAgent(r.askerId).name
+    } catch {
+      name = r.askerId
+    }
+    return `- ${name} paused to ask the user: "${r.question}". The user provided an answer, which ${name} incorporated into its work. (The answer itself is redacted from this record.)`
+  })
+  return `\n\n## User consultations during this run\n${lines.join('\n')}\nThese questions were answered by the user during the run and the answers were incorporated — report them as resolved, not as open questions or placeholder assumptions.`
 }
 
 // ---------- prompts (ported verbatim from the original engine) ----------

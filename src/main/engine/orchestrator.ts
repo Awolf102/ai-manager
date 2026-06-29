@@ -77,8 +77,13 @@ function makeDeps(
 ): { eng: Eng; io: NodeIO; store: RunStore } {
   const store = createRunStore(getCheckpointDir())
   const emitFn = (e: OrchestrationEvent): void => emit(wc, e)
-  const eng: Eng = { wc, abort, runId, runAgent: streamAgent, emit: emitFn }
-  const io: NodeIO = { signal: abort.signal, emit: emitFn, checkpoint: (s) => store.put(s) }
+  const eng: Eng = { wc, abort, runId, runAgent: streamAgent, emit: emitFn, handoffs: [] }
+  const io: NodeIO = {
+    signal: abort.signal,
+    emit: emitFn,
+    checkpoint: (s) => store.put(s),
+    collectExtras: () => (eng.handoffs.length ? { handoffs: [...eng.handoffs] } : {})
+  }
   return { eng, io, store }
 }
 
@@ -111,6 +116,7 @@ async function resumeDrive(
     emit(wc, { runId, type: 'run-finished', status: 'error', error: 'no checkpoint to resume' })
     return
   }
+  eng.handoffs.push(...(saved.handoffs ?? []))
   // HITL continuation (an answer was supplied) keeps the live run view — don't reset it
   // with a fresh run-started. Crash-recovery (no answer) rebuilds the view from scratch.
   if (resumeInput === undefined) {

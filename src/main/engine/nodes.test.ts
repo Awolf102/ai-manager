@@ -10,10 +10,12 @@ import {
   normalizeLessonInput,
   hasManagers,
   reviewerIdsOf,
+  formatUserRequests,
   type Eng,
   type AgentRunner
 } from './nodes'
 import type { RunState, TaskState } from '../../shared/types'
+import { toRunRecord } from '../../shared/run-state'
 
 // Topology + settings live in a hoisted fake so vi.mock can close over them.
 const h = vi.hoisted(() => {
@@ -163,7 +165,8 @@ function eng(runAgent: AgentRunner): Eng {
     abort: new AbortController(),
     runId: 'run1',
     runAgent,
-    emit: () => {}
+    emit: () => {},
+    handoffs: []
   }
 }
 
@@ -807,11 +810,17 @@ describe('orchestrator node graph — peer handoffs (worker site)', () => {
     const e = eng(runAgent)
     ;(e as { emit: (ev: unknown) => void }).emit = (ev) => events.push(ev)
     const store = fakeStore()
+    const io: NodeIO = {
+      signal: e.abort.signal,
+      emit: (ev) => events.push(ev),
+      checkpoint: (s) => store.put(s),
+      collectExtras: () => (e.handoffs.length ? { handoffs: [...e.handoffs] } : {})
+    }
     return runGraph(
       buildOrchestratorGraph(e),
       seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' }),
       store,
-      makeIO(e.abort.signal, store)
+      io
     )
   }
 
@@ -927,6 +936,136 @@ describe('orchestrator node graph — peer handoffs (worker site)', () => {
       h.settings.maxHandoffs = 0
     }
   })
+
+  it('persists the handoff into run state + the run record', async () => {
+    h.edges = [{ source: 'w1', target: 'w2', kind: 'handoff' }]
+    h.settings.maxHandoffs = 1
+    try {
+      const events: unknown[] = []
+      const out = await run(fake([], {}, 'Use a teal/amber palette'), events)
+      expect(out.handoffs).toEqual([{ askerId: 'w1', peerId: 'w2', ask: 'expressive colorful UI ideas' }])
+      expect(toRunRecord(out).handoffs).toEqual([{ askerId: 'w1', peerId: 'w2', ask: 'expressive colorful UI ideas' }])
+    } finally {
+      h.edges = []
+    }
+  })
+
+  it('off (maxHandoffs=0): no handoffs key on the record', async () => {
+    h.settings.maxHandoffs = 0
+    const events: unknown[] = []
+    const out = await run(fake([], {}, 'x'), events)
+    expect(out.handoffs ?? []).toEqual([])
+    expect('handoffs' in toRunRecord(out)).toBe(false)
+  })
+
+  it('emits working + done status for the consulted peer', async () => {
+    h.edges = [{ source: 'w1', target: 'w2', kind: 'handoff' }]
+    h.settings.maxHandoffs = 1
+    try {
+      const events: { type: string; nodeId?: string; status?: string }[] = []
+      await run(fake([], {}, 'Use a teal/amber palette'), events as unknown[])
+      const peerStatuses = events.filter((e) => e.type === 'status' && e.nodeId === 'w2').map((e) => e.status)
+      expect(peerStatuses).toContain('working')
+      expect(peerStatuses).toContain('done')
+    } finally {
+      h.edges = []
+    }
+  })
+
+  it('combined: a worker consults a peer then pauses to ask the user; handoff persists across pause→resume with no double-count, answer never leaks', async () => {
+    // Scenario: w1 is assigned t1.
+    //   Call 1 (You have been assigned + You may CONSULT): emits handoff block → H1 dispatched, w2 answers.
+    //   Call 2 (resumed post-handoff, prompt has "responded to your request"): emits ask block → run pauses.
+    //   Call 3 (HITL resume, prompt has "The user answered"): w1 completes t1.
+    h.edges = [{ source: 'w1', target: 'w2', kind: 'handoff' }]
+    h.settings.maxHandoffs = 1
+    h.settings.maxUserRequests = 1
+    const SECRET = 'SecretAnswer42'
+    try {
+      const order: string[] = []
+      let w1FirstDone = false
+      const runAgent: AgentRunner = async (opts) => {
+        const p = opts.prompt
+        // plan
+        if (p.includes('Produce a concise, ordered list'))
+          return { text: '```json\n{"tasks":[{"id":"t1","title":"Build UI","description":"build the ui"}]}\n```' }
+        // route
+        if (p.includes('You route planned tasks'))
+          return { text: '```json\n{"assignments":[{"taskId":"t1","childId":"w1","effort":"high","reason":"r"}]}\n```' }
+        // w2 peer answer
+        if (p.includes('asked for your help')) {
+          order.push('w2-consult')
+          return { text: 'Use a teal palette' }
+        }
+        // w1 resumed with peer answer → emits ask block
+        if (p.includes('responded to your request')) {
+          order.push('w1-post-handoff')
+          return { text: '```ask\n{"question":"Which shade of teal?"}\n```', sessionId: 's-w1-resumed' }
+        }
+        // w1 resumed with HITL answer → finishes
+        if (p.includes('The user answered')) {
+          order.push('w1-hitl-resume')
+          return { text: `Done: used ${p.includes(SECRET) ? 'the answer' : 'unknown'}`, sessionId: 's-w1-final' }
+        }
+        // w1 first call → handoff request
+        if (p.includes('You have been assigned') && !w1FirstDone) {
+          w1FirstDone = true
+          order.push('w1-task')
+          return { text: '```handoff\n{"to":"W2","ask":"color palette ideas"}\n```', sessionId: 's-w1-1' }
+        }
+        if (p.includes('Judge each task'))
+          return { text: '```json\n{"tasks":[{"taskId":"t1","verdict":"pass","feedback":""}]}\n```' }
+        if (p.includes('Reflect on the work')) return { text: '```json\n{"win":"","loss":"","lessons":[]}\n```' }
+        if (p.includes('Write a clear final report')) return { text: 'DONE' }
+        return { text: '' }
+      }
+
+      // Build the eng+store manually so we can call resumeGraph on the same store.
+      const e = eng(runAgent)
+      ;(e as { emit: (ev: unknown) => void }).emit = (ev: unknown) => {}
+      const store = fakeStore()
+      const io: NodeIO = {
+        signal: e.abort.signal,
+        emit: () => {},
+        checkpoint: (s) => store.put(s),
+        collectExtras: () => (e.handoffs.length ? { handoffs: [...e.handoffs] } : {})
+      }
+
+      // Phase 1: run until paused for the user question.
+      const paused = await runGraph(
+        buildOrchestratorGraph(e),
+        seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' }),
+        store,
+        io
+      )
+
+      // The handoff fired and the ask block paused the run.
+      expect(order).toEqual(['w1-task', 'w2-consult', 'w1-post-handoff'])
+      expect(paused.status).toBe('interrupted')
+      expect(paused.pendingInterrupt?.kind).toBe('ask-user')
+      expect(paused.pendingInterrupt?.prompt).toBe('Which shade of teal?')
+
+      // The handoff is persisted into the paused checkpoint.
+      const saved = await store.get('run1')
+      expect(saved?.handoffs).toEqual([{ askerId: 'w1', peerId: 'w2', ask: 'color palette ideas' }])
+
+      // Phase 2: resume with the user's answer.
+      const final = await resumeGraph(buildOrchestratorGraph(e), 'run1', store, io, SECRET)
+
+      expect(order).toEqual(['w1-task', 'w2-consult', 'w1-post-handoff', 'w1-hitl-resume'])
+      expect(final.status).toBe('completed')
+
+      // Handoffs still exactly one entry — no double-count, no loss across pause→resume.
+      expect(final.handoffs).toEqual([{ askerId: 'w1', peerId: 'w2', ask: 'color palette ideas' }])
+
+      // The answer never appears in any persisted field.
+      expect(JSON.stringify(final)).not.toContain(SECRET)
+    } finally {
+      h.edges = []
+      h.settings.maxHandoffs = 0
+      h.settings.maxUserRequests = 0
+    }
+  })
 })
 
 describe('orchestrator node graph — peer handoffs (review site)', () => {
@@ -982,6 +1121,56 @@ describe('orchestrator node graph — peer handoffs (review site)', () => {
         (ev) => ev.type === 'handoff'
       )
       expect(handoffs).toEqual([{ runId: 'run1', type: 'handoff', askerId: 'm', peerId: 'w2', ask: 'is this compliant?' }])
+    } finally {
+      h.children = { o: ['w1', 'w2'], w1: [], w2: [] }
+      h.edges = []
+      h.settings.maxHandoffs = 0
+    }
+  })
+
+  it('persists a review-site handoff into the record', async () => {
+    h.children = { o: ['m'], m: ['w1'], w1: [], w2: [] }
+    h.edges = [{ source: 'm', target: 'w2', kind: 'handoff' }]
+    h.settings.maxHandoffs = 1
+    try {
+      const runAgent: AgentRunner = async (opts) => {
+        const p = opts.prompt
+        if (p.includes('Produce a concise, ordered list'))
+          return { text: '```json\n{"tasks":[{"id":"t1","title":"T1","description":"d"}]}\n```' }
+        if (p.includes('You route planned tasks')) {
+          const childIds = [...p.matchAll(/- id: (\S+)\n\s+name:/g)].map((mm) => mm[1])
+          return { text: '```json\n{"assignments":[{"taskId":"t1","childId":"' + (childIds[0] ?? 'w1') + '","effort":"high","reason":"r"}]}\n```' }
+        }
+        if (p.includes('You have been assigned')) return { text: 'did t1', sessionId: 's-w1' }
+        if (p.includes('responded to your request'))
+          return { text: '```json\n{"tasks":[{"taskId":"t1","verdict":"pass","feedback":""}]}\n```' }
+        if (p.includes('Judge each task'))
+          return { text: '```handoff\n{"to":"W2","ask":"is this compliant?"}\n```' }
+        if (p.includes('asked for your help')) return { text: 'Yes, compliant.' }
+        if (p.includes('final INTEGRATION review'))
+          return { text: '```json\n{"tasks":[{"taskId":"t1","verdict":"pass","feedback":""}]}\n```' }
+        if (p.includes('Reflect on your REVIEW work')) return { text: '```json\n{"win":"","loss":"","lessons":[]}\n```' }
+        if (p.includes('Reflect on the work')) return { text: '```json\n{"win":"","loss":"","lessons":[]}\n```' }
+        if (p.includes('Write a clear final report')) return { text: 'DONE' }
+        return { text: '' }
+      }
+      const e = eng(runAgent)
+      const store = fakeStore()
+      const io: NodeIO = {
+        signal: e.abort.signal,
+        emit: () => {},
+        checkpoint: (s) => store.put(s),
+        collectExtras: () => (e.handoffs.length ? { handoffs: [...e.handoffs] } : {})
+      }
+      const out = await runGraph(
+        buildOrchestratorGraph(e),
+        seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' }),
+        store,
+        io
+      )
+      expect(out.handoffs?.length).toBeGreaterThan(0)
+      expect(toRunRecord(out).handoffs).toEqual(out.handoffs)
+      expect(out.handoffs).toEqual([{ askerId: 'm', peerId: 'w2', ask: 'is this compliant?' }])
     } finally {
       h.children = { o: ['w1', 'w2'], w1: [], w2: [] }
       h.edges = []
@@ -1428,6 +1617,53 @@ describe('HITL user requests (Stage 3)', () => {
     const resume = calls.find((c) => c.kind === 'resume' && c.agentId === 'w1')
     expect(resume!.prompt).toContain('did not provide an answer')
   })
+
+  it('after resume, synthesis sees the captured reply and acknowledges the answer (no leak)', async () => {
+    h.settings.maxUserRequests = 2
+    let synthPromptSeen = ''
+    let w1Asked = false
+    const runAgent: AgentRunner = async (o) => {
+      const p = o.prompt
+      if (p.includes('Produce a concise, ordered list'))
+        return { text: '```json\n{"tasks":[{"id":"t1","title":"T1","description":"do t1"}]}\n```', sessionId: 's-' + o.agentId }
+      if (p.includes('You route planned tasks'))
+        return { text: '```json\n{"assignments":[{"taskId":"t1","childId":"w1","reason":"r"}]}\n```' }
+      if (p.includes('You have been assigned')) {
+        if (o.agentId === 'w1' && !w1Asked) {
+          w1Asked = true
+          return { text: '```ask\n{"question":"Which package manager?"}\n```', sessionId: 'sess-w1' }
+        }
+        return { text: `worked ${o.agentId}`, sessionId: 's-' + o.agentId }
+      }
+      if (p.includes('The user answered') || p.includes('did not provide an answer'))
+        return { text: 'Installed deps and wrote the CLI per the manager you chose.', sessionId: 's2-w1' }
+      if (p.includes('Judge each task'))
+        return { text: '```json\n{"tasks":[{"taskId":"t1","verdict":"pass","feedback":""}]}\n```' }
+      if (p.includes('final INTEGRATION review'))
+        return { text: '```json\n{"tasks":[{"taskId":"t1","verdict":"pass","feedback":""}]}\n```' }
+      if (p.includes('Reflect on')) return { text: '```json\n{"win":"w","loss":"","lessons":[]}\n```' }
+      if (p.includes('Write a clear final report')) { synthPromptSeen = p; return { text: 'FINAL' } }
+      return { text: 'unknown' }
+    }
+    const e = eng(runAgent)
+    const store = fakeStore()
+    const io = makeIO(e.abort.signal, store)
+    await runGraph(buildOrchestratorGraph(e), seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' }), store, io)
+    const secret = 'pnpm v9 exactly'
+    const final = await resumeGraph(buildOrchestratorGraph(e), 'run1', store, io, secret)
+
+    expect(final.status).toBe('completed')
+    // (a) the resumed reply is captured into the durable task output — NOT the pre-resume ask
+    expect(final.tasks['t1'].output).toContain('Installed deps and wrote the CLI')
+    expect(final.tasks['t1'].output).not.toContain('Which package manager?')
+    // (b) synthesis was handed the consultation section (so it can report it resolved)
+    expect(synthPromptSeen).not.toBe('') // synth actually ran — guards the no-leak assert below
+    expect(synthPromptSeen).toContain('## User consultations during this run')
+    expect(synthPromptSeen).toContain('Which package manager?')
+    // (c) the raw answer never reaches synthesis or any persisted state (S5)
+    expect(synthPromptSeen).not.toContain(secret)
+    expect(JSON.stringify(final)).not.toContain(secret)
+  })
 })
 
 describe('effortForModel', () => {
@@ -1441,5 +1677,40 @@ describe('effortForModel', () => {
   })
   it('passes through unchanged when there is no assigned model (childId null)', () => {
     expect(effortForModel(undefined, 'xhigh', true)).toBe('xhigh')
+  })
+})
+
+describe('formatUserRequests', () => {
+  it('returns empty string when there are no user requests', () => {
+    expect(formatUserRequests({ userRequests: [] } as unknown as RunState)).toBe('')
+    expect(formatUserRequests({} as unknown as RunState)).toBe('')
+  })
+
+  it('summarizes each consultation by asker name + question, marking it resolved', () => {
+    const out = formatUserRequests({
+      userRequests: [{ askerId: 'w1', question: 'Which package manager?' }]
+    } as unknown as RunState)
+    expect(out).toContain('## User consultations during this run')
+    expect(out).toContain('W1') // getAgent('w1').name from the hoisted fake
+    expect(out).toContain('Which package manager?')
+    expect(out).toContain('provided an answer')
+    expect(out).toContain('redacted from this record')
+    expect(out).toContain('resolved') // the directive travels inside the section
+  })
+
+  it('never contains an answer — only the question is an input', () => {
+    const out = formatUserRequests({
+      userRequests: [{ askerId: 'w1', question: 'pick a color' }]
+    } as unknown as RunState)
+    expect(out).not.toContain('teal') // no answer field exists to leak
+  })
+
+  it('falls back to the askerId when the agent is unknown (deleted/renamed)', () => {
+    // h.agents has no 'ghost' entry, so getAgent('ghost') returns undefined → .name throws
+    const out = formatUserRequests({
+      userRequests: [{ askerId: 'ghost', question: 'Q' }]
+    } as unknown as RunState)
+    expect(out).toContain('ghost')
+    expect(out).toContain('Q')
   })
 })

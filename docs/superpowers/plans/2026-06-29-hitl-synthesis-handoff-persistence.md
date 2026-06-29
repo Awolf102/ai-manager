@@ -65,13 +65,16 @@ HistoryView light up; plus a live `status` emit so the consulted peer's pill sto
 
 **Files:**
 - Modify: `src/main/engine/nodes.ts` (add `formatUserRequests` near `formatResults` ~line 1202; wire into
-  `synthNode` ~line 676; one sentence in `synthPrompt` ~line 1292)
+  `synthNode` ~line 676)
 - Test: `src/main/engine/nodes.test.ts`
 
 **Interfaces:**
 - Produces: `export function formatUserRequests(state: RunState): string` — returns `''` when
   `state.userRequests` is empty/absent; otherwise a `\n\n## User consultations during this run\n…` section,
-  one bullet per request, built only from `askerId`/`question`.
+  one bullet per request, built only from `askerId`/`question`, with a trailing directive line telling the
+  synthesizer to treat them as resolved. **No `synthPrompt` change** — the directive travels inside the
+  section, so when there are no consultations the synthesis prompt is byte-for-byte unchanged
+  (off-path guarantee).
 
 - [ ] **Step 1: Write the failing unit tests**
 
@@ -94,6 +97,7 @@ describe('formatUserRequests', () => {
     expect(out).toContain('Which package manager?')
     expect(out).toContain('provided an answer')
     expect(out).toContain('redacted from this record')
+    expect(out).toContain('resolved') // the directive travels inside the section
   })
 
   it('never contains an answer — only the question is an input', () => {
@@ -123,18 +127,22 @@ export function formatUserRequests(state: RunState): string {
     const name = getAgent(r.askerId).name
     return `- ${name} paused to ask the user: "${r.question}". The user provided an answer, which ${name} incorporated into its work. (The answer itself is redacted from this record.)`
   })
-  return `\n\n## User consultations during this run\n${lines.join('\n')}`
+  return `\n\n## User consultations during this run\n${lines.join('\n')}\nThese questions were answered by the user during the run and the answers were incorporated — report them as resolved, not as open questions or placeholder assumptions.`
 }
 ```
+
+> Note: the "treat as resolved" directive lives inside this section (not in `synthPrompt`), so when there are
+> no consultations the synthesis prompt is byte-for-byte unchanged.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `npx vitest run src/main/engine/nodes.test.ts -t formatUserRequests`
 Expected: PASS (3 tests).
 
-- [ ] **Step 5: Wire it into `synthNode` and `synthPrompt`**
+- [ ] **Step 5: Wire it into `synthNode`**
 
-In `synthNode` (~line 676), change the `results` line to append the consultation section:
+In `synthNode` (~line 676), change the `results` line to append the consultation section. **No `synthPrompt`
+change** — the directive is inside the section:
 
 ```ts
   const results =
@@ -142,29 +150,11 @@ In `synthNode` (~line 676), change the `results` line to append the consultation
     formatUserRequests(state)
 ```
 
-In `synthPrompt` (~line 1292), append one sentence to the final instruction paragraph (the one beginning
-"Write a clear final report:"). The new full final paragraph:
-
-```ts
-  return `You are the lead for this project. Your team has executed the plan for this goal:
-${goal}
-
-The plan was:
-${planList}
-
-Here is what came back from the team:
-${results}
-
-Write a clear final report: what was accomplished, how it maps to the goal, and anything still missing or needing follow-up. If a "User consultations during this run" section is present, the user already answered those questions and the team incorporated the answers — report them as resolved, not as open questions or placeholder assumptions. If a small, obviously-safe final integration is needed, you may do it.`
-```
-
 - [ ] **Step 6: Run the full engine suite to confirm no regressions**
 
 Run: `npx vitest run src/main/engine/nodes.test.ts`
-Expected: PASS (all existing + the 3 new). Off-path runs (no `userRequests`) are unaffected because
-`formatUserRequests` returns `''` and the prompt sentence is static text appended to every synth prompt
-(present but inert when there's no consultations section — verify an existing non-HITL end-to-end test still
-passes; if any asserts the exact synth prompt string, update that expectation to include the new sentence).
+Expected: PASS (all existing + the 3 new). Off-path runs (no `userRequests`) are byte-for-byte unaffected:
+`formatUserRequests` returns `''`, so `results` and the synth prompt are unchanged.
 
 - [ ] **Step 7: Commit**
 

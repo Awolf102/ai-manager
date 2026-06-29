@@ -36,6 +36,13 @@ fake secret **in the modal answer** and confirm History shows `[user answer reda
 **Status:** HITL pause/modal/answer/resume = verified working. One real bug logged (resume→synthesis). Redaction
 re-test pending.
 
+**Task-2 regression test outcome (2026-06-29):** capture works in-engine; the live symptom was synthesis-blindness
+(fixed via `formatUserRequests` in Task 1). The end-to-end test (`nodes.test.ts`: "after resume, synthesis sees the
+captured reply and acknowledges the answer (no leak)") passed first-try: `final.tasks['t1'].output` contains the
+resumed reply (not the pre-resume ask), the synthesis prompt carries `## User consultations during this run`, and
+the raw secret leaks nowhere. This test is now the regression guard for both the capture path and the
+synthesis-acknowledgment wiring.
+
 ---
 
 ## Test 2 — Peer handoff
