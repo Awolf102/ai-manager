@@ -51,8 +51,24 @@ dependencies into ordered tasks** rather than leaving them for a mid-run lateral
 when a worker needs *ephemeral* info mid-task that planning can't pre-stage as a deliverable. So the handoff
 path (and R2's bugs on it) is rarely hit in normal use — worth noting before investing R2 effort.
 
-**Attempt 2 (engineered to force a mid-task ephemeral consult):** _(pending — Builder must hand off to Docs
-for a runtime-only "greeting word" that exists in no file)._
+**Attempt 2 (engineered: Builder needs a runtime-only "greeting word" only Docs knows, in no file):**
+**✅ HANDOFF FIRED & WORKED + 🐞 NOT PERSISTED.** Run `2026-06-29T05-32Z`.
+- **Runtime (verified, incl. screenshot):** Builder read the files, hit the wall, emitted a real
+  ` ```handoff {to:"Docs", ask:"what greeting word should greet() use?"} ` block → UI showed
+  **`↪ Handoff: Builder → Docs`** → **Docs ran as the consulted peer** (terminal filled; answered **"Hello"**)
+  → **Builder resumed with the answer** and used it (verified code matched; **no stale session**). The audit's
+  Dimension-1 "Expected" for handoff (↪ line · peer runs · asker continues) is **met live** — the
+  "handoff never run against real Claude" gap is **cleared.**
+- **🐞 PERSISTENCE BUG (R2 confirmed, #23/#27/#25):** the run record has **no `handoffs` field at all**
+  (`'handoffs' in record → False`). A handoff that visibly fired left **zero durable trace** in History
+  (no asker/peer/ask record). `state.handoffs` was never set / not persisted. This is exactly R2's "handoff
+  persistence & observability" — now with a live repro.
+- **Related observation:** the orchestrator *also* planned `t1: "Get greeting word from Docs"`, so the lateral
+  handoff overlapped a planned task — redundancy between planner-resolution and handoff. Note for R2 scoping.
+
+**Status:** handoff path **verified working live** (clears the audit's never-run concern); **R2 persistence/
+observability gap confirmed** (handoffs not recorded). Also: forcing a handoff required an *engineered*
+ephemeral-consult goal — natural goals get sequenced (Attempt 1), so the path is rarely hit in normal use.
 
 ## Test 3 — Mid-run re-plan + escalation
 _(pending)_
