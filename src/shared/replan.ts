@@ -28,6 +28,14 @@ export function pendingStageBoundary(
   return null
 }
 
+/** A deterministic id not already in `used`: returns `base`, else `base~2`, `base~3`, … */
+function freshId(base: string, used: Set<string>): string {
+  if (!used.has(base)) return base
+  let n = 2
+  while (used.has(`${base}~${n}`)) n++
+  return `${base}~${n}`
+}
+
 /**
  * Apply a re-plan decision. `replaceIds` selects which existing tasks the decision
  * replaces (defaults to all `pending` ids — Phase-2 proactive behavior); every task
@@ -50,18 +58,50 @@ export function mergeReplan(
   for (const [id, t] of Object.entries(tasks)) {
     if (!replace.has(id)) frozen[id] = t
   }
-  const next: Record<string, TaskState> = { ...frozen }
-  for (const rt of decision.tasks) {
-    next[rt.id] = {
-      task: { id: rt.id, title: rt.title, description: rt.description },
+
+  // Assign each decision task a collision-free final id (re-id, never clobber a frozen task or an
+  // earlier decision task). `used` seeds from FROZEN ids only — reusing a replaced id is legitimate.
+  const used = new Set(Object.keys(frozen))
+  const remap: Record<string, string> = {}
+  const finalIds = decision.tasks.map((rt) => {
+    const finalId = freshId(rt.id, used)
+    used.add(finalId)
+    if (finalId !== rt.id) remap[rt.id] = finalId
+    return finalId
+  })
+
+  // Every id that will exist after the merge — used to drop dangling deps.
+  const present = new Set<string>([...Object.keys(frozen), ...finalIds])
+
+  const next: Record<string, TaskState> = {}
+  // Frozen tasks: kept verbatim, but re-filter dependsOn so a dropped target no longer dangles.
+  // Keep the same object reference when nothing changes (shape parity with the pre-fix output).
+  for (const [id, t] of Object.entries(frozen)) {
+    const cleaned = (t.dependsOn ?? []).filter((d) => present.has(d))
+    if (t.dependsOn && cleaned.length !== t.dependsOn.length) {
+      const { dependsOn: _drop, ...rest } = t
+      next[id] = cleaned.length ? { ...rest, dependsOn: cleaned } : rest
+    } else {
+      next[id] = t
+    }
+  }
+  // Decision tasks: fresh pending, un-owned, with deps remapped to final ids and danglers dropped.
+  decision.tasks.forEach((rt, i) => {
+    const finalId = finalIds[i]
+    const cleaned = (deps[rt.id] ?? [])
+      .map((d) => remap[d] ?? d)
+      .filter((d) => d !== finalId && present.has(d))
+    next[finalId] = {
+      task: { id: finalId, title: rt.title, description: rt.description },
       ownerId: null,
       status: 'pending',
       attempts: 0,
       output: '',
-      ...(deps[rt.id]?.length ? { dependsOn: deps[rt.id] } : {})
+      ...(cleaned.length ? { dependsOn: cleaned } : {})
     }
-  }
+  })
+
   const frozenInOrder = plan.filter((p) => frozen[p.id]).map((p) => frozen[p.id].task)
-  const newTasks = decision.tasks.map((rt) => ({ id: rt.id, title: rt.title, description: rt.description }))
+  const newTasks = decision.tasks.map((rt, i) => ({ id: finalIds[i], title: rt.title, description: rt.description }))
   return { plan: [...frozenInOrder, ...newTasks], tasks: next }
 }
