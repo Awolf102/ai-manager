@@ -1,22 +1,3 @@
-:root {
-  --bg: #0e0f13;
-  --panel: #16181f;
-  --panel-2: #1c1f28;
-  --border: #262a35;
-  --border-strong: #333949;
-  --text: #e6e8ee;
-  --muted: #8b90a0;
-  --accent: #6ea8fe;
-  --accent-dim: #2b3a55;
-  --orchestrator: #f0b54a;
-  --manager: #b08cff;
-  --worker: #4fd1c5;
-  --danger: #f06a6a;
-  --good: #5fd07a;
-  --radius: 10px;
-  font-synthesis: none;
-}
-
 * {
   box-sizing: border-box;
 }

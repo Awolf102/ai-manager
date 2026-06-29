@@ -118,7 +118,7 @@ export default function App() {
         </div>
       )}
       <div className="topbar">
-        <span className="brand">AI Manager</span>
+        <span className="brand">Orkestr</span>
         <span className="project">{graph.project.name}</span>
         <span className="spacer" />
         <AuthPill checking={authChecking} status={auth} onClick={() => void recheckAuth()} />
@@ -362,7 +362,7 @@ function ProjectPicker({ onOpen }: { onOpen: (g: ProjectGraph) => void }) {
   return (
     <div className="picker">
       <div className="picker-card">
-        <h1>AI Manager</h1>
+        <h1>Orkestr</h1>
         <p>Choose a project folder — all your agents will work inside it.</p>
         <button
           className="btn primary"

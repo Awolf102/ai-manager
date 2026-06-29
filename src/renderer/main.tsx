@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client'
 import App from './App'
+import './tokens.css'
 import './styles.css'
 import '@xyflow/react/dist/style.css'
 import '@xterm/xterm/css/xterm.css'
