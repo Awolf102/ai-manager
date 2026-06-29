@@ -273,7 +273,7 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
       setStatus(eng, steps, ask.ownerId, 'error', titles)
     }
     userRequestCount += 1
-    await io.checkpoint({ ...state, ...scrub, tasks: structuredClone(tasks), steps: { ...steps }, userRequestCount, phase: 'executing' })
+    await io.checkpoint({ ...state, ...scrub, tasks: structuredClone(tasks), steps: { ...steps }, userRequestCount, phase: 'executing', ...(io.collectExtras?.() ?? {}) })
   }
 
   // Execute one worker's batch of ready tasks in a single agent call.
@@ -329,7 +329,7 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
       steps[ownerId] = { ...stepBase(ownerId, steps), output: `ERROR: ${msg}` }
       setStatus(eng, steps, ownerId, 'error', titles)
     }
-    await io.checkpoint({ ...state, ...scrub, tasks: structuredClone(tasks), steps: { ...steps }, userRequestCount, phase: 'executing' })
+    await io.checkpoint({ ...state, ...scrub, tasks: structuredClone(tasks), steps: { ...steps }, userRequestCount, phase: 'executing', ...(io.collectExtras?.() ?? {}) })
   }
 
   // Wave loop: each wave runs the still-pending tasks whose dependencies have
@@ -542,7 +542,7 @@ async function repairNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeRe
     steps[ownerId] = { ...stepBase(ownerId, steps), output: tasks[t.task.id].output }
   })
 
-  await io.checkpoint({ ...state, tasks: structuredClone(tasks), steps: { ...steps }, phase: 'repairing' })
+  await io.checkpoint({ ...state, tasks: structuredClone(tasks), steps: { ...steps }, phase: 'repairing', ...(io.collectExtras?.() ?? {}) })
   return { patch: { tasks, steps, phase: 'reviewing', repairAttempts: state.repairAttempts + 1 }, goto: 'domainReview' }
 }
 
