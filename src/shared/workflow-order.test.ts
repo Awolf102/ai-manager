@@ -47,6 +47,15 @@ describe('deriveOrderDeps', () => {
     expect(out.t3).toEqual(['t1']) // only ordered teams chain
     expect(out.t2).toBeUndefined() // unordered team unaffected
   })
+
+  it('never emits a self-dependency when one worker is shared across two ordered teams', () => {
+    // w1 is under BOTH team-1 (order 1) and team-2 (order 2); it owns t1 (in team 2's slot)
+    const edges = [E('o', 'w1', 1), E('o', 'w2', 2), E('o', 'w1', 2)]
+    const out = deriveOrderDeps(edges, 'o', [T('t1', 'w1'), T('t2', 'w2')])
+    for (const [id, deps] of Object.entries(out)) {
+      expect(deps).not.toContain(id) // no task depends on itself
+    }
+  })
 })
 
 describe('applyOrderClick', () => {

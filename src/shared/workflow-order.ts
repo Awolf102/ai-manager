@@ -56,7 +56,10 @@ export function deriveOrderDeps(
   for (let k = 0; k < teamTasks.length; k++) {
     const earlier = [...new Set(teamTasks.slice(0, k).flat())]
     if (earlier.length === 0) continue
-    for (const id of teamTasks[k]) out[id] = earlier
+    for (const id of teamTasks[k]) {
+      const deps = earlier.filter((e) => e !== id) // never depend on yourself (shared-worker across ordered teams)
+      if (deps.length) out[id] = deps
+    }
   }
   return out
 }
