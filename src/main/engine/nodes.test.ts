@@ -10,6 +10,7 @@ import {
   normalizeLessonInput,
   hasManagers,
   reviewerIdsOf,
+  formatUserRequests,
   type Eng,
   type AgentRunner
 } from './nodes'
@@ -1441,5 +1442,31 @@ describe('effortForModel', () => {
   })
   it('passes through unchanged when there is no assigned model (childId null)', () => {
     expect(effortForModel(undefined, 'xhigh', true)).toBe('xhigh')
+  })
+})
+
+describe('formatUserRequests', () => {
+  it('returns empty string when there are no user requests', () => {
+    expect(formatUserRequests({ userRequests: [] } as unknown as RunState)).toBe('')
+    expect(formatUserRequests({} as unknown as RunState)).toBe('')
+  })
+
+  it('summarizes each consultation by asker name + question, marking it resolved', () => {
+    const out = formatUserRequests({
+      userRequests: [{ askerId: 'w1', question: 'Which package manager?' }]
+    } as unknown as RunState)
+    expect(out).toContain('## User consultations during this run')
+    expect(out).toContain('W1') // getAgent('w1').name from the hoisted fake
+    expect(out).toContain('Which package manager?')
+    expect(out).toContain('provided an answer')
+    expect(out).toContain('redacted from this record')
+    expect(out).toContain('resolved') // the directive travels inside the section
+  })
+
+  it('never contains an answer — only the question is an input', () => {
+    const out = formatUserRequests({
+      userRequests: [{ askerId: 'w1', question: 'pick a color' }]
+    } as unknown as RunState)
+    expect(out).not.toContain('teal') // no answer field exists to leak
   })
 })

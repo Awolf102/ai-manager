@@ -673,7 +673,9 @@ async function synthNode(state: RunState, _io: NodeIO, eng: Eng): Promise<NodeRe
   const steps = { ...state.steps }
   setStatus(eng, steps, state.orchestratorId, 'working')
   const owned = ownedTasks(state)
-  const results = owned.length > 0 ? formatResults(state) + formatVerdicts(state) : '(no work was assigned)'
+  const results =
+    (owned.length > 0 ? formatResults(state) + formatVerdicts(state) : '(no work was assigned)') +
+    formatUserRequests(state)
   const final = await synthesizeStep(eng, state.goal, state.actingMode, state.orchestratorId, state.plan, results)
   eng.emit({ runId: eng.runId, type: 'final', text: final })
   setStatus(eng, steps, state.orchestratorId, 'done')
@@ -1219,6 +1221,17 @@ function formatVerdicts(state: RunState): string {
     })
     .filter((l): l is string => l !== null)
   return lines.length ? `\n\n## Review verdicts\n${lines.join('\n')}` : ''
+}
+
+/** Synthesis-visible summary of HITL consultations — questions only (S5-safe; never the answer). */
+export function formatUserRequests(state: RunState): string {
+  const reqs = state.userRequests ?? []
+  if (reqs.length === 0) return ''
+  const lines = reqs.map((r) => {
+    const name = getAgent(r.askerId).name
+    return `- ${name} paused to ask the user: "${r.question}". The user provided an answer, which ${name} incorporated into its work. (The answer itself is redacted from this record.)`
+  })
+  return `\n\n## User consultations during this run\n${lines.join('\n')}\nThese questions were answered by the user during the run and the answers were incorporated — report them as resolved, not as open questions or placeholder assumptions.`
 }
 
 // ---------- prompts (ported verbatim from the original engine) ----------
