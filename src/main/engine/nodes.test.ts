@@ -1429,6 +1429,52 @@ describe('HITL user requests (Stage 3)', () => {
     const resume = calls.find((c) => c.kind === 'resume' && c.agentId === 'w1')
     expect(resume!.prompt).toContain('did not provide an answer')
   })
+
+  it('after resume, synthesis sees the captured reply and acknowledges the answer (no leak)', async () => {
+    h.settings.maxUserRequests = 2
+    let synthPromptSeen = ''
+    let w1Asked = false
+    const runAgent: AgentRunner = async (o) => {
+      const p = o.prompt
+      if (p.includes('Produce a concise, ordered list'))
+        return { text: '```json\n{"tasks":[{"id":"t1","title":"T1","description":"do t1"}]}\n```', sessionId: 's-' + o.agentId }
+      if (p.includes('You route planned tasks'))
+        return { text: '```json\n{"assignments":[{"taskId":"t1","childId":"w1","reason":"r"}]}\n```' }
+      if (p.includes('You have been assigned')) {
+        if (o.agentId === 'w1' && !w1Asked) {
+          w1Asked = true
+          return { text: '```ask\n{"question":"Which package manager?"}\n```', sessionId: 'sess-w1' }
+        }
+        return { text: `worked ${o.agentId}`, sessionId: 's-' + o.agentId }
+      }
+      if (p.includes('The user answered') || p.includes('did not provide an answer'))
+        return { text: 'Installed deps and wrote the CLI per the manager you chose.', sessionId: 's2-w1' }
+      if (p.includes('Judge each task'))
+        return { text: '```json\n{"tasks":[{"taskId":"t1","verdict":"pass","feedback":""}]}\n```' }
+      if (p.includes('final INTEGRATION review'))
+        return { text: '```json\n{"tasks":[{"taskId":"t1","verdict":"pass","feedback":""}]}\n```' }
+      if (p.includes('Reflect on')) return { text: '```json\n{"win":"w","loss":"","lessons":[]}\n```' }
+      if (p.includes('Write a clear final report')) { synthPromptSeen = p; return { text: 'FINAL' } }
+      return { text: 'unknown' }
+    }
+    const e = eng(runAgent)
+    const store = fakeStore()
+    const io = makeIO(e.abort.signal, store)
+    await runGraph(buildOrchestratorGraph(e), seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' }), store, io)
+    const secret = 'pnpm v9 exactly'
+    const final = await resumeGraph(buildOrchestratorGraph(e), 'run1', store, io, secret)
+
+    expect(final.status).toBe('completed')
+    // (a) the resumed reply is captured into the durable task output — NOT the pre-resume ask
+    expect(final.tasks['t1'].output).toContain('Installed deps and wrote the CLI')
+    expect(final.tasks['t1'].output).not.toContain('Which package manager?')
+    // (b) synthesis was handed the consultation section (so it can report it resolved)
+    expect(synthPromptSeen).toContain('## User consultations during this run')
+    expect(synthPromptSeen).toContain('Which package manager?')
+    // (c) the raw answer never reaches synthesis or any persisted state (S5)
+    expect(synthPromptSeen).not.toContain(secret)
+    expect(JSON.stringify(final)).not.toContain(secret)
+  })
 })
 
 describe('effortForModel', () => {
