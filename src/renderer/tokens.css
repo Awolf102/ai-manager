@@ -59,6 +59,11 @@
   --elev-2: 0 8px 24px rgba(0, 0, 0, 0.38);
   --motion-fast: 120ms; --motion: 180ms; --motion-slow: 260ms;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --orchestrator-tint: rgba(240, 181, 74, 0.14);
+  --manager-tint: rgba(142, 162, 240, 0.14);
+  --worker-tint: rgba(79, 209, 197, 0.14);
 
   /* ===== Legacy aliases — map OLD names onto the warm-dark system so the
      existing styles.css re-tints with zero churn. Later cycles migrate
