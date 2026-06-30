@@ -117,9 +117,9 @@ export default function App() {
       .map((f) => window.api.getPathForFile(f))
       .filter((p) => p) // drop non-file items (text/url) whose path is ''
     if (paths.length === 0) return
-    const r = await window.api.addContext(paths)
+    const r = await window.api.addContextPaths(paths)
     setGraph(r.graph)
-    if (r.skipped.length) notify({ kind: 'info', message: `Skipped (not a readable file): ${r.skipped.join(', ')}` })
+    if (r.skipped.length) notify({ kind: 'info', message: `Skipped: ${r.skipped.join(', ')}` })
   }
 
   return (
@@ -130,7 +130,7 @@ export default function App() {
       onDragLeave={onDragLeave}
       onDrop={(e) => void onDrop(e)}
     >
-      {dragDepth > 0 && <div className="ctx-drop-overlay">Drop files to add as project context</div>}
+      {dragDepth > 0 && <div className="ctx-drop-overlay">Drop files or folders to add as project context</div>}
       {resumable.length > 0 && !resumableDismissed && (
         <div className="resume-banner">
           <span>{resumable.length} run{resumable.length > 1 ? 's' : ''} can be resumed.</span>
@@ -155,7 +155,7 @@ export default function App() {
         </button>
         <TeamMenu />
         {graph.linkedTeam && (<span className="team-link" title={`Linked team brain: ${graph.linkedTeam.path}`}><Users size={12} /> {graph.linkedTeam.path.split(/[\\/]/).pop()}</span>)}
-        <button className="btn ctx-btn" title="Project context — files & images for the team" onClick={() => setShowContext(true)}><Paperclip size={14} /> Context{(graph.context?.length ?? 0) > 0 && <span className="ctx-badge">{graph.context!.length}</span>}</button>
+        <button className="btn ctx-btn" title="Project context — files & folders for the team" onClick={() => setShowContext(true)}><Paperclip size={14} /> Context{((graph.context?.length ?? 0) + (graph.contextFolders?.length ?? 0)) > 0 && <span className="ctx-badge">{(graph.context?.length ?? 0) + (graph.contextFolders?.length ?? 0)}</span>}</button>
         <button className="btn" title="Settings" onClick={() => setShowSettings(true)}><SettingsIcon size={14} /> Settings</button>
         <button className="btn primary" onClick={() => setShowAdd(true)}><Plus size={14} /> Add agent</button>
       </div>

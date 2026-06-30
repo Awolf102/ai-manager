@@ -1308,7 +1308,7 @@ button {
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  background: rgba(110, 168, 254, 0.12);
+  background: rgba(221, 153, 187, 0.12);
   border: 3px dashed var(--accent);
   color: var(--text);
   font-size: 18px;
