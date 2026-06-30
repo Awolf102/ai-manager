@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Network, Play, Rocket, Sparkles, Square, Target } from 'lucide-react'
+import { Network, PanelRight, Play, Rocket, Sparkles, Square, Target } from 'lucide-react'
 import { isGoalSubmitKey } from './goalbar-keys'
 import { useStore } from '../store'
 import RoleDraftModal from '../RoleDraftModal'
@@ -7,7 +7,7 @@ import TeamSpawnModal from '../TeamSpawnModal'
 import RunResultModal from './RunResultModal'
 import type { RunManifest, SpawnedMember } from '../../shared/types'
 
-const MAX_GOAL_HEIGHT = 160 // px — ~8 lines, then the textarea scrolls
+const MAX_GOAL_HEIGHT = 360 // px — focused expansion cap (~18 lines), then the textarea scrolls
 
 /** Grow the goal textarea to fit its content, capped at MAX_GOAL_HEIGHT. */
 function autosize(el: HTMLTextAreaElement): void {
@@ -22,7 +22,10 @@ export default function GoalBar() {
   const runId = useStore((s) => s.run.runId)
   const pendingInterrupt = useStore((s) => s.run.pendingInterrupt)
   const beginRun = useStore((s) => s.beginRun)
+  const inspectorCollapsed = useStore((s) => s.layout.inspector.collapsed)
+  const toggleZoneCollapsed = useStore((s) => s.toggleZoneCollapsed)
   const [goal, setGoal] = useState('')
+  const [focused, setFocused] = useState(false)
   const [drafting, setDrafting] = useState(false)
   const [drafts, setDrafts] = useState<{ agentId: string; name: string; role: string; skills?: string[] }[] | null>(null)
   const [spawning, setSpawning] = useState(false)
@@ -95,7 +98,7 @@ export default function GoalBar() {
         : target.name
 
   return (
-    <div className="goalbar">
+    <div className={`goalbar ${focused ? 'goalbar-focus' : ''}`}>
       <textarea
         className="goal-input"
         rows={1}
@@ -103,7 +106,15 @@ export default function GoalBar() {
         value={goal}
         onChange={(e) => {
           setGoal(e.target.value)
+          if (focused) autosize(e.target)
+        }}
+        onFocus={(e) => {
+          setFocused(true)
           autosize(e.target)
+        }}
+        onBlur={(e) => {
+          setFocused(false)
+          e.target.style.height = ''
         }}
         onKeyDown={(e) => {
           if (isGoalSubmitKey(e.key, e.shiftKey)) {
@@ -158,6 +169,11 @@ export default function GoalBar() {
       ) : (
         <button className="btn primary" onClick={() => void start()} disabled={!canRun}>
           <Play size={14} /> Run
+        </button>
+      )}
+      {inspectorCollapsed && (
+        <button className="btn" title="Show the inspector panel" onClick={() => toggleZoneCollapsed('inspector')}>
+          <PanelRight size={14} /> Inspector
         </button>
       )}
       {drafts && <RoleDraftModal drafts={drafts} onClose={() => setDrafts(null)} />}

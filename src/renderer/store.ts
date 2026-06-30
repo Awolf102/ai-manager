@@ -79,6 +79,7 @@ interface AppState {
   run: RunState
   showRunView: boolean
   showHistory: boolean
+  dockOpen: boolean
 
   setGraph: (g: ProjectGraph | null) => void
   patchPositions: (list: { id: string; position: { x: number; y: number } }[]) => void
@@ -86,6 +87,7 @@ interface AppState {
   openTerminal: (agent: AgentNodeData, mode: TerminalMode) => void
   closeTerminal: (id: string) => void
   setActiveDock: (id: string) => void
+  toggleDock: () => void
 
   beginRun: (runId: string, goal: string, orchestratorId: string) => void
   applyOrchestration: (e: OrchestrationEvent) => void
@@ -134,6 +136,7 @@ export const useStore = create<AppState>((set, get) => ({
   run: emptyRun,
   showRunView: false,
   showHistory: false,
+  dockOpen: true,
   resumable: [],
   resumableDismissed: false,
 
@@ -197,7 +200,7 @@ export const useStore = create<AppState>((set, get) => ({
         currentActive: s.activeDockId,
         newTermId: id
       })
-      return { terminals: [...s.terminals, tab], activeDockId }
+      return { terminals: [...s.terminals, tab], activeDockId, dockOpen: true }
     }),
 
   closeTerminal: (id) =>
@@ -209,6 +212,7 @@ export const useStore = create<AppState>((set, get) => ({
     }),
 
   setActiveDock: (id) => set({ activeDockId: id }),
+  toggleDock: () => set((s) => ({ dockOpen: !s.dockOpen })),
 
   beginRun: (runId, goal, orchestratorId) =>
     set({
@@ -222,7 +226,8 @@ export const useStore = create<AppState>((set, get) => ({
         selectedStepId: orchestratorId
       },
       showRunView: true,
-      activeDockId: 'run'
+      activeDockId: 'run',
+      dockOpen: true
     }),
 
   applyOrchestration: (e) =>
@@ -241,7 +246,8 @@ export const useStore = create<AppState>((set, get) => ({
               selectedStepId: e.orchestratorId
             },
             showRunView: true,
-            activeDockId: 'run'
+            activeDockId: 'run',
+            dockOpen: true
           }
         case 'status':
           run.nodeStatus = { ...run.nodeStatus, [e.nodeId]: e.status }
@@ -303,7 +309,7 @@ export const useStore = create<AppState>((set, get) => ({
     }),
   minimizeInterrupt: (v) => set((s) => ({ run: { ...s.run, interruptMinimized: v } })),
   setShowRunView: (v) => set({ showRunView: v }),
-  openHistory: () => set({ showHistory: true, activeDockId: 'history' }),
+  openHistory: () => set({ showHistory: true, activeDockId: 'history', dockOpen: true }),
 
   agentById: (id) => get().graph?.nodes.find((n) => n.id === id),
 
@@ -332,7 +338,8 @@ export const useStore = create<AppState>((set, get) => ({
         resumable: s.resumable.filter((r) => r.runId !== runId),
         showRunView: true,
         showHistory: false,
-        activeDockId: 'run'
+        activeDockId: 'run',
+        dockOpen: true
       }
     }),
   discardResumable: async (runId) => {

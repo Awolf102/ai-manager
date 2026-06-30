@@ -59,7 +59,7 @@ button {
   -webkit-app-region: no-drag;
 }
 
-.body { display: grid; overflow: hidden; height: 100%; }
+.body { display: grid; overflow: hidden; height: 100%; position: relative; }
 .zone-main { display: grid; grid-template-rows: 46px 1fr; overflow: hidden; position: relative; min-width: 0; }
 .zone-inspector { position: relative; border-left: 1px solid var(--hairline); background: var(--surface-1); overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
 .zone-inspector.collapsed, .zone-dock.collapsed { display: none; }
@@ -72,7 +72,6 @@ button {
 .panel-divider-y { left: 0; right: 0; top: 0; height: 6px; margin-top: -3px; cursor: ns-resize; }
 .panel-divider:hover { background: var(--signal-tint); }
 .zone-reopen { position: absolute; z-index: 6; background: var(--surface-2); border: 1px solid var(--hairline-strong); color: var(--fg-muted); border-radius: var(--radius-sm); cursor: pointer; padding: 2px 6px; }
-.reopen-inspector { top: 8px; right: 8px; }
 .reopen-dock { bottom: 8px; right: 8px; }
 
 /* ---------- goal bar ---------- */
@@ -105,6 +104,21 @@ button {
 .goal-input:focus {
   outline: none;
   border-color: var(--accent);
+}
+
+/* Focus-to-expand: the goal box floats over the canvas when focused, and
+   collapses to a single line when blurred. */
+.goalbar-focus {
+  position: relative;
+  z-index: 30;
+}
+.goalbar-focus .goal-input {
+  max-height: 360px;
+  box-shadow: var(--elev-2);
+}
+.goalbar:not(.goalbar-focus) .goal-input {
+  height: 30px;
+  overflow: hidden;
 }
 
 .goal-target {
@@ -155,6 +169,7 @@ button {
 .btn.danger:hover { border-color: var(--state-danger); background: var(--surface-hover); }
 .btn.tiny { padding: 3px 8px; font-size: var(--text-xs); border-radius: var(--radius-sm); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn.active { border-color: var(--signal); background: var(--surface-hover); }
 
 /* ---------- project picker ---------- */
 
@@ -458,6 +473,7 @@ button {
 /* ---------- terminal dock ---------- */
 
 .terminal-dock {
+  height: 100%;
   border-top: 1px solid var(--border);
   background: #0b0c10;
   display: grid;
