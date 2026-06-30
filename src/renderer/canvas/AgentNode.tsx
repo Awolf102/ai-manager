@@ -1,14 +1,15 @@
-import { memo } from 'react'
+import { memo, type CSSProperties } from 'react'
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react'
 import { Play, TerminalSquare } from 'lucide-react'
 import type { AgentNodeData } from '../../shared/types'
 import { iconComponent } from './iconComponents'
 import { useStore } from '../store'
 
-export type AgentFlowNode = Node<{ agent: AgentNodeData }, 'agent'>
+export type AgentFlowNode = Node<{ agent: AgentNodeData; enterDelay?: number }, 'agent'>
 
 function AgentNodeImpl({ data, selected }: NodeProps<AgentFlowNode>) {
   const agent = data.agent
+  const enterDelay = data.enterDelay ?? 0
   const Icon = iconComponent(agent.icon)
   const openTerminal = useStore((s) => s.openTerminal)
   const status = useStore((s) => s.run.nodeStatus[agent.id])
@@ -19,6 +20,7 @@ function AgentNodeImpl({ data, selected }: NodeProps<AgentFlowNode>) {
       className={`agent-node kind-${agent.kind} ${selected ? 'selected' : ''} ${
         active ? `run-${status}` : ''
       }`}
+      style={{ '--enter-delay': `${enterDelay}ms` } as CSSProperties}
     >
       <Handle type="target" position={Position.Top} />
       <div className="agent-node-head">
