@@ -790,12 +790,11 @@ button {
 
 /* ---------- run view ---------- */
 
-.runview {
-  display: grid;
-  grid-template-columns: 230px 1fr;
-  height: 100%;
-  overflow: hidden;
-}
+.runview { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+.run-main { display: grid; grid-template-columns: 230px 1fr; flex: 1; min-height: 0; overflow: hidden; }
+.run-banner { display: flex; align-items: center; gap: var(--space-2); padding: 6px 12px; font-size: var(--text-sm); font-weight: var(--weight-medium); border-bottom: 1px solid var(--hairline); }
+.run-banner.success { background: rgba(111, 208, 138, 0.12); color: var(--state-good); }
+.run-banner.failure { background: rgba(240, 114, 111, 0.12); color: var(--state-danger); }
 
 .run-tree {
   border-right: 1px solid var(--border);
@@ -859,13 +858,7 @@ button {
   padding: 10px 12px;
 }
 
-.run-output {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  padding: 6px 8px;
-  background: #0b0c10;
-}
+.run-output { position: absolute; inset: 0; padding: 6px 8px; background: #0b0c10; }
 
 .run-row-name {
   flex: 1;
@@ -1406,21 +1399,15 @@ button {
 }
 
 /* ---- activity feed ---- */
-.run-right {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
-}
-.activity-feed {
-  flex: 0 0 38%;
-  overflow-y: auto;
-  border-bottom: 1px solid var(--border);
-  background: var(--panel);
-  padding: 4px 0;
-  font-size: 12px;
-}
+.run-right { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; }
+.run-tabs { display: flex; align-items: stretch; border-bottom: 1px solid var(--hairline); background: var(--surface-1); }
+.run-tab { padding: 6px 12px; background: none; border: none; border-right: 1px solid var(--hairline); color: var(--fg-muted); font-size: var(--text-sm); cursor: pointer; }
+.run-tab.active { background: var(--surface-0); color: var(--fg); }
+.run-slots { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+.run-slot { position: absolute; inset: 0; visibility: hidden; overflow: hidden; }
+.run-slot.active { visibility: visible; }
+.run-result { margin: 0; height: 100%; overflow: auto; padding: 12px 14px; white-space: pre-wrap; font-size: var(--text-sm); line-height: var(--lh-normal); color: var(--fg); }
+.activity-feed { height: 100%; overflow-y: auto; background: var(--surface-1); padding: 4px 0; font-size: var(--text-sm); }
 .activity-empty {
   padding: 8px 12px;
   color: var(--muted);

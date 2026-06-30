@@ -5,6 +5,7 @@ import {
   serializeLayout, parseLayout, type LayoutState
 } from './layout'
 import { activeDockAfterOpenTerminal } from './dock'
+import { shouldToastRunEnd, runEndToast } from './run/run-status'
 import type {
   AgentNodeData,
   Assignment,
@@ -291,10 +292,16 @@ export const useStore = create<AppState>((set, get) => ({
         case 'final':
           run.final = e.text
           return { run }
-        case 'run-finished':
+        case 'run-finished': {
           run.running = false
           run.error = e.error
+          if (shouldToastRunEnd({ activeDockId: s.activeDockId, dockOpen: s.dockOpen })) {
+            const t = runEndToast(e.error)
+            const toast: Toast = { id: crypto.randomUUID(), kind: t.kind, message: t.message, createdAt: Date.now() }
+            return { run, toasts: addToast(s.toasts, toast) }
+          }
           return { run }
+        }
         default:
           return {}
       }
