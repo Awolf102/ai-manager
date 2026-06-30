@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Clock, CloudDownload, CloudUpload, Download, FolderOpen, Paperclip, Plus, Settings as SettingsIcon, Upload, Users } from 'lucide-react'
+import { CircleHelp, Clock, FolderOpen, Paperclip, Plus, Settings as SettingsIcon, Users } from 'lucide-react'
 import { useStore } from './store'
-import { buildImportConfirmBody } from './import-confirm'
+import TeamMenu from './TeamMenu'
+import FaqModal from './FaqModal'
 import OrgChart from './canvas/OrgChart'
 import AgentConfigPanel from './panels/AgentConfigPanel'
 import RoleMemoryEditor from './panels/RoleMemoryEditor'
@@ -14,6 +15,8 @@ import ContextModal from './ContextModal'
 import HitlModal from './HitlModal'
 import ConfirmDialog from './ConfirmDialog'
 import ToastViewport from './ToastViewport'
+import PanelDivider from './PanelDivider'
+import { computeBodyGrid } from './layout'
 import { AGENT_KINDS } from '../shared/types'
 import type { AgentKind, AuthStatus, ProjectGraph, ProjectMeta } from '../shared/types'
 
@@ -26,6 +29,7 @@ export default function App() {
   const closeTerminal = useStore((s) => s.closeTerminal)
   const selectedId = useStore((s) => s.selectedAgentId)
   const showRunView = useStore((s) => s.showRunView)
+  const runRunning = useStore((s) => s.run.running)
   const showHistory = useStore((s) => s.showHistory)
   const openHistory = useStore((s) => s.openHistory)
   const applyOrchestration = useStore((s) => s.applyOrchestration)
@@ -35,9 +39,15 @@ export default function App() {
   const resumableDismissed = useStore((s) => s.resumableDismissed)
   const refreshResumable = useStore((s) => s.refreshResumable)
   const dismissResumableBanner = useStore((s) => s.dismissResumableBanner)
+  const layout = useStore((s) => s.layout)
+  const loadLayout = useStore((s) => s.loadLayout)
+  const setZoneSize = useStore((s) => s.setZoneSize)
+  const toggleZoneCollapsed = useStore((s) => s.toggleZoneCollapsed)
+  const setZonePlacement = useStore((s) => s.setZonePlacement)
   const [showAdd, setShowAdd] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showContext, setShowContext] = useState(false)
+  const [showFaq, setShowFaq] = useState(false)
   const [dragDepth, setDragDepth] = useState(0)
 
   const [auth, setAuth] = useState<AuthStatus | null>(null)
@@ -56,6 +66,9 @@ export default function App() {
   useEffect(() => {
     void recheckAuth()
   }, [recheckAuth])
+  useEffect(() => {
+    if (graph?.project.path) loadLayout(graph.project.path)
+  }, [graph?.project.path, loadLayout])
 
   const authBanner =
     !authChecking && auth && auth.state !== 'ok' ? (
@@ -77,6 +90,7 @@ export default function App() {
   }
 
   const showDock = terminals.length > 0 || showRunView || showHistory
+  const grid = computeBodyGrid(layout)
 
   const hasFiles = (e: React.DragEvent): boolean => Array.from(e.dataTransfer.types).includes('Files')
   const onDragEnter = (e: React.DragEvent): void => {
@@ -120,115 +134,69 @@ export default function App() {
         </div>
       )}
       <div className="topbar">
+        <button className="btn faq-btn" title="How to prompt" onClick={() => setShowFaq(true)}><CircleHelp size={15} /></button>
         <span className="brand">Orkestr</span>
         <span className="project">{graph.project.name}</span>
         <span className="spacer" />
         <AuthPill checking={authChecking} status={auth} onClick={() => void recheckAuth()} />
-        <button
-          className="btn"
-          onClick={async () => {
-            const g = await window.api.pickProjectFolder()
-            if (g) { setGraph(g); void refreshResumable(true) }
-          }}
-        >
-          <FolderOpen size={14} /> Switch project
-        </button>
-        <button className="btn" title="Run history" onClick={() => openHistory()}>
-          <Clock size={14} />
-          {resumable.length > 0 && <span className="resume-badge">{resumable.length}</span>}
-        </button>
-        <button
-          className="btn"
-          title="Export team to a file"
-          onClick={async () => {
-            await window.api.exportTeam()
-          }}
-        >
-          <Upload size={14} />
-        </button>
-        <button
-          className="btn"
-          title="Import a team into this project"
-          onClick={async () => {
-            const r = await window.api.importTeamPreview()
-            if (r.status === 'canceled') return
-            if (r.status === 'error') { notify({ kind: 'error', message: r.error }); return }
-            const ok = await requestConfirm({
-              title: 'Import this team?',
-              body: buildImportConfirmBody(r.preview),
-              confirmLabel: 'Import',
-              danger: false
-            })
-            if (!ok) return
-            const a = await window.api.importTeamApply(r.bundle, r.path)
-            if ('graph' in a && a.graph) setGraph(a.graph)
-            else if ('error' in a && a.error) notify({ kind: 'error', message: a.error })
-          }}
-        >
-          <Download size={14} />
-        </button>
-        {graph.linkedTeam && (
-          <span className="team-link" title={`Linked team brain: ${graph.linkedTeam.path}`}>
-            <Users size={12} /> {graph.linkedTeam.path.split(/[\\/]/).pop()}
-          </span>
-        )}
-        <button
-          className="btn"
-          title="Sync this project's portable lessons to the team brain"
-          onClick={async () => {
-            const r = await window.api.syncToTeam()
-            if (r.synced && r.graph) setGraph(r.graph)
-          }}
-        >
-          <CloudUpload size={14} />
-        </button>
-        <button
-          className="btn"
-          title="Refresh this project's agents from the team brain"
-          onClick={async () => {
-            const r = await window.api.refreshFromTeam()
-            if (r.refreshed && r.graph) {
-              setGraph(r.graph)
-              notify({ kind: 'success', message: `Updated ${r.updated} agent(s) from the team brain.` })
-            } else if (r.error) {
-              notify({ kind: 'error', message: r.error })
-            }
-          }}
-        >
-          <CloudDownload size={14} />
-        </button>
-        <button
-          className="btn ctx-btn"
-          title="Project context — files & images for the team"
-          onClick={() => setShowContext(true)}
-        >
-          <Paperclip size={14} />
-          {(graph.context?.length ?? 0) > 0 && <span className="ctx-badge">{graph.context!.length}</span>}
-        </button>
-        <button className="btn" title="Settings" onClick={() => setShowSettings(true)}>
-          <SettingsIcon size={14} />
-        </button>
-        <button className="btn primary" onClick={() => setShowAdd(true)}>
-          <Plus size={14} /> Add agent
-        </button>
+        <button className="btn" onClick={async () => { const g = await window.api.pickProjectFolder(); if (g) { setGraph(g); void refreshResumable(true) } }}><FolderOpen size={14} /> Switch project</button>
+        <button className="btn" title="Run history" onClick={() => openHistory()}><Clock size={14} /> History{resumable.length > 0 && <span className="resume-badge">{resumable.length}</span>}</button>
+        <TeamMenu />
+        {graph.linkedTeam && (<span className="team-link" title={`Linked team brain: ${graph.linkedTeam.path}`}><Users size={12} /> {graph.linkedTeam.path.split(/[\\/]/).pop()}</span>)}
+        <button className="btn ctx-btn" title="Project context — files & images for the team" onClick={() => setShowContext(true)}><Paperclip size={14} /> Context{(graph.context?.length ?? 0) > 0 && <span className="ctx-badge">{graph.context!.length}</span>}</button>
+        <button className="btn" title="Settings" onClick={() => setShowSettings(true)}><SettingsIcon size={14} /> Settings</button>
+        <button className="btn primary" onClick={() => setShowAdd(true)}><Plus size={14} /> Add agent</button>
       </div>
 
-      <div className="body">
-        <div className={`main ${showDock ? 'has-dock' : ''}`}>
+      <div
+        className="body"
+        style={{ gridTemplateColumns: grid.columns, gridTemplateRows: grid.rows, gridTemplateAreas: grid.areas }}
+      >
+        <div className="zone-main" style={{ gridArea: 'main' }}>
           <GoalBar />
-          <div className="canvas-wrap">
-            <OrgChart />
-          </div>
+          <div className="canvas-wrap"><OrgChart /></div>
+        </div>
 
-          {showDock && (
+        <div className={`zone-inspector ${layout.inspector.collapsed ? 'collapsed' : ''}`} style={{ gridArea: 'inspector' }}>
+          {!layout.inspector.collapsed && (
+            <PanelDivider
+              axis="x"
+              invert={layout.inspector.placement === 'right'}
+              getStart={() => layout.inspector.size}
+              onResize={(px) => setZoneSize('inspector', px, window.innerHeight)}
+            />
+          )}
+          <div className="zone-head">
+            <span>Inspector</span>
+            <span className="spacer" />
+            <button className="btn tiny" title="Move left/right" onClick={() => setZonePlacement('inspector', layout.inspector.placement === 'right' ? 'left' : 'right')}>⇄</button>
+            <button className="btn tiny" title="Collapse" onClick={() => toggleZoneCollapsed('inspector')}>×</button>
+          </div>
+          <div className="zone-body">
+            {selectedId ? (<><AgentConfigPanel /><RoleMemoryEditor /></>) : (
+              <div className="empty-hint">Select an agent to edit its role, memory, and settings.<br /><br />Drag from the <b>bottom</b> of one node to the <b>top</b> of another to make it <b>delegate</b> work down the chain.</div>
+            )}
+          </div>
+        </div>
+
+        {showDock && (
+          <div className={`zone-dock ${layout.dock.collapsed ? 'collapsed' : ''}`} style={{ gridArea: 'dock' }}>
+            {!layout.dock.collapsed && (
+              <PanelDivider
+                axis={layout.dock.placement === 'right' ? 'x' : 'y'}
+                invert={true}
+                getStart={() => layout.dock.size}
+                onResize={(px) => setZoneSize('dock', px, window.innerHeight)}
+              />
+            )}
             <div className="terminal-dock">
               <div className="term-tabs">
                 {showRunView && (
                   <div
-                    className={`term-tab mode-run ${activeDockId === 'run' ? 'active' : ''}`}
+                    className={`term-tab mode-run ${activeDockId === 'run' ? 'active' : ''} ${runRunning ? 'running' : ''}`}
                     onClick={() => setActiveDock('run')}
                   >
-                    <span className="dot" /> Run
+                    <span className="dot" /> Run{runRunning && <span className="run-live" title="Run in progress">● running</span>}
                   </div>
                 )}
                 {showHistory && (
@@ -276,30 +244,22 @@ export default function App() {
                 ))}
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
-        <div className="sidepanel">
-          {selectedId ? (
-            <>
-              <AgentConfigPanel />
-              <RoleMemoryEditor />
-            </>
-          ) : (
-            <div className="empty-hint">
-              Select an agent to edit its role, memory, and settings.
-              <br />
-              <br />
-              Drag from the <b>bottom</b> of one node to the <b>top</b> of another to make it{' '}
-              <b>delegate</b> work down the chain. Then give the Orchestrator a goal up top.
-            </div>
-          )}
-        </div>
+        {/* collapsed re-open affordances */}
+        {layout.inspector.collapsed && (
+          <button className="zone-reopen reopen-inspector" onClick={() => toggleZoneCollapsed('inspector')} title="Show inspector">‹</button>
+        )}
+        {showDock && layout.dock.collapsed && (
+          <button className="zone-reopen reopen-dock" onClick={() => toggleZoneCollapsed('dock')} title="Show dock">▴</button>
+        )}
       </div>
 
       {showAdd && <AddAgentModal onClose={() => setShowAdd(false)} onCreated={setGraph} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showContext && <ContextModal onClose={() => setShowContext(false)} />}
+      {showFaq && <FaqModal onClose={() => setShowFaq(false)} />}
       <HitlModal />
       <ConfirmDialog />
       <ToastViewport />

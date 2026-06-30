@@ -72,7 +72,7 @@ export default function RunResultModal({
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
-        <h2>Run result</h2>
+        <h2>Launch app</h2>
         {launchable ? (
           <>
             <div className="field">
