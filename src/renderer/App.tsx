@@ -134,7 +134,7 @@ export default function App() {
         </div>
       )}
       <div className="topbar">
-        <button className="btn icon faq-btn" title="How to prompt" onClick={() => setShowFaq(true)}><CircleHelp size={15} /></button>
+        <button className="btn faq-btn" title="How to prompt" onClick={() => setShowFaq(true)}><CircleHelp size={15} /></button>
         <span className="brand">Orkestr</span>
         <span className="project">{graph.project.name}</span>
         <span className="spacer" />
