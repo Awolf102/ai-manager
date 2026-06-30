@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ReactFlow,
   Background,
@@ -14,6 +14,7 @@ import {
 import AgentNode, { type AgentFlowNode } from './AgentNode'
 import { useStore } from '../store'
 import { applyOrderClick } from '../../shared/workflow-order'
+import { octopusLayout } from '../../shared/octopus-layout'
 import type { GraphEdge, ProjectGraph } from '../../shared/types'
 
 const nodeTypes: NodeTypes = { agent: AgentNode }
@@ -73,6 +74,39 @@ export default function OrgChart() {
     setEdges(toEdges(graph))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [edgeSig])
+
+  const applyLayout = useCallback(() => {
+    const positioned = octopusLayout(
+      graph.nodes.map((n) => ({ id: n.id, kind: n.kind })),
+      graph.edges.map((e) => ({ source: e.source, target: e.target, kind: e.kind, order: e.order }))
+    )
+    const posById = new Map(positioned.map((p) => [p.id, p.position]))
+    setNodes((prev) => prev.map((n) => (posById.has(n.id) ? { ...n, position: posById.get(n.id)! } : n)))
+    patchPositions(positioned)
+    void window.api.setNodePositions(positioned)
+  }, [graph.nodes, graph.edges, setNodes, patchPositions])
+
+  // Structure = node ids+kinds + the report edges (handoff edges & positions excluded).
+  const structSig = useMemo(
+    () =>
+      graph.nodes.map((n) => `${n.id}:${n.kind}`).sort().join('|') +
+      '#' +
+      graph.edges
+        .filter((e) => e.kind !== 'handoff')
+        .map((e) => `${e.source}>${e.target}`)
+        .sort()
+        .join('|'),
+    [graph.nodes, graph.edges]
+  )
+  const mounted = useRef(false)
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true
+      return // respect saved positions on first load
+    }
+    applyLayout()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [structSig])
 
   const persistEdges = useCallback(
     async (next: GraphEdge[]) => {
@@ -189,6 +223,9 @@ export default function OrgChart() {
         </Panel>
       )}
       <Panel position="top-right">
+        <button className="btn" onClick={applyLayout} title="Auto-arrange the team into a tidy hierarchy">
+          Tidy
+        </button>
         <button
           className={`btn order-toggle ${orderMode ? 'active' : ''}`}
           onClick={() => setOrderMode((v) => !v)}
