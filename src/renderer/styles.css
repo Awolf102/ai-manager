@@ -233,15 +233,16 @@ button {
 /* ---------- agent node ---------- */
 
 .agent-node {
-  width: 190px;
-  background: var(--panel);
-  border: 1px solid var(--border-strong);
-  border-left: 3px solid var(--border-strong);
+  width: 200px;
+  background: var(--surface-2);
+  border: 1px solid var(--hairline-strong);
+  border-left: 3px solid var(--hairline-strong);
   border-radius: var(--radius);
-  padding: 10px 11px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-  transition: border-color 0.12s;
+  padding: var(--space-4) var(--space-4);
+  box-shadow: var(--elev-1);
+  transition: border-color var(--motion-fast) var(--ease-standard), box-shadow var(--motion-fast) var(--ease-standard);
 }
+.agent-node:hover { box-shadow: var(--elev-2); }
 
 .agent-node.kind-orchestrator {
   border-left-color: var(--orchestrator);
@@ -253,9 +254,7 @@ button {
   border-left-color: var(--worker);
 }
 
-.agent-node.selected {
-  border-color: var(--accent);
-}
+.agent-node.selected { border-color: var(--signal); box-shadow: 0 0 0 1px var(--signal); }
 
 .agent-node-head {
   display: flex;
@@ -264,14 +263,8 @@ button {
 }
 
 .agent-icon {
-  width: 30px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  border-radius: 8px;
-  background: var(--panel-2);
-  border: 1px solid var(--border);
-  flex: none;
+  width: 30px; height: 30px; display: grid; place-items: center;
+  border-radius: var(--radius-sm); background: var(--surface-1); border: 1px solid var(--hairline); flex: none;
 }
 
 .kind-orchestrator .agent-icon {
@@ -295,36 +288,15 @@ button {
   text-overflow: ellipsis;
 }
 
-.agent-kind {
-  font-size: 10.5px;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
+.agent-kind { font-size: var(--text-xs); color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.5px; }
 
-.agent-node-actions {
-  display: flex;
-  gap: 6px;
-  margin-top: 9px;
-}
-
+.agent-node-actions { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
 .agent-node-actions button {
-  flex: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  font-size: 11px;
-  padding: 4px 6px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--panel-2);
-  color: var(--text);
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  font-size: var(--text-xs); padding: 4px 6px; border-radius: var(--radius-sm);
+  border: 1px solid var(--hairline-strong); background: var(--surface-1); color: var(--fg);
 }
-
-.agent-node-actions button:hover {
-  border-color: var(--accent);
-}
+.agent-node-actions button:hover { border-color: var(--signal); background: var(--surface-hover); }
 
 .react-flow__handle {
   width: 8px;
@@ -1361,7 +1333,7 @@ button {
 }
 .react-flow__edge.edge-handoff .react-flow__edge-path {
   stroke: #d6a44c;
-  stroke-dasharray: 6 4;
+  stroke-width: 2;
 }
 
 /* ---- human-in-the-loop modal ---- */
@@ -1511,3 +1483,32 @@ button {
 .faq-body p { margin: 0 0 10px; }
 .faq-btn { padding: 5px; }
 .term-tab.running .dot { background: var(--state-good); }
+
+/* ---- canvas edge: report edges dashed ---- */
+.react-flow__edge:not(.edge-handoff) .react-flow__edge-path { stroke-dasharray: 5 4; }
+
+/* ---- canvas legend ---- */
+.canvas-legend {
+  display: flex; flex-direction: column; gap: var(--space-1);
+  background: var(--surface-1); border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm); padding: 8px 10px;
+  font-size: var(--text-xs); color: var(--fg-muted);
+}
+.canvas-legend .legend-row { display: flex; align-items: center; gap: var(--space-2); }
+.legend-line { width: 22px; height: 0; }
+.legend-line.report { border-top: 2px dashed var(--fg-dim); }
+.legend-line.handoff { border-top: 2px solid #d6a44c; }
+.legend-badge {
+  display: inline-grid; place-items: center; width: 16px; height: 16px;
+  border-radius: var(--radius-pill); background: var(--signal-tint); color: var(--signal);
+  font-size: 10px;
+}
+.legend-hint { color: var(--fg-dim); margin-top: 2px; }
+.coachmarks {
+  max-width: 360px; background: var(--surface-2); border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-lg); box-shadow: var(--elev-2); padding: 14px 16px; margin-top: 8px;
+  color: var(--fg); font-size: var(--text-sm);
+}
+.coachmarks h3 { margin: 0 0 8px; font-size: var(--text-md); }
+.coachmarks ul { margin: 0 0 12px; padding-left: 18px; line-height: var(--lh-normal); }
+.coachmarks li { margin-bottom: 6px; }
