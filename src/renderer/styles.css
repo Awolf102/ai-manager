@@ -1512,3 +1512,20 @@ button {
 .coachmarks h3 { margin: 0 0 8px; font-size: var(--text-md); }
 .coachmarks ul { margin: 0 0 12px; padding-left: 18px; line-height: var(--lh-normal); }
 .coachmarks li { margin-bottom: 6px; }
+
+/* ---- recent prompts picker ---- */
+.recent-menu { position: relative; display: inline-flex; }
+.recent-list {
+  position: absolute; top: 100%; left: 0; margin-top: 4px;
+  background: var(--surface-2); border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius); box-shadow: var(--elev-2); padding: 4px;
+  display: flex; flex-direction: column; min-width: 240px; max-width: 360px;
+  max-height: 320px; overflow-y: auto; z-index: 60;
+}
+.recent-item {
+  display: block; width: 100%; padding: 7px 10px; background: none; border: none;
+  color: var(--fg); font-size: var(--text-sm); border-radius: var(--radius-sm);
+  text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.recent-item:hover { background: var(--surface-hover); }
+.recent-empty { padding: 8px 10px; color: var(--fg-dim); font-size: var(--text-sm); }
