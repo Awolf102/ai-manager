@@ -59,4 +59,34 @@ describe('octopusLayout', () => {
     const orph = r.find((p) => p.id === 'ORPH')!.position
     expect(Number.isFinite(orph.x) && Number.isFinite(orph.y)).toBe(true)
   })
+  it('terminates on a report-edge cycle (no infinite recursion)', () => {
+    const cyc: LayoutNode[] = [
+      { id: 'A', kind: 'manager' },
+      { id: 'B', kind: 'worker' }
+    ]
+    const cycEdges: LayoutEdge[] = [
+      { source: 'A', target: 'B' },
+      { source: 'B', target: 'A' }
+    ]
+    const r = octopusLayout(cyc, cycEdges)
+    expect(r).toHaveLength(2)
+    expect(r.every((p) => Number.isFinite(p.position.x) && Number.isFinite(p.position.y))).toBe(true)
+  })
+  it('places a node with two report parents only once (no NaN)', () => {
+    const dag: LayoutNode[] = [
+      { id: 'O', kind: 'orchestrator' },
+      { id: 'M1', kind: 'manager' },
+      { id: 'M2', kind: 'manager' },
+      { id: 'W', kind: 'worker' }
+    ]
+    const dagEdges: LayoutEdge[] = [
+      { source: 'O', target: 'M1' },
+      { source: 'O', target: 'M2' },
+      { source: 'M1', target: 'W' },
+      { source: 'M2', target: 'W' }
+    ]
+    const r = octopusLayout(dag, dagEdges)
+    expect(r).toHaveLength(4)
+    expect(r.every((p) => Number.isFinite(p.position.x) && Number.isFinite(p.position.y))).toBe(true)
+  })
 })

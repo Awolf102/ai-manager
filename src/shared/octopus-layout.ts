@@ -25,7 +25,7 @@ export function octopusLayout(nodes: LayoutNode[], edges: LayoutEdge[]): Positio
   const idSet = new Set(ids)
   const kindOf = new Map(nodes.map((n) => [n.id, n.kind]))
 
-  // report children only; ordered by `order` (nulls last) then input order
+  // report children only (handoff ignored); ordered by `order` (nulls last) then input order
   const childrenOf = new Map<string, string[]>()
   const hasParent = new Set<string>()
   edges
@@ -37,7 +37,27 @@ export function octopusLayout(nodes: LayoutNode[], edges: LayoutEdge[]): Positio
       childrenOf.get(e.source)!.push(e.target)
       hasParent.add(e.target)
     })
-  const children = (id: string): string[] => childrenOf.get(id) ?? []
+
+  const roots = ids.filter((id) => !hasParent.has(id))
+
+  // Reduce the report graph to a forest: each node is kept under its first-seen
+  // parent only. This drops cycle back-edges and second parents so the recursive
+  // layout below can never re-enter a node (no infinite recursion / double-place).
+  // Nodes left unreachable (e.g. a pure A<->B cycle with no root) fall to the
+  // defensive trailing row at the end.
+  const treeChildren = new Map<string, string[]>()
+  const seen = new Set<string>(roots)
+  const buildTree = (id: string): void => {
+    for (const c of childrenOf.get(id) ?? []) {
+      if (seen.has(c)) continue
+      seen.add(c)
+      if (!treeChildren.has(id)) treeChildren.set(id, [])
+      treeChildren.get(id)!.push(c)
+      buildTree(c)
+    }
+  }
+  for (const r of roots) buildTree(r)
+  const children = (id: string): string[] => treeChildren.get(id) ?? []
 
   const pos = new Map<string, { x: number; y: number }>()
   let leafCursor = 0
@@ -64,7 +84,6 @@ export function octopusLayout(nodes: LayoutNode[], edges: LayoutEdge[]): Positio
     return { minX, maxX }
   }
 
-  const roots = ids.filter((id) => !hasParent.has(id))
   const primary = roots.find((id) => kindOf.get(id) === 'orchestrator') ?? roots[0] ?? null
 
   if (primary) {
@@ -94,7 +113,7 @@ export function octopusLayout(nodes: LayoutNode[], edges: LayoutEdge[]): Positio
     if (r === primary || pos.has(r)) continue
     place(r, 0, 0)
   }
-  // defensive: anything still unplaced → trailing slot
+  // defensive: anything still unplaced (orphans, pure-cycle nodes) → trailing slot
   for (const id of ids) {
     if (pos.has(id)) continue
     pos.set(id, { x: leafCursor * SLOT, y: ROW_GAP })
