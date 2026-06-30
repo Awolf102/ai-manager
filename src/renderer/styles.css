@@ -136,7 +136,7 @@ button {
   position: relative;
   overflow: hidden;
   background:
-    radial-gradient(circle at 1px 1px, #1d2230 1px, transparent 0) 0 0 / 22px 22px;
+    radial-gradient(circle at 1px 1px, var(--canvas-dot) 1px, transparent 0) 0 0 / 22px 22px;
 }
 
 /* .sidepanel removed — replaced by .zone-inspector */
@@ -154,8 +154,10 @@ button {
   color: var(--fg);
   font-size: var(--text-sm);
   transition: border-color var(--motion-fast) var(--ease-standard),
-              background var(--motion-fast) var(--ease-standard);
+              background var(--motion-fast) var(--ease-standard),
+              transform var(--motion-fast) var(--ease-out);
 }
+.btn:active { transform: scale(0.97); }
 .btn:hover { border-color: var(--signal); background: var(--surface-hover); }
 .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
 .btn.primary {
@@ -232,6 +234,11 @@ button {
 
 /* ---------- agent node ---------- */
 
+@keyframes agent-enter {
+  from { opacity: 0; transform: translateY(6px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 .agent-node {
   width: 200px;
   background: var(--surface-2);
@@ -240,9 +247,13 @@ button {
   border-radius: var(--radius);
   padding: var(--space-4) var(--space-4);
   box-shadow: var(--elev-1);
-  transition: border-color var(--motion-fast) var(--ease-standard), box-shadow var(--motion-fast) var(--ease-standard);
+  transition: border-color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion) var(--ease-out),
+    transform var(--motion) var(--ease-out);
+  animation: agent-enter var(--motion-slow) var(--ease-out) backwards;
+  animation-delay: var(--enter-delay, 0ms);
 }
-.agent-node:hover { box-shadow: var(--elev-2); }
+.agent-node:hover { box-shadow: var(--elev-2); transform: translateY(-2px); }
 
 .agent-node.kind-orchestrator {
   border-left-color: var(--orchestrator);
@@ -254,7 +265,11 @@ button {
   border-left-color: var(--worker);
 }
 
-.agent-node.selected { border-color: var(--signal); box-shadow: 0 0 0 1px var(--signal); }
+.agent-node.selected {
+  border-color: var(--signal);
+  box-shadow: 0 0 0 1px var(--signal), var(--elev-2);
+  transform: translateY(-2px);
+}
 
 .agent-node-head {
   display: flex;
@@ -267,15 +282,9 @@ button {
   border-radius: var(--radius-sm); background: var(--surface-1); border: 1px solid var(--hairline); flex: none;
 }
 
-.kind-orchestrator .agent-icon {
-  color: var(--orchestrator);
-}
-.kind-manager .agent-icon {
-  color: var(--manager);
-}
-.kind-worker .agent-icon {
-  color: var(--worker);
-}
+.kind-orchestrator .agent-icon { color: var(--orchestrator); background: var(--orchestrator-tint); }
+.kind-manager .agent-icon { color: var(--manager); background: var(--manager-tint); }
+.kind-worker .agent-icon { color: var(--worker); background: var(--worker-tint); }
 
 .agent-meta {
   min-width: 0;
@@ -295,8 +304,12 @@ button {
   flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 4px;
   font-size: var(--text-xs); padding: 4px 6px; border-radius: var(--radius-sm);
   border: 1px solid var(--hairline-strong); background: var(--surface-1); color: var(--fg);
+  transition: transform var(--motion-fast) var(--ease-out),
+    border-color var(--motion-fast) var(--ease-standard),
+    background var(--motion-fast) var(--ease-standard);
 }
 .agent-node-actions button:hover { border-color: var(--signal); background: var(--surface-hover); }
+.agent-node-actions button:active { transform: scale(0.97); }
 
 .react-flow__handle {
   width: 8px;
@@ -729,7 +742,7 @@ button {
   box-shadow:
     0 0 0 1px var(--accent),
     0 6px 18px rgba(0, 0, 0, 0.35);
-  animation: pulse 1.4s ease-in-out infinite;
+  animation: pulse 1.6s ease-in-out infinite;
 }
 
 .agent-node.run-done {
@@ -743,16 +756,11 @@ button {
 }
 
 @keyframes pulse {
-  0%,
-  100% {
-    box-shadow:
-      0 0 0 1px var(--accent),
-      0 6px 18px rgba(0, 0, 0, 0.35);
+  0%, 100% {
+    box-shadow: 0 0 0 1px var(--accent), 0 6px 18px rgba(0, 0, 0, 0.35);
   }
   50% {
-    box-shadow:
-      0 0 0 3px var(--accent-dim),
-      0 6px 18px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 0 0 4px var(--accent-dim), 0 8px 22px rgba(0, 0, 0, 0.38);
   }
 }
 
@@ -1830,4 +1838,25 @@ button {
 .gated-count {
   font-size: 12px;
   color: var(--muted);
+}
+
+/* ---- Canvas: glide on tidy/auto-layout (gated so dragging stays instant) ---- */
+.org-tidying .react-flow__node { transition: transform 320ms var(--ease-in-out); }
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-node {
+    animation: none;
+    transition: border-color var(--motion-fast) var(--ease-standard),
+      box-shadow var(--motion-fast) var(--ease-standard);
+  }
+  .agent-node:hover,
+  .agent-node.selected { transform: none; }
+  .org-tidying .react-flow__node { transition: none; }
+  .agent-node-actions button:active,
+  .btn:active { transform: none; }
+  .agent-node.run-planning,
+  .agent-node.run-assigning,
+  .agent-node.run-working,
+  .agent-node.run-reviewing,
+  .agent-node.run-reflecting { animation: none; }
 }

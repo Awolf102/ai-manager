@@ -16,17 +16,19 @@ import CanvasLegend from './CanvasLegend'
 import CoachMarks from './CoachMarks'
 import { useStore } from '../store'
 import { applyOrderClick } from '../../shared/workflow-order'
+import { entranceDelays } from '../../shared/canvas-motion'
 import { octopusLayout } from '../../shared/octopus-layout'
 import type { GraphEdge, ProjectGraph } from '../../shared/types'
 
 const nodeTypes: NodeTypes = { agent: AgentNode }
 
 function toNodes(graph: ProjectGraph): AgentFlowNode[] {
+  const delays = entranceDelays(graph.nodes, graph.edges)
   return graph.nodes.map((a) => ({
     id: a.id,
     type: 'agent',
     position: a.position,
-    data: { agent: a }
+    data: { agent: a, enterDelay: delays[a.id] ?? 0 }
   }))
 }
 
@@ -86,6 +88,9 @@ export default function OrgChart() {
     setNodes((prev) => prev.map((n) => (posById.has(n.id) ? { ...n, position: posById.get(n.id)! } : n)))
     patchPositions(positioned)
     void window.api.setNodePositions(positioned)
+    setTidying(true)
+    clearTimeout(tidyTimer.current)
+    tidyTimer.current = setTimeout(() => setTidying(false), 360)
   }, [graph.nodes, graph.edges, setNodes, patchPositions])
 
   // Structure = node ids+kinds + the report edges (handoff edges & positions excluded).
@@ -167,6 +172,10 @@ export default function OrgChart() {
     void window.api.setNodePositions(positions)
   }, [nodes, patchPositions])
 
+  const [tidying, setTidying] = useState(false)
+  const tidyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  useEffect(() => () => clearTimeout(tidyTimer.current), [])
+
   const [orderMode, setOrderMode] = useState(false)
   const orchIds = useMemo(
     () => new Set(graph.nodes.filter((n) => n.kind === 'orchestrator').map((n) => n.id)),
@@ -208,6 +217,7 @@ export default function OrgChart() {
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
+      className={tidying ? 'org-tidying' : undefined}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
@@ -244,7 +254,8 @@ export default function OrgChart() {
           {orderMode ? 'Ordering — click edges in run order' : 'Order'}
         </button>
       </Panel>
-      <Background gap={22} color="#1d2230" />
+      {/* color mirrors --canvas-dot in tokens.css (React Flow can't read CSS vars) */}
+      <Background gap={22} color="#322A4D" />
       <Controls showInteractive={false} />
       <Panel position="bottom-left"><CanvasLegend /></Panel>
       <Panel position="top-center"><CoachMarks /></Panel>
