@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { CircleHelp, Clock, FolderOpen, Paperclip, Plus, Settings as SettingsIcon, Users } from 'lucide-react'
+import { CircleHelp, Clock, FolderOpen, Paperclip, Plus, Settings as SettingsIcon, Terminal, Users } from 'lucide-react'
 import { useStore } from './store'
 import TeamMenu from './TeamMenu'
 import FaqModal from './FaqModal'
@@ -29,6 +29,8 @@ export default function App() {
   const closeTerminal = useStore((s) => s.closeTerminal)
   const selectedId = useStore((s) => s.selectedAgentId)
   const showRunView = useStore((s) => s.showRunView)
+  const dockOpen = useStore((s) => s.dockOpen)
+  const toggleDock = useStore((s) => s.toggleDock)
   const runRunning = useStore((s) => s.run.running)
   const showHistory = useStore((s) => s.showHistory)
   const openHistory = useStore((s) => s.openHistory)
@@ -89,8 +91,11 @@ export default function App() {
     )
   }
 
-  const showDock = terminals.length > 0 || showRunView || showHistory
-  const grid = computeBodyGrid(layout)
+  const dockHasContent = terminals.length > 0 || showRunView || showHistory
+  const showDock = dockOpen && dockHasContent
+  // The grid must not reserve the dock's track when the dock isn't shown,
+  // otherwise an empty strip remains at the bottom. Treat it as collapsed.
+  const grid = computeBodyGrid({ ...layout, dock: { ...layout.dock, collapsed: layout.dock.collapsed || !showDock } })
 
   const hasFiles = (e: React.DragEvent): boolean => Array.from(e.dataTransfer.types).includes('Files')
   const onDragEnter = (e: React.DragEvent): void => {
@@ -141,6 +146,13 @@ export default function App() {
         <AuthPill checking={authChecking} status={auth} onClick={() => void recheckAuth()} />
         <button className="btn" onClick={async () => { const g = await window.api.pickProjectFolder(); if (g) { setGraph(g); void refreshResumable(true) } }}><FolderOpen size={14} /> Switch project</button>
         <button className="btn" title="Run history" onClick={() => openHistory()}><Clock size={14} /> History{resumable.length > 0 && <span className="resume-badge">{resumable.length}</span>}</button>
+        <button
+          className={`btn ${showDock ? 'active' : ''}`}
+          title={showDock ? 'Hide the bottom panel' : 'Show the bottom panel'}
+          onClick={() => toggleDock()}
+        >
+          <Terminal size={14} /> Terminal
+        </button>
         <TeamMenu />
         {graph.linkedTeam && (<span className="team-link" title={`Linked team brain: ${graph.linkedTeam.path}`}><Users size={12} /> {graph.linkedTeam.path.split(/[\\/]/).pop()}</span>)}
         <button className="btn ctx-btn" title="Project context — files & images for the team" onClick={() => setShowContext(true)}><Paperclip size={14} /> Context{(graph.context?.length ?? 0) > 0 && <span className="ctx-badge">{graph.context!.length}</span>}</button>
@@ -247,10 +259,7 @@ export default function App() {
           </div>
         )}
 
-        {/* collapsed re-open affordances */}
-        {layout.inspector.collapsed && (
-          <button className="zone-reopen reopen-inspector" onClick={() => toggleZoneCollapsed('inspector')} title="Show inspector">‹</button>
-        )}
+        {/* collapsed dock re-open affordance (inspector re-open lives next to Run in the goal bar) */}
         {showDock && layout.dock.collapsed && (
           <button className="zone-reopen reopen-dock" onClick={() => toggleZoneCollapsed('dock')} title="Show dock">▴</button>
         )}
