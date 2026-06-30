@@ -136,7 +136,7 @@ button {
   position: relative;
   overflow: hidden;
   background:
-    radial-gradient(circle at 1px 1px, #1d2230 1px, transparent 0) 0 0 / 22px 22px;
+    radial-gradient(circle at 1px 1px, var(--canvas-dot) 1px, transparent 0) 0 0 / 22px 22px;
 }
 
 /* .sidepanel removed — replaced by .zone-inspector */

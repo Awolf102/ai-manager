@@ -61,6 +61,7 @@
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --canvas-dot: #322A4D; /* warm canvas dot-grid colour (mirrored to the React Flow <Background color> prop, which can't read CSS vars) */
   --orchestrator-tint: rgba(240, 181, 74, 0.14);
   --manager-tint: rgba(142, 162, 240, 0.14);
   --worker-tint: rgba(79, 209, 197, 0.14);

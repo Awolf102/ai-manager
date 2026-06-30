@@ -254,6 +254,7 @@ export default function OrgChart() {
           {orderMode ? 'Ordering — click edges in run order' : 'Order'}
         </button>
       </Panel>
+      {/* color mirrors --canvas-dot in tokens.css (React Flow can't read CSS vars) */}
       <Background gap={22} color="#322A4D" />
       <Controls showInteractive={false} />
       <Panel position="bottom-left"><CanvasLegend /></Panel>
