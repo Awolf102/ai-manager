@@ -1,0 +1,79 @@
+:root {
+  /* ===== Brand anchors (locked) ===== */
+  --indigo: #1F1A38;
+  --plum: #7B506F;
+  --rose: #DD99BB;
+  --cream: #EAD7D1;
+  --greige: #DBCDC6;
+
+  /* ===== Surfaces (indigo→plum ramp; plum reserved for selected/active) ===== */
+  --surface-0: #1F1A38;      /* app background / canvas — deepest */
+  --surface-1: #25203F;      /* panels, dock, top bar */
+  --surface-2: #2E2749;      /* raised cards, inputs, modals */
+  --surface-hover: #3A2F54;
+  --surface-selected: #7B506F;
+
+  /* ===== Text & borders ===== */
+  --fg: #EAD7D1;
+  --fg-muted: #C9BEC2;
+  --fg-dim: #9C8F96;
+  --hairline: rgba(234, 215, 209, 0.10);
+  --hairline-strong: rgba(234, 215, 209, 0.18);
+
+  /* ===== Signal & states ===== */
+  --signal: #DD99BB;
+  --signal-hover: #E7ADC8;
+  --signal-press: #C97FA6;
+  --signal-tint: rgba(221, 153, 187, 0.16);
+  --focus-ring: rgba(221, 153, 187, 0.45);
+  --on-signal: #1F1A38;      /* text/icon on a rose fill */
+
+  /* ===== Agent roles ===== */
+  --orchestrator: #F0B54A;   /* gold — kept */
+  --manager: #8EA2F0;        /* periwinkle — re-mapped off lavender #b08cff */
+  --worker: #4FD1C5;         /* teal — kept */
+  --state-danger: #F0726F;
+  --state-good: #6FD08A;
+
+  /* ===== Typography ===== */
+  --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-md: 15px;
+  --text-lg: 18px;
+  --text-xl: 22px;
+  --lh-tight: 1.25;
+  --lh-normal: 1.5;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --tracking-tight: -0.01em;
+
+  /* ===== Spacing / radius / elevation / motion ===== */
+  --space-1: 2px; --space-2: 4px; --space-3: 8px; --space-4: 12px;
+  --space-5: 16px; --space-6: 24px; --space-7: 32px;
+  --radius-sm: 6px; --radius: 10px; --radius-lg: 14px; --radius-pill: 999px;
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.30);
+  --elev-2: 0 8px 24px rgba(0, 0, 0, 0.38);
+  --motion-fast: 120ms; --motion: 180ms; --motion-slow: 260ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  /* ===== Legacy aliases — map OLD names onto the warm-dark system so the
+     existing styles.css re-tints with zero churn. Later cycles migrate
+     individual rules to the semantic names above. ===== */
+  --bg: var(--surface-0);
+  --panel: var(--surface-1);
+  --panel-2: var(--surface-2);
+  --border: var(--hairline);
+  --border-strong: var(--hairline-strong);
+  --text: var(--fg);
+  --muted: var(--fg-muted);
+  --accent: var(--signal);
+  --accent-dim: var(--signal-tint);
+  --danger: var(--state-danger);
+  --good: var(--state-good);
+
+  font-synthesis: none;
+}

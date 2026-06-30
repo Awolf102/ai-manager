@@ -11,8 +11,8 @@ function createWindow(): void {
     height: 920,
     minWidth: 1040,
     minHeight: 700,
-    backgroundColor: '#0e0f13',
-    title: 'AI Manager',
+    backgroundColor: '#1F1A38',
+    title: 'Orkestr',
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),

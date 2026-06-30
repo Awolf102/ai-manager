@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { addToast, removeToast, type Toast } from './toasts'
 import type {
   AgentNodeData,
   Assignment,
@@ -101,6 +102,10 @@ interface AppState {
   resumeResumable: (runId: string) => void
   discardResumable: (runId: string) => Promise<void>
   dismissResumableBanner: () => void
+
+  toasts: Toast[]
+  notify: (input: { kind: Toast['kind']; message: string }) => string
+  dismissToast: (id: string) => void
 }
 
 let counter = 0
@@ -281,4 +286,12 @@ export const useStore = create<AppState>((set, get) => ({
     set({ resumable: await window.api.listResumable() })
   },
   dismissResumableBanner: () => set({ resumableDismissed: true }),
+
+  toasts: [],
+  notify: ({ kind, message }) => {
+    const toast: Toast = { id: crypto.randomUUID(), kind, message, createdAt: Date.now() }
+    set((s) => ({ toasts: addToast(s.toasts, toast) }))
+    return toast.id
+  },
+  dismissToast: (id) => set((s) => ({ toasts: removeToast(s.toasts, id) })),
 }))

@@ -13,6 +13,7 @@ import SettingsModal from './SettingsModal'
 import ContextModal from './ContextModal'
 import HitlModal from './HitlModal'
 import ConfirmDialog from './ConfirmDialog'
+import ToastViewport from './ToastViewport'
 import { AGENT_KINDS } from '../shared/types'
 import type { AgentKind, AuthStatus, ProjectGraph, ProjectMeta } from '../shared/types'
 
@@ -29,6 +30,7 @@ export default function App() {
   const openHistory = useStore((s) => s.openHistory)
   const applyOrchestration = useStore((s) => s.applyOrchestration)
   const requestConfirm = useStore((s) => s.requestConfirm)
+  const notify = useStore((s) => s.notify)
   const resumable = useStore((s) => s.resumable)
   const resumableDismissed = useStore((s) => s.resumableDismissed)
   const refreshResumable = useStore((s) => s.refreshResumable)
@@ -98,7 +100,7 @@ export default function App() {
     if (paths.length === 0) return
     const r = await window.api.addContext(paths)
     setGraph(r.graph)
-    if (r.skipped.length) window.alert(`Skipped (not a readable file): ${r.skipped.join(', ')}`)
+    if (r.skipped.length) notify({ kind: 'info', message: `Skipped (not a readable file): ${r.skipped.join(', ')}` })
   }
 
   return (
@@ -118,7 +120,7 @@ export default function App() {
         </div>
       )}
       <div className="topbar">
-        <span className="brand">AI Manager</span>
+        <span className="brand">Orkestr</span>
         <span className="project">{graph.project.name}</span>
         <span className="spacer" />
         <AuthPill checking={authChecking} status={auth} onClick={() => void recheckAuth()} />
@@ -150,7 +152,7 @@ export default function App() {
           onClick={async () => {
             const r = await window.api.importTeamPreview()
             if (r.status === 'canceled') return
-            if (r.status === 'error') { window.alert(r.error); return }
+            if (r.status === 'error') { notify({ kind: 'error', message: r.error }); return }
             const ok = await requestConfirm({
               title: 'Import this team?',
               body: buildImportConfirmBody(r.preview),
@@ -160,7 +162,7 @@ export default function App() {
             if (!ok) return
             const a = await window.api.importTeamApply(r.bundle, r.path)
             if ('graph' in a && a.graph) setGraph(a.graph)
-            else if ('error' in a && a.error) window.alert(a.error)
+            else if ('error' in a && a.error) notify({ kind: 'error', message: a.error })
           }}
         >
           <Download size={14} />
@@ -187,9 +189,9 @@ export default function App() {
             const r = await window.api.refreshFromTeam()
             if (r.refreshed && r.graph) {
               setGraph(r.graph)
-              window.alert(`Updated ${r.updated} agent(s) from the team brain.`)
+              notify({ kind: 'success', message: `Updated ${r.updated} agent(s) from the team brain.` })
             } else if (r.error) {
-              window.alert(r.error)
+              notify({ kind: 'error', message: r.error })
             }
           }}
         >
@@ -300,6 +302,7 @@ export default function App() {
       {showContext && <ContextModal onClose={() => setShowContext(false)} />}
       <HitlModal />
       <ConfirmDialog />
+      <ToastViewport />
       {authBanner}
     </div>
   )
@@ -362,7 +365,7 @@ function ProjectPicker({ onOpen }: { onOpen: (g: ProjectGraph) => void }) {
   return (
     <div className="picker">
       <div className="picker-card">
-        <h1>AI Manager</h1>
+        <h1>Orkestr</h1>
         <p>Choose a project folder — all your agents will work inside it.</p>
         <button
           className="btn primary"
