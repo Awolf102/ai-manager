@@ -3,6 +3,7 @@ import { FileText, Folder, Image as ImageIcon, Plus, Users, X } from 'lucide-rea
 import { useStore } from './store'
 import { scopeLabel } from '../shared/context-files'
 import type { AgentKind, AgentNodeData, ContextFile, ContextScope } from '../shared/types'
+import { Modal } from './Modal'
 
 function fmtBytes(n: number): string {
   if (n < 1024) return `${n} B`
@@ -104,8 +105,7 @@ export default function ContextModal({ onClose }: { onClose: () => void }) {
     setGraph(await window.api.setContextScope(id, scope))
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal ctx-modal" onClick={(e) => e.stopPropagation()}>
+    <Modal onClose={onClose} className="ctx-modal">{(close) => (<>
         <h2>Project context</h2>
         <p className="ctx-hint">
           Reference material for this project. Every item goes to all agents by default — use "Applies to"
@@ -192,11 +192,10 @@ export default function ContextModal({ onClose }: { onClose: () => void }) {
 
         <div className="modal-actions">
           <span className="spacer" />
-          <button className="btn primary" onClick={onClose}>
+          <button className="btn primary" onClick={() => close()}>
             Close
           </button>
         </div>
-      </div>
-    </div>
+    </>)}</Modal>
   )
 }

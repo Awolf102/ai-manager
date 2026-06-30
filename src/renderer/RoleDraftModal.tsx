@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useStore } from './store'
+import { Modal } from './Modal'
 
 type Draft = { agentId: string; name: string; role: string; skills?: string[] }
 
@@ -30,8 +31,7 @@ export default function RoleDraftModal({ drafts, onClose }: { drafts: Draft[]; o
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
+    <Modal onClose={onClose} className="modal-wide">{(close) => (<>
         <h2>Draft roles ({edited.length})</h2>
         <div className="draft-list">
           {edited.map((d, i) => (
@@ -51,14 +51,13 @@ export default function RoleDraftModal({ drafts, onClose }: { drafts: Draft[]; o
           ))}
         </div>
         <div className="modal-actions">
-          <button className="btn" onClick={onClose} disabled={applying}>
+          <button className="btn" onClick={() => close()} disabled={applying}>
             Cancel
           </button>
           <button className="btn primary" onClick={() => void apply()} disabled={applying}>
             {applying ? 'Applying…' : 'Apply roles'}
           </button>
         </div>
-      </div>
-    </div>
+    </>)}</Modal>
   )
 }
