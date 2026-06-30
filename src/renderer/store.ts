@@ -1,5 +1,10 @@
 import { create } from 'zustand'
 import { addToast, removeToast, type Toast } from './toasts'
+import {
+  DEFAULT_LAYOUT, clampInspector, clampDockHeight, clampDockWidth,
+  serializeLayout, parseLayout, type LayoutState
+} from './layout'
+import { activeDockAfterOpenTerminal } from './dock'
 import type {
   AgentNodeData,
   Assignment,
@@ -106,9 +111,20 @@ interface AppState {
   toasts: Toast[]
   notify: (input: { kind: Toast['kind']; message: string }) => string
   dismissToast: (id: string) => void
+
+  layout: LayoutState
+  layoutProjectPath: string | null
+  loadLayout: (projectPath: string) => void
+  setZoneSize: (zone: 'inspector' | 'dock', px: number, viewportH: number) => void
+  toggleZoneCollapsed: (zone: 'inspector' | 'dock') => void
+  setZonePlacement: (zone: 'inspector' | 'dock', placement: string) => void
 }
 
 let counter = 0
+
+function persistLayout(projectPath: string | null, layout: LayoutState): void {
+  if (projectPath) localStorage.setItem(`orkestr:layout:${projectPath}`, serializeLayout(layout))
+}
 
 export const useStore = create<AppState>((set, get) => ({
   graph: null,
@@ -120,6 +136,39 @@ export const useStore = create<AppState>((set, get) => ({
   showHistory: false,
   resumable: [],
   resumableDismissed: false,
+
+  layout: DEFAULT_LAYOUT,
+  layoutProjectPath: null,
+
+  loadLayout: (projectPath) =>
+    set((s) => {
+      if (s.layoutProjectPath === projectPath) return {}
+      const raw = localStorage.getItem(`orkestr:layout:${projectPath}`)
+      return { layout: parseLayout(raw), layoutProjectPath: projectPath }
+    }),
+
+  setZoneSize: (zone, px, viewportH) =>
+    set((s) => {
+      const layout: LayoutState = { ...s.layout, [zone]: { ...s.layout[zone] } }
+      if (zone === 'inspector') layout.inspector.size = clampInspector(px)
+      else layout.dock.size = s.layout.dock.placement === 'right' ? clampDockWidth(px) : clampDockHeight(px, viewportH)
+      persistLayout(s.layoutProjectPath, layout)
+      return { layout }
+    }),
+
+  toggleZoneCollapsed: (zone) =>
+    set((s) => {
+      const layout: LayoutState = { ...s.layout, [zone]: { ...s.layout[zone], collapsed: !s.layout[zone].collapsed } }
+      persistLayout(s.layoutProjectPath, layout)
+      return { layout }
+    }),
+
+  setZonePlacement: (zone, placement) =>
+    set((s) => {
+      const layout: LayoutState = { ...s.layout, [zone]: { ...s.layout[zone], placement: placement as never } }
+      persistLayout(s.layoutProjectPath, layout)
+      return { layout }
+    }),
 
   setGraph: (g) => set({ graph: g }),
 
@@ -143,7 +192,12 @@ export const useStore = create<AppState>((set, get) => ({
     set((s) => {
       const id = `term-${++counter}`
       const tab: TerminalTab = { id, agentId: agent.id, agentName: agent.name, mode }
-      return { terminals: [...s.terminals, tab], activeDockId: id }
+      const activeDockId = activeDockAfterOpenTerminal({
+        running: s.run.running,
+        currentActive: s.activeDockId,
+        newTermId: id
+      })
+      return { terminals: [...s.terminals, tab], activeDockId }
     }),
 
   closeTerminal: (id) =>
