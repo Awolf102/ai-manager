@@ -12,6 +12,8 @@ import {
   type NodeTypes
 } from '@xyflow/react'
 import AgentNode, { type AgentFlowNode } from './AgentNode'
+import CanvasLegend from './CanvasLegend'
+import CoachMarks from './CoachMarks'
 import { useStore } from '../store'
 import { applyOrderClick } from '../../shared/workflow-order'
 import { octopusLayout } from '../../shared/octopus-layout'
@@ -236,6 +238,8 @@ export default function OrgChart() {
       </Panel>
       <Background gap={22} color="#1d2230" />
       <Controls showInteractive={false} />
+      <Panel position="bottom-left"><CanvasLegend /></Panel>
+      <Panel position="top-center"><CoachMarks /></Panel>
     </ReactFlow>
   )
 }
