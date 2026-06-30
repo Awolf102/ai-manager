@@ -1361,7 +1361,7 @@ button {
 }
 .react-flow__edge.edge-handoff .react-flow__edge-path {
   stroke: #d6a44c;
-  stroke-dasharray: 6 4;
+  stroke-width: 2;
 }
 
 /* ---- human-in-the-loop modal ---- */
@@ -1525,7 +1525,7 @@ button {
 .canvas-legend .legend-row { display: flex; align-items: center; gap: var(--space-2); }
 .legend-line { width: 22px; height: 0; }
 .legend-line.report { border-top: 2px dashed var(--fg-dim); }
-.legend-line.handoff { border-top: 2px solid var(--signal); }
+.legend-line.handoff { border-top: 2px solid #d6a44c; }
 .legend-badge {
   display: inline-grid; place-items: center; width: 16px; height: 16px;
   border-radius: var(--radius-pill); background: var(--signal-tint); color: var(--signal);
