@@ -1598,3 +1598,43 @@ button {
 
 .gated-count { display: flex; align-items: center; gap: var(--space-2); margin-top: 4px; font-size: var(--text-xs); color: var(--fg-muted); }
 .gated-count input { width: 64px; }
+
+/* ---- Switch (reusable toggle) ---- */
+.switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--panel-2);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.switch.on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.switch:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 120ms ease, background 120ms ease;
+}
+.switch.on .switch-knob {
+  transform: translateX(16px);
+  background: var(--bg);
+}
+.switch:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
