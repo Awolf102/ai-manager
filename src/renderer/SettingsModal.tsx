@@ -7,6 +7,44 @@ const MODES: { id: ReviewMode; label: string; desc: string }[] = [
   { id: 'loop', label: '+ repair loop', desc: 'Redo until pass or max attempts.' }
 ]
 
+function GatedToggle({
+  label,
+  desc,
+  value,
+  max,
+  onChange
+}: {
+  label: string
+  desc: string
+  value: number
+  max: number
+  onChange: (v: number) => void
+}) {
+  return (
+    <div className="field">
+      <label className="check">
+        <input type="checkbox" checked={value > 0} onChange={(e) => onChange(e.target.checked ? 1 : 0)} />
+        {label}
+      </label>
+      {value > 0 && (
+        <div className="gated-count">
+          up to{' '}
+          <input
+            type="number"
+            min={1}
+            max={max}
+            value={value}
+            onChange={(e) => onChange(Math.max(1, Math.min(max, Number(e.target.value) || 1)))}
+          />
+        </div>
+      )}
+      <div className="radio-desc" style={{ marginTop: 4 }}>
+        {desc}
+      </div>
+    </div>
+  )
+}
+
 export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const graph = useStore((s) => s.graph)
   const setGraph = useStore((s) => s.setGraph)
@@ -26,7 +64,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
         confirmLabel: 'Enable Full auto',
         danger: true
       })
-      if (!ok) return // decline → leave the controlled <select> on its prior value
+      if (!ok) return
     }
     await update({ autonomy: next })
   }
@@ -36,6 +74,99 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h2>Settings</h2>
 
+        <h3 className="settings-section">Safety</h3>
+        <div className="field">
+          <label>Autonomy (acting steps)</label>
+          <select value={s.autonomy} onChange={(e) => void onAutonomyChange(e.target.value as Autonomy)}>
+            <option value="auto">Auto — run safe commands, deny risky ones</option>
+            <option value="full">Full auto — no permission checks (not sandboxed)</option>
+            <option value="cautious">Cautious — edits only, no command execution</option>
+          </select>
+          <div className="radio-desc" style={{ marginTop: 4 }}>
+            {s.autonomy === 'auto' &&
+              'Planning stays read-only; the review can run tests, and risky commands are blocked by a classifier.'}
+            {s.autonomy === 'full' && (
+              <span className="autonomy-danger">
+                ⚠ No permission checks and NOT sandboxed to this project — agents can read or write anything
+                your user account can (SSH keys, other projects, system files). Use only on a throwaway or
+                git-committed project.
+              </span>
+            )}
+            {s.autonomy === 'cautious' &&
+              "Workers edit files, but commands (including the review's tests) are blocked. Also governs running an agent directly."}
+          </div>
+        </div>
+        <div className="field">
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={s.lockBypassPermissions}
+              onChange={(e) => void update({ lockBypassPermissions: e.target.checked })}
+            />
+            Never bypass permissions (lock)
+          </label>
+          <div className="radio-desc" style={{ marginTop: 4 }}>
+            Forces any Full-auto or per-agent run down to "accept edits", engine-wide. A hard ceiling.
+          </div>
+        </div>
+        <div className="field">
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={s.trustAnthropicOnly}
+              onChange={(e) => void update({ trustAnthropicOnly: e.target.checked })}
+            />
+            Auto-trust only Anthropic-authored skills
+          </label>
+          <div className="radio-desc" style={{ marginTop: 4 }}>
+            {s.trustAnthropicOnly
+              ? 'Only skills authored by Anthropic (in a verified anthropics-owned marketplace) are offered to agents.'
+              : "⚠ Third-party skills from anthropics-owned marketplaces are also trusted — their plugin code runs under the agent’s permission mode."}
+          </div>
+        </div>
+        <div className="field">
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={s.blockPluginHooks}
+              onChange={(e) => void update({ blockPluginHooks: e.target.checked })}
+            />
+            Block skills whose plugin ships hooks
+          </label>
+          <div className="radio-desc" style={{ marginTop: 4 }}>
+            Plugin hooks run shell/HTTP/MCP commands at tool events. Blocked plugins are not offered to agents.
+          </div>
+        </div>
+
+        <h3 className="settings-section">Cost</h3>
+        <div className="field">
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={s.autoAssignModels}
+              onChange={(e) => void update({ autoAssignModels: e.target.checked })}
+            />
+            Auto-assign worker models — orchestrator picks Sonnet/Opus per worker when building a team
+          </label>
+          <div className="radio-desc" style={{ marginTop: 4 }}>
+            💸 Opus costs more per token than Sonnet — auto-assign reserves Opus for the harder roles.
+          </div>
+        </div>
+        <div className="field">
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={s.adaptiveEffort}
+              onChange={(e) => void update({ adaptiveEffort: e.target.checked })}
+            />
+            Adaptive effort — managers assign reasoning effort by task difficulty
+          </label>
+          <div className="radio-desc" style={{ marginTop: 4 }}>
+            💸 Higher reasoning effort spends more tokens (higher cost) on the tasks that get it.
+          </div>
+        </div>
+
+        <h3 className="settings-section">Review &amp; repair</h3>
         <div className="field">
           <label>Review &amp; repair</label>
           <div className="radio-list">
@@ -55,7 +186,6 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
             ))}
           </div>
         </div>
-
         {s.reviewMode === 'loop' && (
           <div className="field">
             <label>Max repair attempts</label>
@@ -65,14 +195,11 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
               max={6}
               value={s.maxRepairAttempts}
               onChange={(e) =>
-                void update({
-                  maxRepairAttempts: Math.max(1, Math.min(6, Number(e.target.value) || 1))
-                })
+                void update({ maxRepairAttempts: Math.max(1, Math.min(6, Number(e.target.value) || 1)) })
               }
             />
           </div>
         )}
-
         <div className="field">
           <label className="check">
             <input
@@ -84,79 +211,30 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           </label>
         </div>
 
-        <div className="field">
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={s.adaptiveEffort}
-              onChange={(e) => void update({ adaptiveEffort: e.target.checked })}
-            />
-            Adaptive effort — managers assign reasoning effort by task difficulty
-          </label>
-        </div>
+        <h3 className="settings-section">Run behavior</h3>
+        <GatedToggle
+          label="Mid-run re-plans"
+          max={3}
+          value={s.maxReplans}
+          onChange={(v) => void update({ maxReplans: v })}
+          desc="When you set an execution order on the canvas, the orchestrator may rewrite the not-yet-run plan between stages based on what earlier stages found. The goal never changes."
+        />
+        <GatedToggle
+          label="Peer handoffs per step"
+          max={3}
+          value={s.maxHandoffs}
+          onChange={(v) => void update({ maxHandoffs: v })}
+          desc="When you draw a handoff edge (select an edge → Make handoff), an agent may consult that connected teammate mid-step and continue with their answer. The reporting tree is unaffected."
+        />
+        <GatedToggle
+          label="User questions per run"
+          max={5}
+          value={s.maxUserRequests}
+          onChange={(v) => void update({ maxUserRequests: v })}
+          desc="A worker that is blocked may pause the run to ask you one question. Your answer resumes that worker. Workers only — it's sent to the agent, so don't share secrets."
+        />
 
-        <div className="field">
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={s.autoAssignModels}
-              onChange={(e) => void update({ autoAssignModels: e.target.checked })}
-            />
-            Auto-assign worker models — orchestrator picks Sonnet/Opus per worker when building a team
-          </label>
-        </div>
-
-        <div className="field">
-          <label>Max mid-run re-plans (0 = off)</label>
-          <input
-            type="number"
-            min={0}
-            max={3}
-            value={s.maxReplans}
-            onChange={(e) =>
-              void update({ maxReplans: Math.max(0, Math.min(3, Number(e.target.value) || 0)) })
-            }
-          />
-          <div className="radio-desc" style={{ marginTop: 4 }}>
-            When you set an execution order on the canvas, the orchestrator may rewrite the
-            not-yet-run plan between stages based on what earlier stages found. The goal never changes.
-          </div>
-        </div>
-
-        <div className="field">
-          <label>Max peer handoffs per step (0 = off)</label>
-          <input
-            type="number"
-            min={0}
-            max={3}
-            value={s.maxHandoffs}
-            onChange={(e) =>
-              void update({ maxHandoffs: Math.max(0, Math.min(3, Number(e.target.value) || 0)) })
-            }
-          />
-          <div className="radio-desc" style={{ marginTop: 4 }}>
-            When you draw a handoff edge (select an edge → Make handoff), an agent may consult that
-            connected teammate mid-step and continue with their answer. The reporting tree is unaffected.
-          </div>
-        </div>
-
-        <div className="field">
-          <label>Max user questions per run (0 = off)</label>
-          <input
-            type="number"
-            min={0}
-            max={5}
-            value={s.maxUserRequests}
-            onChange={(e) =>
-              void update({ maxUserRequests: Math.max(0, Math.min(5, Number(e.target.value) || 0)) })
-            }
-          />
-          <div className="radio-desc" style={{ marginTop: 4 }}>
-            When on, a worker that is blocked may pause the run to ask you one question. Your answer
-            resumes that worker. Workers only — it's sent to the agent, so don't share secrets.
-          </div>
-        </div>
-
+        <h3 className="settings-section">Team</h3>
         <div className="field">
           <label className="check">
             <input
@@ -167,7 +245,6 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
             Auto-sync team brain — pull lessons before a run, push after
           </label>
         </div>
-
         <div className="field">
           <label>Trusted-skill install threshold</label>
           <input
@@ -175,86 +252,12 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
             min={0}
             step={1000}
             value={s.skillInstallThreshold}
-            onChange={(e) =>
-              void update({ skillInstallThreshold: Math.max(0, Number(e.target.value) || 0) })
-            }
+            onChange={(e) => void update({ skillInstallThreshold: Math.max(0, Number(e.target.value) || 0) })}
           />
           <div className="radio-desc" style={{ marginTop: 4 }}>
             Non-Anthropic plugins are offered to agents only at/above this many installs. Anthropic plugins are always trusted.
           </div>
         </div>
-
-        <h3 className="settings-section">Security</h3>
-
-        <div className="field">
-          <label>Autonomy (acting steps)</label>
-          <select
-            value={s.autonomy}
-            onChange={(e) => void onAutonomyChange(e.target.value as Autonomy)}
-          >
-            <option value="auto">Auto — run safe commands, deny risky ones</option>
-            <option value="full">Full auto — no permission checks (not sandboxed)</option>
-            <option value="cautious">Cautious — edits only, no command execution</option>
-          </select>
-          <div className="radio-desc" style={{ marginTop: 4 }}>
-            {s.autonomy === 'auto' &&
-              'Planning stays read-only; the review can run tests, and risky commands are blocked by a classifier.'}
-            {s.autonomy === 'full' && (
-              <span className="autonomy-danger">
-                ⚠ No permission checks and NOT sandboxed to this project — agents can read or write anything
-                your user account can (SSH keys, other projects, system files). Use only on a throwaway or
-                git-committed project.
-              </span>
-            )}
-            {s.autonomy === 'cautious' &&
-              "Workers edit files, but commands (including the review's tests) are blocked."}
-          </div>
-        </div>
-
-        <div className="field">
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={s.lockBypassPermissions}
-              onChange={(e) => void update({ lockBypassPermissions: e.target.checked })}
-            />
-            Never bypass permissions (lock)
-          </label>
-          <div className="radio-desc" style={{ marginTop: 4 }}>
-            Forces any Full-auto or per-agent run down to "accept edits", engine-wide. A hard ceiling.
-          </div>
-        </div>
-
-        <div className="field">
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={s.trustAnthropicOnly}
-              onChange={(e) => void update({ trustAnthropicOnly: e.target.checked })}
-            />
-            Auto-trust only Anthropic-authored skills
-          </label>
-          <div className="radio-desc" style={{ marginTop: 4 }}>
-            {s.trustAnthropicOnly
-              ? 'Only skills authored by Anthropic (in a verified anthropics-owned marketplace) are offered to agents.'
-              : '⚠ Third-party skills from anthropics-owned marketplaces are also trusted — their plugin code runs under the agent’s permission mode.'}
-          </div>
-        </div>
-
-        <div className="field">
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={s.blockPluginHooks}
-              onChange={(e) => void update({ blockPluginHooks: e.target.checked })}
-            />
-            Block skills whose plugin ships hooks
-          </label>
-          <div className="radio-desc" style={{ marginTop: 4 }}>
-            Plugin hooks run shell/HTTP/MCP commands at tool events. Blocked plugins are not offered to agents.
-          </div>
-        </div>
-
         <div className="field">
           <label className="check">
             <input
@@ -265,7 +268,6 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
             Skills pack — load curated design + Playwright skills as options for every agent
           </label>
         </div>
-
         <div className="field">
           <label>Skills-pack folder (optional)</label>
           <input
