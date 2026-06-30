@@ -608,6 +608,8 @@ button {
   display: grid;
   place-items: center;
   z-index: 50;
+  opacity: 1;
+  transition: opacity var(--motion) var(--ease-out);
 }
 
 .modal {
@@ -1859,4 +1861,35 @@ button {
   .agent-node.run-working,
   .agent-node.run-reviewing,
   .agent-node.run-reflecting { animation: none; }
+}
+
+/* ---- Shared modal motion (Modal.tsx primitive) ---- */
+@starting-style {
+  .modal-backdrop { opacity: 0; }
+}
+.modal-backdrop[data-closing] { opacity: 0; transition: opacity 150ms var(--ease-out); }
+
+.modal-panel {
+  transform-origin: center;
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity var(--motion) var(--ease-out), transform var(--motion) var(--ease-out);
+}
+@starting-style {
+  .modal-panel { opacity: 0; transform: scale(0.96); }
+}
+.modal-panel[data-closing] {
+  opacity: 0;
+  transform: scale(0.96);
+  transition: opacity 150ms var(--ease-out), transform 150ms var(--ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal-panel,
+  .modal-panel[data-closing] { transform: none; }
+}
+
+/* ---- Checkbox restyle (accent-recolor the few remaining multi-select checkboxes) ---- */
+input[type='checkbox'] {
+  accent-color: var(--accent);
+  cursor: pointer;
 }

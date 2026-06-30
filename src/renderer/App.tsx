@@ -19,6 +19,7 @@ import PanelDivider from './PanelDivider'
 import { computeBodyGrid } from './layout'
 import { AGENT_KINDS } from '../shared/types'
 import type { AgentKind, AuthStatus, ProjectGraph, ProjectMeta } from '../shared/types'
+import { Modal } from './Modal'
 
 export default function App() {
   const graph = useStore((s) => s.graph)
@@ -387,8 +388,7 @@ function AddAgentModal({
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+    <Modal onClose={onClose}>{(close) => (<>
         <h2>Add agent</h2>
         <div className="field">
           <label>Name</label>
@@ -413,14 +413,13 @@ function AddAgentModal({
           </div>
         </div>
         <div className="modal-actions">
-          <button className="btn" onClick={onClose}>
+          <button className="btn" onClick={() => close()}>
             Cancel
           </button>
           <button className="btn primary" onClick={() => void create()}>
             Create
           </button>
         </div>
-      </div>
-    </div>
+    </>)}</Modal>
   )
 }

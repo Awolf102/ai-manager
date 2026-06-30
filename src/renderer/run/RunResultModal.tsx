@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { RunManifest, ServerStatus } from '../../shared/types'
 import { parseStartCommand } from '../../shared/run-manifest'
+import { Modal } from '../Modal'
 
 export default function RunResultModal({
   manifest,
@@ -70,8 +71,7 @@ export default function RunResultModal({
   const running = serverId !== null && status !== 'exited' && status !== 'error'
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
+    <Modal onClose={onClose} className="modal-wide">{(close) => (<>
         <h2>Launch app</h2>
         {launchable ? (
           <>
@@ -106,7 +106,7 @@ export default function RunResultModal({
           </p>
         )}
         <div className="modal-actions">
-          <button className="btn" onClick={onClose}>
+          <button className="btn" onClick={() => close()}>
             Close
           </button>
           {launchable ? (
@@ -125,7 +125,6 @@ export default function RunResultModal({
             </button>
           )}
         </div>
-      </div>
-    </div>
+    </>)}</Modal>
   )
 }

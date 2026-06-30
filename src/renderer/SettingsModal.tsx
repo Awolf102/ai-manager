@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { AlertTriangle, ClipboardCheck, Coins, Shield, Users, Workflow, X, type LucideIcon } from 'lucide-react'
 import { useStore } from './store'
 import { Switch } from './Switch'
+import { Modal } from './Modal'
 import type { Autonomy, ProjectSettings, ReviewMode } from '../shared/types'
 
 type CategoryId = 'safety' | 'cost' | 'review' | 'run' | 'team'
@@ -102,8 +103,8 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const meta = CATEGORIES.find((c) => c.id === active)!
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="settings-modal" onClick={(e) => e.stopPropagation()}>
+    <Modal onClose={onClose} unstyled className="settings-modal">
+      {(close) => (<>
         <aside className="settings-rail">
           <div className="settings-rail-head">
             <div className="settings-rail-eyebrow">Settings</div>
@@ -125,7 +126,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           </nav>
         </aside>
 
-        <button className="settings-close" title="Close" onClick={onClose}>
+        <button className="settings-close" title="Close" onClick={() => close()}>
           <X size={18} />
         </button>
 
@@ -366,7 +367,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
             </>
           )}
         </div>
-      </div>
-    </div>
+      </>)}
+    </Modal>
   )
 }

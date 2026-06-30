@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useStore } from './store'
 import type { SpawnedMember } from '../shared/types'
+import { Modal } from './Modal'
 
 export default function TeamSpawnModal({
   members,
@@ -41,8 +42,7 @@ export default function TeamSpawnModal({
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
+    <Modal onClose={onClose} className="modal-wide">{(close) => (<>
         <h2>Proposed team ({edited.length})</h2>
         <div className="draft-list">
           {edited.map((m, i) => (
@@ -73,14 +73,13 @@ export default function TeamSpawnModal({
           ))}
         </div>
         <div className="modal-actions">
-          <button className="btn" onClick={onClose} disabled={applying}>
+          <button className="btn" onClick={() => close()} disabled={applying}>
             Cancel
           </button>
           <button className="btn primary" onClick={() => void apply()} disabled={applying}>
             {applying ? 'Creating…' : 'Apply — create team'}
           </button>
         </div>
-      </div>
-    </div>
+    </>)}</Modal>
   )
 }
