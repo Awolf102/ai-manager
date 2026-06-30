@@ -5,6 +5,7 @@ import { useStore } from '../store'
 import RoleDraftModal from '../RoleDraftModal'
 import TeamSpawnModal from '../TeamSpawnModal'
 import RunResultModal from './RunResultModal'
+import RecentPrompts from './RecentPrompts'
 import type { RunManifest, SpawnedMember } from '../../shared/types'
 
 const MAX_GOAL_HEIGHT = 360 // px — focused expansion cap (~18 lines), then the textarea scrolls
@@ -132,6 +133,7 @@ export default function GoalBar() {
       <span className="goal-target" title="The goal is given to this Orchestrator">
         <Target size={12} /> {hint}
       </span>
+      <RecentPrompts onPick={setGoal} />
       <span className="goal-tools">
         <button
           className="btn"
