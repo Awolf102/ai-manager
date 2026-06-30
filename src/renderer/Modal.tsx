@@ -60,6 +60,8 @@ export function Modal({
       onClick={() => {
         if (dismissable) close()
       }}
+      // Escape relies on the keydown bubbling up from the focused child to this backdrop;
+      // a modal child that calls e.stopPropagation() on keydown would swallow it.
       onKeyDown={(e) => {
         if (dismissable && e.key === 'Escape') {
           e.stopPropagation()

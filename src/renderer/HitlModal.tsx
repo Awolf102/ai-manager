@@ -24,6 +24,7 @@ export default function HitlModal() {
     setText('')
   }
 
+  // dismissable={false}: backdrop/Escape can't close; onClose is the minimize fallback by design
   return (
     <Modal dismissable={false} onClose={() => minimizeInterrupt(true)}>
       {(close) => (<>
