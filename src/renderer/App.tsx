@@ -14,6 +14,8 @@ import ContextModal from './ContextModal'
 import HitlModal from './HitlModal'
 import ConfirmDialog from './ConfirmDialog'
 import ToastViewport from './ToastViewport'
+import PanelDivider from './PanelDivider'
+import { computeBodyGrid } from './layout'
 import { AGENT_KINDS } from '../shared/types'
 import type { AgentKind, AuthStatus, ProjectGraph, ProjectMeta } from '../shared/types'
 
@@ -35,6 +37,11 @@ export default function App() {
   const resumableDismissed = useStore((s) => s.resumableDismissed)
   const refreshResumable = useStore((s) => s.refreshResumable)
   const dismissResumableBanner = useStore((s) => s.dismissResumableBanner)
+  const layout = useStore((s) => s.layout)
+  const loadLayout = useStore((s) => s.loadLayout)
+  const setZoneSize = useStore((s) => s.setZoneSize)
+  const toggleZoneCollapsed = useStore((s) => s.toggleZoneCollapsed)
+  const setZonePlacement = useStore((s) => s.setZonePlacement)
   const [showAdd, setShowAdd] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showContext, setShowContext] = useState(false)
@@ -56,6 +63,9 @@ export default function App() {
   useEffect(() => {
     void recheckAuth()
   }, [recheckAuth])
+  useEffect(() => {
+    if (graph?.project.path) loadLayout(graph.project.path)
+  }, [graph?.project.path, loadLayout])
 
   const authBanner =
     !authChecking && auth && auth.state !== 'ok' ? (
@@ -77,6 +87,7 @@ export default function App() {
   }
 
   const showDock = terminals.length > 0 || showRunView || showHistory
+  const grid = computeBodyGrid(layout)
 
   const hasFiles = (e: React.DragEvent): boolean => Array.from(e.dataTransfer.types).includes('Files')
   const onDragEnter = (e: React.DragEvent): void => {
@@ -213,14 +224,47 @@ export default function App() {
         </button>
       </div>
 
-      <div className="body">
-        <div className={`main ${showDock ? 'has-dock' : ''}`}>
+      <div
+        className="body"
+        style={{ gridTemplateColumns: grid.columns, gridTemplateRows: grid.rows, gridTemplateAreas: grid.areas }}
+      >
+        <div className="zone-main" style={{ gridArea: 'main' }}>
           <GoalBar />
-          <div className="canvas-wrap">
-            <OrgChart />
-          </div>
+          <div className="canvas-wrap"><OrgChart /></div>
+        </div>
 
-          {showDock && (
+        <div className={`zone-inspector ${layout.inspector.collapsed ? 'collapsed' : ''}`} style={{ gridArea: 'inspector' }}>
+          {!layout.inspector.collapsed && (
+            <PanelDivider
+              axis="x"
+              invert={layout.inspector.placement === 'right'}
+              getStart={() => layout.inspector.size}
+              onResize={(px) => setZoneSize('inspector', px, window.innerHeight)}
+            />
+          )}
+          <div className="zone-head">
+            <span>Inspector</span>
+            <span className="spacer" />
+            <button className="btn tiny" title="Move left/right" onClick={() => setZonePlacement('inspector', layout.inspector.placement === 'right' ? 'left' : 'right')}>⇄</button>
+            <button className="btn tiny" title="Collapse" onClick={() => toggleZoneCollapsed('inspector')}>×</button>
+          </div>
+          <div className="zone-body">
+            {selectedId ? (<><AgentConfigPanel /><RoleMemoryEditor /></>) : (
+              <div className="empty-hint">Select an agent to edit its role, memory, and settings.<br /><br />Drag from the <b>bottom</b> of one node to the <b>top</b> of another to make it <b>delegate</b> work down the chain.</div>
+            )}
+          </div>
+        </div>
+
+        {showDock && (
+          <div className={`zone-dock ${layout.dock.collapsed ? 'collapsed' : ''}`} style={{ gridArea: 'dock' }}>
+            {!layout.dock.collapsed && (
+              <PanelDivider
+                axis={layout.dock.placement === 'right' ? 'x' : 'y'}
+                invert={true}
+                getStart={() => layout.dock.size}
+                onResize={(px) => setZoneSize('dock', px, window.innerHeight)}
+              />
+            )}
             <div className="terminal-dock">
               <div className="term-tabs">
                 {showRunView && (
@@ -276,25 +320,16 @@ export default function App() {
                 ))}
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
-        <div className="sidepanel">
-          {selectedId ? (
-            <>
-              <AgentConfigPanel />
-              <RoleMemoryEditor />
-            </>
-          ) : (
-            <div className="empty-hint">
-              Select an agent to edit its role, memory, and settings.
-              <br />
-              <br />
-              Drag from the <b>bottom</b> of one node to the <b>top</b> of another to make it{' '}
-              <b>delegate</b> work down the chain. Then give the Orchestrator a goal up top.
-            </div>
-          )}
-        </div>
+        {/* collapsed re-open affordances */}
+        {layout.inspector.collapsed && (
+          <button className="zone-reopen reopen-inspector" onClick={() => toggleZoneCollapsed('inspector')} title="Show inspector">‹</button>
+        )}
+        {showDock && layout.dock.collapsed && (
+          <button className="zone-reopen reopen-dock" onClick={() => toggleZoneCollapsed('dock')} title="Show dock">▴</button>
+        )}
       </div>
 
       {showAdd && <AddAgentModal onClose={() => setShowAdd(false)} onCreated={setGraph} />}
