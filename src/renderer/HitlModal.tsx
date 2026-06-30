@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useStore } from './store'
+import { Modal } from './Modal'
 
 export default function HitlModal() {
   const run = useStore((s) => s.run)
@@ -24,8 +25,8 @@ export default function HitlModal() {
   }
 
   return (
-    <div className="modal-backdrop">
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+    <Modal dismissable={false} onClose={() => minimizeInterrupt(true)}>
+      {(close) => (<>
         <h2>{pending.askerName} has a question</h2>
         <div className="hitl-question">{pending.question}</div>
         <div className="field">
@@ -42,17 +43,17 @@ export default function HitlModal() {
           </div>
         </div>
         <div className="modal-actions">
-          <button className="btn" onClick={() => minimizeInterrupt(true)}>
+          <button className="btn" onClick={() => close(() => minimizeInterrupt(true))}>
             Minimize
           </button>
-          <button className="btn" onClick={() => submit('')}>
+          <button className="btn" onClick={() => close(() => submit(''))}>
             Skip
           </button>
-          <button className="btn primary" disabled={!text.trim()} onClick={() => submit(text.trim())}>
+          <button className="btn primary" disabled={!text.trim()} onClick={() => close(() => submit(text.trim()))}>
             Submit
           </button>
         </div>
-      </div>
-    </div>
+      </>)}
+    </Modal>
   )
 }
