@@ -504,8 +504,11 @@ export async function setContextScope(id: string, scope: ContextScope): Promise<
     return saveGraph()
   }
   const folder = (graph.contextFolders ?? []).find((f) => f.id === id)
-  if (folder) folder.scope = value
-  return saveGraph()
+  if (folder) {
+    folder.scope = value
+    return saveGraph()
+  }
+  return graph // id not found: nothing changed, don't write
 }
 
 /** Drag-drop router: stat each path and copy files / reference directories. */

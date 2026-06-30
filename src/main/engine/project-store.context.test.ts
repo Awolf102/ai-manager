@@ -119,6 +119,17 @@ describe('scope filtering in buildAgentContext', () => {
     expect(wCtx.context.some((c) => c.fileName === 'api.md')).toBe(true)
     expect(mCtx.context.some((c) => c.fileName === 'api.md')).toBe(false)
   })
+  it('returns graph unchanged and skips the disk write when id matches nothing', async () => {
+    const file = join(proj, 'readme.md')
+    await fs.writeFile(file, 'hi', 'utf8')
+    const { graph: g } = await addContextFiles([file])
+    const existingId = g.context![0].id
+    const result = await setContextScope('nonexistent-id', { kinds: ['worker'] })
+    // existing item untouched
+    expect(result.context!.find((c) => c.id === existingId)?.scope).toBeUndefined()
+    // returns a ProjectGraph (has the nodes array at minimum)
+    expect(Array.isArray(result.nodes)).toBe(true)
+  })
   it('delivers a node-scoped folder to that node only, and unscoped to all', async () => {
     await createAgent({ name: 'a', kind: 'worker' })
     await createAgent({ name: 'b', kind: 'worker' })
