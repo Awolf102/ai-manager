@@ -17,7 +17,7 @@ export default function TeamMenu() {
     return () => document.removeEventListener('mousedown', onDoc)
   }, [open])
 
-  const exportTeam = async (): Promise<void> => { await window.api.exportTeam(); setOpen(false) }
+  const exportTeam = async (): Promise<void> => { setOpen(false); await window.api.exportTeam() }
   const importTeam = async (): Promise<void> => {
     setOpen(false)
     const r = await window.api.importTeamPreview()
