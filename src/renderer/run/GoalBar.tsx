@@ -22,6 +22,7 @@ export default function GoalBar() {
   const runId = useStore((s) => s.run.runId)
   const pendingInterrupt = useStore((s) => s.run.pendingInterrupt)
   const beginRun = useStore((s) => s.beginRun)
+  const notify = useStore((s) => s.notify)
   const inspectorCollapsed = useStore((s) => s.layout.inspector.collapsed)
   const toggleZoneCollapsed = useStore((s) => s.toggleZoneCollapsed)
   const [goal, setGoal] = useState('')
@@ -48,7 +49,7 @@ export default function GoalBar() {
     try {
       const r = await window.api.spawnTeam({ goal: goal.trim(), orchestratorId: target.id })
       if (r.ok && r.members && r.members.length) setSpawned(r.members)
-      else window.alert(r.error ?? 'Could not build a team.')
+      else notify({ kind: 'error', message: r.error ?? 'Could not build a team.' })
     } finally {
       setSpawning(false)
     }
@@ -60,7 +61,7 @@ export default function GoalBar() {
     try {
       const r = await window.api.detectManifest({ goal: goal.trim(), orchestratorId: target.id })
       if (r.ok && r.manifest) setManifest(r.manifest)
-      else window.alert(r.error ?? 'Could not detect how to run the result.')
+      else notify({ kind: 'error', message: r.error ?? 'Could not detect how to run the result.' })
     } finally {
       setDetecting(false)
     }
@@ -72,7 +73,7 @@ export default function GoalBar() {
     try {
       const r = await window.api.draftRoles({ goal: goal.trim(), orchestratorId: target.id })
       if (r.ok && r.drafts) setDrafts(r.drafts)
-      else window.alert(r.error ?? 'Could not draft roles.')
+      else notify({ kind: 'error', message: r.error ?? 'Could not draft roles.' })
     } finally {
       setDrafting(false)
     }
@@ -80,11 +81,15 @@ export default function GoalBar() {
 
   const start = async (): Promise<void> => {
     if (!target || !goal.trim() || running) return
-    const { runId: id } = await window.api.startRun({
-      goal: goal.trim(),
-      orchestratorId: target.id
-    })
-    beginRun(id, goal.trim(), target.id)
+    try {
+      const { runId: id } = await window.api.startRun({
+        goal: goal.trim(),
+        orchestratorId: target.id
+      })
+      beginRun(id, goal.trim(), target.id)
+    } catch (err) {
+      notify({ kind: 'error', message: err instanceof Error ? err.message : 'Could not start the run.' })
+    }
   }
   const stop = (): void => {
     if (runId) void window.api.stopRun(runId)
