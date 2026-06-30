@@ -18,7 +18,7 @@ function ToastItem({ toast }: { toast: Toast }) {
     return () => clearTimeout(t)
   }, [toast.id, toast.kind, dismiss])
   return (
-    <div className={`toast toast-${toast.kind}`} role="status">
+    <div className={`toast toast-${toast.kind}`} role={toast.kind === 'error' ? 'alert' : 'status'}>
       <span className="toast-msg">{toast.message}</span>
       <button className="toast-close" onClick={() => dismiss(toast.id)} aria-label="Dismiss">
         <X size={13} />
