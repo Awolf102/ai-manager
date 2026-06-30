@@ -1495,3 +1495,6 @@ button {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+.term-tab .run-live { margin-left: 6px; color: var(--state-good); font-size: var(--text-xs); }
+.term-tab.running .dot { background: var(--state-good); }

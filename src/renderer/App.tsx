@@ -28,6 +28,7 @@ export default function App() {
   const closeTerminal = useStore((s) => s.closeTerminal)
   const selectedId = useStore((s) => s.selectedAgentId)
   const showRunView = useStore((s) => s.showRunView)
+  const runRunning = useStore((s) => s.run.running)
   const showHistory = useStore((s) => s.showHistory)
   const openHistory = useStore((s) => s.openHistory)
   const applyOrchestration = useStore((s) => s.applyOrchestration)
@@ -269,10 +270,10 @@ export default function App() {
               <div className="term-tabs">
                 {showRunView && (
                   <div
-                    className={`term-tab mode-run ${activeDockId === 'run' ? 'active' : ''}`}
+                    className={`term-tab mode-run ${activeDockId === 'run' ? 'active' : ''} ${runRunning ? 'running' : ''}`}
                     onClick={() => setActiveDock('run')}
                   >
-                    <span className="dot" /> Run
+                    <span className="dot" /> Run{runRunning && <span className="run-live" title="Run in progress">● running</span>}
                   </div>
                 )}
                 {showHistory && (
