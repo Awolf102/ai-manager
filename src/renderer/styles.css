@@ -1497,4 +1497,12 @@ button {
 }
 
 .term-tab .run-live { margin-left: 6px; color: var(--state-good); font-size: var(--text-xs); }
+
+.topmenu { position: relative; -webkit-app-region: no-drag; }
+.topmenu-list { position: absolute; top: 100%; right: 0; margin-top: 4px; background: var(--surface-2); border: 1px solid var(--hairline-strong); border-radius: var(--radius); box-shadow: var(--elev-2); padding: 4px; display: flex; flex-direction: column; min-width: 200px; z-index: 60; }
+.topmenu-list button { display: flex; align-items: center; gap: var(--space-3); padding: 7px 10px; background: none; border: none; color: var(--fg); font-size: var(--text-sm); border-radius: var(--radius-sm); text-align: left; }
+.topmenu-list button:hover { background: var(--surface-hover); }
+.faq-body { font-size: var(--text-base); line-height: var(--lh-normal); color: var(--fg); }
+.faq-body p { margin: 0 0 10px; }
+.faq-btn { padding: 5px; }
 .term-tab.running .dot { background: var(--state-good); }

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Clock, CloudDownload, CloudUpload, Download, FolderOpen, Paperclip, Plus, Settings as SettingsIcon, Upload, Users } from 'lucide-react'
+import { CircleHelp, Clock, FolderOpen, Paperclip, Plus, Settings as SettingsIcon, Users } from 'lucide-react'
 import { useStore } from './store'
-import { buildImportConfirmBody } from './import-confirm'
+import TeamMenu from './TeamMenu'
+import FaqModal from './FaqModal'
 import OrgChart from './canvas/OrgChart'
 import AgentConfigPanel from './panels/AgentConfigPanel'
 import RoleMemoryEditor from './panels/RoleMemoryEditor'
@@ -46,6 +47,7 @@ export default function App() {
   const [showAdd, setShowAdd] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showContext, setShowContext] = useState(false)
+  const [showFaq, setShowFaq] = useState(false)
   const [dragDepth, setDragDepth] = useState(0)
 
   const [auth, setAuth] = useState<AuthStatus | null>(null)
@@ -132,97 +134,18 @@ export default function App() {
         </div>
       )}
       <div className="topbar">
+        <button className="btn icon faq-btn" title="How to prompt" onClick={() => setShowFaq(true)}><CircleHelp size={15} /></button>
         <span className="brand">Orkestr</span>
         <span className="project">{graph.project.name}</span>
         <span className="spacer" />
         <AuthPill checking={authChecking} status={auth} onClick={() => void recheckAuth()} />
-        <button
-          className="btn"
-          onClick={async () => {
-            const g = await window.api.pickProjectFolder()
-            if (g) { setGraph(g); void refreshResumable(true) }
-          }}
-        >
-          <FolderOpen size={14} /> Switch project
-        </button>
-        <button className="btn" title="Run history" onClick={() => openHistory()}>
-          <Clock size={14} />
-          {resumable.length > 0 && <span className="resume-badge">{resumable.length}</span>}
-        </button>
-        <button
-          className="btn"
-          title="Export team to a file"
-          onClick={async () => {
-            await window.api.exportTeam()
-          }}
-        >
-          <Upload size={14} />
-        </button>
-        <button
-          className="btn"
-          title="Import a team into this project"
-          onClick={async () => {
-            const r = await window.api.importTeamPreview()
-            if (r.status === 'canceled') return
-            if (r.status === 'error') { notify({ kind: 'error', message: r.error }); return }
-            const ok = await requestConfirm({
-              title: 'Import this team?',
-              body: buildImportConfirmBody(r.preview),
-              confirmLabel: 'Import',
-              danger: false
-            })
-            if (!ok) return
-            const a = await window.api.importTeamApply(r.bundle, r.path)
-            if ('graph' in a && a.graph) setGraph(a.graph)
-            else if ('error' in a && a.error) notify({ kind: 'error', message: a.error })
-          }}
-        >
-          <Download size={14} />
-        </button>
-        {graph.linkedTeam && (
-          <span className="team-link" title={`Linked team brain: ${graph.linkedTeam.path}`}>
-            <Users size={12} /> {graph.linkedTeam.path.split(/[\\/]/).pop()}
-          </span>
-        )}
-        <button
-          className="btn"
-          title="Sync this project's portable lessons to the team brain"
-          onClick={async () => {
-            const r = await window.api.syncToTeam()
-            if (r.synced && r.graph) setGraph(r.graph)
-          }}
-        >
-          <CloudUpload size={14} />
-        </button>
-        <button
-          className="btn"
-          title="Refresh this project's agents from the team brain"
-          onClick={async () => {
-            const r = await window.api.refreshFromTeam()
-            if (r.refreshed && r.graph) {
-              setGraph(r.graph)
-              notify({ kind: 'success', message: `Updated ${r.updated} agent(s) from the team brain.` })
-            } else if (r.error) {
-              notify({ kind: 'error', message: r.error })
-            }
-          }}
-        >
-          <CloudDownload size={14} />
-        </button>
-        <button
-          className="btn ctx-btn"
-          title="Project context — files & images for the team"
-          onClick={() => setShowContext(true)}
-        >
-          <Paperclip size={14} />
-          {(graph.context?.length ?? 0) > 0 && <span className="ctx-badge">{graph.context!.length}</span>}
-        </button>
-        <button className="btn" title="Settings" onClick={() => setShowSettings(true)}>
-          <SettingsIcon size={14} />
-        </button>
-        <button className="btn primary" onClick={() => setShowAdd(true)}>
-          <Plus size={14} /> Add agent
-        </button>
+        <button className="btn" onClick={async () => { const g = await window.api.pickProjectFolder(); if (g) { setGraph(g); void refreshResumable(true) } }}><FolderOpen size={14} /> Switch project</button>
+        <button className="btn" title="Run history" onClick={() => openHistory()}><Clock size={14} /> History{resumable.length > 0 && <span className="resume-badge">{resumable.length}</span>}</button>
+        <TeamMenu />
+        {graph.linkedTeam && (<span className="team-link" title={`Linked team brain: ${graph.linkedTeam.path}`}><Users size={12} /> {graph.linkedTeam.path.split(/[\\/]/).pop()}</span>)}
+        <button className="btn ctx-btn" title="Project context — files & images for the team" onClick={() => setShowContext(true)}><Paperclip size={14} /> Context{(graph.context?.length ?? 0) > 0 && <span className="ctx-badge">{graph.context!.length}</span>}</button>
+        <button className="btn" title="Settings" onClick={() => setShowSettings(true)}><SettingsIcon size={14} /> Settings</button>
+        <button className="btn primary" onClick={() => setShowAdd(true)}><Plus size={14} /> Add agent</button>
       </div>
 
       <div
@@ -336,6 +259,7 @@ export default function App() {
       {showAdd && <AddAgentModal onClose={() => setShowAdd(false)} onCreated={setGraph} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showContext && <ContextModal onClose={() => setShowContext(false)} />}
+      {showFaq && <FaqModal onClose={() => setShowFaq(false)} />}
       <HitlModal />
       <ConfirmDialog />
       <ToastViewport />
