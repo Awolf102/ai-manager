@@ -13,6 +13,7 @@ import SettingsModal from './SettingsModal'
 import ContextModal from './ContextModal'
 import HitlModal from './HitlModal'
 import ConfirmDialog from './ConfirmDialog'
+import ToastViewport from './ToastViewport'
 import { AGENT_KINDS } from '../shared/types'
 import type { AgentKind, AuthStatus, ProjectGraph, ProjectMeta } from '../shared/types'
 
@@ -300,6 +301,7 @@ export default function App() {
       {showContext && <ContextModal onClose={() => setShowContext(false)} />}
       <HitlModal />
       <ConfirmDialog />
+      <ToastViewport />
       {authBanner}
     </div>
   )
