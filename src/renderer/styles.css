@@ -1066,6 +1066,8 @@ button {
 .hist-detail-inner h3 {
   margin: 0 0 4px;
   font-size: 15px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .hist-sub {
@@ -1376,8 +1378,8 @@ button {
 .run-tab { padding: 6px 12px; background: none; border: none; border-right: 1px solid var(--hairline); color: var(--fg-muted); font-size: var(--text-sm); cursor: pointer; }
 .run-tab.active { background: var(--surface-0); color: var(--fg); }
 .run-slots { position: relative; flex: 1; min-height: 0; overflow: hidden; }
-.run-slot { position: absolute; inset: 0; visibility: hidden; overflow: hidden; }
-.run-slot.active { visibility: visible; }
+.run-slot { position: absolute; inset: 0; display: none; overflow: hidden; }
+.run-slot.active { display: block; }
 .run-result { margin: 0; height: 100%; overflow: auto; padding: 12px 14px; white-space: pre-wrap; font-size: var(--text-sm); line-height: var(--lh-normal); color: var(--fg); }
 .activity-feed { height: 100%; overflow-y: auto; background: var(--surface-1); padding: 4px 0; font-size: var(--text-sm); }
 .activity-empty {
