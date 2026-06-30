@@ -116,6 +116,8 @@ button {
   white-space: nowrap;
 }
 
+.goal-tools { display: inline-flex; gap: var(--space-2); padding-right: var(--space-3); margin-right: var(--space-1); border-right: 1px solid var(--hairline); }
+
 .canvas-wrap {
   position: relative;
   overflow: hidden;

@@ -116,30 +116,32 @@ export default function GoalBar() {
       <span className="goal-target" title="The goal is given to this Orchestrator">
         <Target size={12} /> {hint}
       </span>
-      <button
-        className="btn"
-        onClick={() => void draftRoles()}
-        disabled={!canDraft}
-        title="Have the orchestrator draft roles for the team from this goal"
-      >
-        <Sparkles size={14} /> {drafting ? 'Drafting…' : 'Draft roles'}
-      </button>
-      <button
-        className="btn"
-        onClick={() => void buildTeam()}
-        disabled={!canBuild}
-        title="Have the orchestrator design and create a team for this goal"
-      >
-        <Network size={14} /> {spawning ? 'Building…' : 'Build team'}
-      </button>
-      <button
-        className="btn"
-        onClick={() => void runResult()}
-        disabled={!canRunResult}
-        title="Launch the app your team built and open it in the browser"
-      >
-        <Rocket size={14} /> {detecting ? 'Detecting…' : 'Run result'}
-      </button>
+      <span className="goal-tools">
+        <button
+          className="btn"
+          onClick={() => void draftRoles()}
+          disabled={!canDraft}
+          title="Have the orchestrator draft roles for the team from this goal"
+        >
+          <Sparkles size={14} /> {drafting ? 'Drafting…' : 'Draft roles'}
+        </button>
+        <button
+          className="btn"
+          onClick={() => void buildTeam()}
+          disabled={!canBuild}
+          title="Have the orchestrator design and create a team for this goal"
+        >
+          <Network size={14} /> {spawning ? 'Building…' : 'Build team'}
+        </button>
+        <button
+          className="btn"
+          onClick={() => void runResult()}
+          disabled={!canRunResult}
+          title="Launch the app your team built and open it in the browser"
+        >
+          <Rocket size={14} /> {detecting ? 'Launching…' : 'Launch app'}
+        </button>
+      </span>
       {running ? (
         <button
           className="btn danger"
