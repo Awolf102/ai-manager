@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto'
 import { IPC } from '../shared/types'
 import type {
   AgentNodeData,
+  ContextScope,
   CreateAgentInput,
   GraphEdge,
   ProjectSettings,
@@ -272,6 +273,26 @@ export function registerIpc(): void {
   )
   ipcMain.handle(IPC.removeContext, (_e, id: string) => store.removeContextFile(id))
   ipcMain.handle(IPC.contextThumbnail, (_e, id: string) => store.contextThumbnail(id))
+  ipcMain.handle(IPC.addContextPaths, (_e, paths: string[]) => store.addContextPaths(paths))
+  ipcMain.handle(IPC.setContextScope, (_e, id: string, scope: ContextScope) =>
+    store.setContextScope(id, scope)
+  )
+  ipcMain.handle(IPC.addContextFolder, async (_e, paths?: string[]) => {
+    let sources = paths
+    if (!sources || sources.length === 0) {
+      const r = await dialog.showOpenDialog({
+        title: 'Add a context folder',
+        properties: ['openDirectory', 'multiSelections']
+      })
+      if (r.canceled || r.filePaths.length === 0) return { graph: store.getGraph(), skipped: [] }
+      sources = r.filePaths
+    }
+    return store.addContextFolders(sources)
+  })
+  ipcMain.handle(IPC.updateContextFolder, (_e, id: string, note: string) =>
+    store.updateContextFolder(id, { note })
+  )
+  ipcMain.handle(IPC.removeContextFolder, (_e, id: string) => store.removeContextFolder(id))
 
   // ---- skills ----
   ipcMain.handle(IPC.listSkills, () => {
