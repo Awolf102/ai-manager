@@ -187,13 +187,21 @@ export default function OrgChart() {
   )
 
   const selectedEdge = graph.edges.find((e) => e.id === selectedEdgeId) ?? null
-  const convertSelected = useCallback(() => {
+  const convertSelected = useCallback(async () => {
     if (!selectedEdge) return
     const nextKind = selectedEdge.kind === 'handoff' ? 'report' : 'handoff'
-    void persistEdges(
+    if (nextKind === 'handoff' && graph.settings.maxHandoffs === 0) {
+      const ok = await requestConfirm({
+        title: 'Enable handoffs?',
+        body: 'Handoffs are off, so this edge would do nothing during a run. Enable peer handoffs now?',
+        confirmLabel: 'Enable'
+      })
+      if (ok) setGraph(await window.api.updateSettings({ maxHandoffs: 1 }))
+    }
+    await persistEdges(
       graph.edges.map((e) => (e.id === selectedEdge.id ? { ...e, kind: nextKind, order: undefined } : e))
     )
-  }, [selectedEdge, graph.edges, persistEdges])
+  }, [selectedEdge, graph.edges, graph.settings.maxHandoffs, requestConfirm, setGraph, persistEdges])
 
   return (
     <ReactFlow
@@ -219,7 +227,7 @@ export default function OrgChart() {
     >
       {selectedEdge && !orderMode && (
         <Panel position="top-left">
-          <button className="btn" onClick={convertSelected}>
+          <button className="btn" onClick={() => void convertSelected()}>
             {selectedEdge.kind === 'handoff' ? 'Make reporting' : 'Make handoff'}
           </button>
         </Panel>

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import { useStore } from '../store'
-import { AGENT_KINDS, MODELS, PERMISSION_MODES } from '../../shared/types'
-import type { AgentKind, AgentNodeData, DiscoveredPlugin, PermissionMode } from '../../shared/types'
+import { AGENT_KINDS, MODELS } from '../../shared/types'
+import type { AgentKind, AgentNodeData, DiscoveredPlugin } from '../../shared/types'
 
 export default function AgentConfigPanel() {
   const graph = useStore((s) => s.graph)
@@ -65,19 +65,6 @@ export default function AgentConfigPanel() {
           {MODELS.map((m) => (
             <option key={m.id} value={m.id}>
               {m.label}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="field">
-        <label>Permission mode</label>
-        <select
-          value={agent.permissionMode}
-          onChange={(e) => update({ permissionMode: e.target.value as PermissionMode })}
-        >
-          {PERMISSION_MODES.map((p) => (
-            <option key={p} value={p}>
-              {p}
             </option>
           ))}
         </select>

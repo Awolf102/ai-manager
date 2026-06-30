@@ -10,7 +10,6 @@ import type { WebContents } from 'electron'
 import type { StreamAgentOptions } from './agent-runner'
 import type {
   Assignment,
-  Autonomy,
   Effort,
   OrchestrationEvent,
   PermissionMode,
@@ -61,11 +60,7 @@ export interface Eng {
   handoffs: { askerId: string; peerId: string; ask: string }[]
 }
 
-export function actingModeFor(autonomy: Autonomy): PermissionMode {
-  if (autonomy === 'full') return 'bypassPermissions'
-  if (autonomy === 'cautious') return 'acceptEdits'
-  return 'auto'
-}
+export { actingModeFor } from './acting-mode'
 
 export function seedRunState(args: {
   runId: string

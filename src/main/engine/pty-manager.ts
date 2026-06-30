@@ -3,8 +3,9 @@ import type { WebContents } from 'electron'
 import * as pty from 'node-pty'
 import type { SpawnPtyInput } from '../../shared/types'
 import { IPC } from '../../shared/types'
-import { buildAgentContext } from './project-store'
+import { buildAgentContext, getSettings } from './project-store'
 import { resolveClaudeBin } from './env'
+import { launchMode } from './acting-mode'
 
 type Session = { proc: pty.IPty }
 const sessions = new Map<string, Session>()
@@ -24,6 +25,7 @@ export async function spawnPty(
   const { agent, projectPath, role, memory } = await buildAgentContext(input.agentId)
   const ptyId = randomUUID()
 
+  const settings = getSettings()
   const append = [role.trim(), '', '## Your memory', memory.trim() || '(empty)'].join('\n')
   const args = [
     '--append-system-prompt',
@@ -31,7 +33,7 @@ export async function spawnPty(
     '--model',
     agent.model,
     '--permission-mode',
-    agent.permissionMode
+    launchMode(settings.autonomy, settings.lockBypassPermissions)
   ]
   if (input.resume && agent.sessionId) args.push('--resume', agent.sessionId)
 
