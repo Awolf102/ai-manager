@@ -1,12 +1,14 @@
 import { app } from 'electron'
 import { promises as fs } from 'node:fs'
 import { existsSync } from 'node:fs'
-import { join, basename } from 'node:path'
+import { join, basename, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type {
   AgentKind,
   AgentNodeData,
   ContextFile,
+  ContextFolder,
+  ContextScope,
   CreateAgentInput,
   GraphEdge,
   ProjectGraph,
@@ -19,7 +21,7 @@ import type {
 import { DEFAULT_MODEL_BY_KIND, DEFAULT_SETTINGS } from '../../shared/types'
 import { iconForName } from '../../shared/icons'
 import { slugify, uniqueSlug } from '../../shared/slug'
-import { isImageName, uniqueContextName } from '../../shared/context-files'
+import { isImageName, uniqueContextName, scopeAppliesTo } from '../../shared/context-files'
 import { parseLessonBullet } from '../../shared/lessons'
 import { buildTeamBundle, planTeamImport, validateTeamBundle, type TeamBundle } from '../../shared/team-bundle'
 import { atomicWriteWithBackup, atomicWrite } from './atomic-write'
@@ -213,6 +215,7 @@ export async function openProject(projectPath: string): Promise<ProjectGraph> {
   // apply settings defaults for graphs created before this field existed
   graph.settings = { ...DEFAULT_SETTINGS, ...(graph.settings ?? {}) }
   graph.context = graph.context ?? []
+  graph.contextFolders = graph.contextFolders ?? []
   current = { path: projectPath, graph }
   // Re-persist (applies settings/context defaults). After a .bak recovery the corrupt
   // graph.json was already renamed to *.corrupt-<ts>, so atomicWriteWithBackup sees no
@@ -351,10 +354,13 @@ export async function buildAgentContext(agentId: string): Promise<{
   role: string
   memory: string
   context: ContextFile[]
+  folders: ContextFolder[]
 }> {
   const agent = getAgent(agentId)
   const [role, memory] = await Promise.all([readRole(agentId), readMemory(agentId)])
-  return { agent, projectPath: getCurrentProjectPath(), role, memory, context: getContextFiles() }
+  const context = getContextFiles().filter((f) => scopeAppliesTo(f.scope, agent))
+  const folders = getContextFolders().filter((f) => scopeAppliesTo(f.scope, agent))
+  return { agent, projectPath: getCurrentProjectPath(), role, memory, context, folders }
 }
 
 // ---------- context files ----------
@@ -428,6 +434,113 @@ export async function contextThumbnail(id: string): Promise<string | null> {
   } catch {
     return null
   }
+}
+
+/** The user's referenced folders for this project. */
+export function getContextFolders(): ContextFolder[] {
+  return [...(requireCurrent().graph.contextFolders ?? [])]
+}
+
+/** Record each source directory as an absolute reference path. Non-dirs / symlinks / dupes are skipped. */
+export async function addContextFolders(
+  sourcePaths: string[]
+): Promise<{ graph: ProjectGraph; skipped: string[] }> {
+  const { graph } = requireCurrent()
+  graph.contextFolders = graph.contextFolders ?? []
+  const skipped: string[] = []
+  for (const src of sourcePaths) {
+    try {
+      const abs = resolve(src)
+      const stat = await fs.lstat(abs)
+      if (stat.isSymbolicLink()) {
+        skipped.push(`${basename(abs)} (symlink)`)
+        continue
+      }
+      if (!stat.isDirectory()) {
+        skipped.push(`${basename(abs)} (not a folder)`)
+        continue
+      }
+      if (graph.contextFolders.some((f) => f.path === abs)) {
+        skipped.push(`${basename(abs)} (already added)`)
+        continue
+      }
+      graph.contextFolders.push({
+        id: randomUUID(),
+        path: abs,
+        note: '',
+        addedAt: new Date().toISOString(),
+        scope: undefined
+      })
+    } catch {
+      skipped.push(`${basename(src)} (unreadable)`)
+    }
+  }
+  return { graph: await saveGraph(), skipped }
+}
+
+/** Edit a referenced folder's note. */
+export async function updateContextFolder(id: string, patch: { note?: string }): Promise<ProjectGraph> {
+  const { graph } = requireCurrent()
+  const entry = (graph.contextFolders ?? []).find((f) => f.id === id)
+  if (entry && patch.note !== undefined) entry.note = patch.note
+  return saveGraph()
+}
+
+/** Remove a referenced folder (nothing on disk to delete). */
+export async function removeContextFolder(id: string): Promise<ProjectGraph> {
+  const { graph } = requireCurrent()
+  graph.contextFolders = (graph.contextFolders ?? []).filter((f) => f.id !== id)
+  return saveGraph()
+}
+
+/** Set the scope on the file OR folder with this id. An empty scope is stored as undefined (= all agents). */
+export async function setContextScope(id: string, scope: ContextScope): Promise<ProjectGraph> {
+  const { graph } = requireCurrent()
+  const empty = (scope.kinds?.length ?? 0) === 0 && (scope.nodeIds?.length ?? 0) === 0
+  const value = empty ? undefined : scope
+  const file = (graph.context ?? []).find((c) => c.id === id)
+  if (file) {
+    file.scope = value
+    return saveGraph()
+  }
+  const folder = (graph.contextFolders ?? []).find((f) => f.id === id)
+  if (folder) {
+    folder.scope = value
+    return saveGraph()
+  }
+  return graph // id not found: nothing changed, don't write
+}
+
+/** Drag-drop router: stat each path and copy files / reference directories. */
+export async function addContextPaths(
+  sourcePaths: string[]
+): Promise<{ graph: ProjectGraph; skipped: string[] }> {
+  const files: string[] = []
+  const dirs: string[] = []
+  const skipped: string[] = []
+  for (const src of sourcePaths) {
+    try {
+      const stat = await fs.lstat(src)
+      if (stat.isSymbolicLink()) skipped.push(`${basename(src)} (symlink)`)
+      else if (stat.isDirectory()) dirs.push(src)
+      else if (stat.isFile()) files.push(src)
+      else skipped.push(`${basename(src)} (unsupported)`)
+    } catch {
+      skipped.push(`${basename(src)} (unreadable)`)
+    }
+  }
+  let graph = requireCurrent().graph
+  if (files.length > 0) {
+    const r = await addContextFiles(files)
+    skipped.push(...r.skipped)
+    graph = r.graph
+  }
+  if (dirs.length > 0) {
+    const r = await addContextFolders(dirs)
+    skipped.push(...r.skipped)
+    graph = r.graph
+  }
+  return { graph, skipped }
 }
 
 // ---------- orchestration helpers ----------

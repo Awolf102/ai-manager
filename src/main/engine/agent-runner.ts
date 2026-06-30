@@ -3,7 +3,7 @@ import type { WebContents } from 'electron'
 // Type-only import: erased at compile time, so it does NOT trigger a runtime
 // require of this ESM-only package (we load it via dynamic import below).
 import type { Options, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
-import type { AgentStreamEvent, ContextFile, Effort, PermissionMode, RunHeadlessInput } from '../../shared/types'
+import type { AgentStreamEvent, ContextFile, ContextFolder, Effort, PermissionMode, RunHeadlessInput } from '../../shared/types'
 import { IPC } from '../../shared/types'
 import { skillOptionsFor } from '../../shared/skill-trust'
 import { assembleAgentSkills, headlessNote } from '../../shared/skills-pack'
@@ -15,9 +15,9 @@ import { buildAgentContext, getSettings, updateAgent } from './project-store'
 import { buildPermissionOptions } from './permission-options'
 import { actingModeFor } from './acting-mode'
 
-/** Role + persistent memory + the user's project context, appended onto Claude Code's preset system prompt. */
-function composeAppend(role: string, memory: string, context: ContextFile[]): string {
-  const block = buildContextBlock(context)
+/** Role + persistent memory + the user's project context (files + folders), appended onto the preset prompt. */
+function composeAppend(role: string, memory: string, context: ContextFile[], folders: ContextFolder[]): string {
+  const block = buildContextBlock(context, folders)
   return [
     role.trim(),
     '',
@@ -91,7 +91,7 @@ export async function streamAgent(
   opts: StreamAgentOptions
 ): Promise<{ text: string; sessionId?: string }> {
   const { wc, agentId, prompt, runId, stepId } = opts
-  const { agent, projectPath, role, memory, context } = await buildAgentContext(agentId)
+  const { agent, projectPath, role, memory, context, folders } = await buildAgentContext(agentId)
   const abort = opts.abort ?? new AbortController()
   const send = (
     kind: AgentStreamEvent['kind'],
@@ -114,7 +114,7 @@ export async function streamAgent(
     const options: Options = {
       cwd: projectPath,
       model: agent.model,
-      systemPrompt: { type: 'preset', preset: 'claude_code', append: composeAppend(role, memory, context) + headlessNote(pack.names) },
+      systemPrompt: { type: 'preset', preset: 'claude_code', append: composeAppend(role, memory, context, folders) + headlessNote(pack.names) },
       ...buildPermissionOptions(mode, { lockBypass: getSettings().lockBypassPermissions }),
       settingSources: ['project'],
       abortController: abort

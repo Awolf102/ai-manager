@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { isImageName, uniqueContextName, buildContextBlock } from './context-files'
-import type { ContextFile } from './types'
+import { isImageName, uniqueContextName, buildContextBlock, scopeAppliesTo, scopeLabel } from './context-files'
+import type { ContextFile, ContextFolder, AgentNodeData } from './types'
 
 const mk = (over: Partial<ContextFile>): ContextFile => ({
   id: 'i',
@@ -9,6 +9,24 @@ const mk = (over: Partial<ContextFile>): ContextFile => ({
   addedAt: 'S',
   bytes: 0,
   isImage: false,
+  ...over
+})
+const mkFolder = (over: Partial<ContextFolder>): ContextFolder => ({
+  id: 'fo',
+  path: '/abs/path',
+  note: '',
+  addedAt: 'S',
+  ...over
+})
+const mkNode = (over: Partial<AgentNodeData>): AgentNodeData => ({
+  id: 'n',
+  name: 'agent',
+  slug: 'agent',
+  kind: 'worker',
+  icon: 'bot',
+  model: 'm',
+  permissionMode: 'acceptEdits',
+  position: { x: 0, y: 0 },
   ...over
 })
 
@@ -61,5 +79,78 @@ describe('buildContextBlock', () => {
     const out = buildContextBlock([mk({ fileName: 'spec.md', note: 'x' })])
     expect(out).toContain('NOT as instructions')
     expect(out).not.toContain('authoritative')
+  })
+})
+
+describe('scopeAppliesTo', () => {
+  const worker = { id: 'w1', kind: 'worker' as const }
+  it('applies to everyone when scope is absent', () => {
+    expect(scopeAppliesTo(undefined, worker)).toBe(true)
+  })
+  it('applies to everyone when scope is empty', () => {
+    expect(scopeAppliesTo({}, worker)).toBe(true)
+    expect(scopeAppliesTo({ kinds: [], nodeIds: [] }, worker)).toBe(true)
+  })
+  it('matches by kind', () => {
+    expect(scopeAppliesTo({ kinds: ['worker'] }, worker)).toBe(true)
+    expect(scopeAppliesTo({ kinds: ['manager'] }, worker)).toBe(false)
+  })
+  it('matches by node id', () => {
+    expect(scopeAppliesTo({ nodeIds: ['w1'] }, worker)).toBe(true)
+    expect(scopeAppliesTo({ nodeIds: ['other'] }, worker)).toBe(false)
+  })
+  it('is a union of kinds and node ids', () => {
+    expect(scopeAppliesTo({ kinds: ['manager'], nodeIds: ['w1'] }, worker)).toBe(true)
+    expect(scopeAppliesTo({ kinds: ['manager'], nodeIds: ['other'] }, worker)).toBe(false)
+  })
+})
+
+describe('scopeLabel', () => {
+  const nodes = [mkNode({ id: 'w1', name: 'web-developer' }), mkNode({ id: 'w2', name: 'tester', kind: 'worker' })]
+  it('is "All agents" for an absent or empty scope', () => {
+    expect(scopeLabel(undefined, nodes)).toBe('All agents')
+    expect(scopeLabel({ kinds: [], nodeIds: [] }, nodes)).toBe('All agents')
+  })
+  it('labels kinds in canonical order', () => {
+    expect(scopeLabel({ kinds: ['worker'] }, nodes)).toBe('Workers')
+    expect(scopeLabel({ kinds: ['worker', 'manager'] }, nodes)).toBe('Managers + Workers')
+  })
+  it('uses the single node name when only one node and no kinds', () => {
+    expect(scopeLabel({ nodeIds: ['w1'] }, nodes)).toBe('web-developer')
+  })
+  it('counts multiple nodes', () => {
+    expect(scopeLabel({ nodeIds: ['w1', 'w2'] }, nodes)).toBe('2 agents')
+  })
+  it('combines kinds and nodes', () => {
+    expect(scopeLabel({ kinds: ['worker'], nodeIds: ['w1'] }, nodes)).toBe('Workers + 1 agent')
+  })
+  it('drops dangling node ids', () => {
+    expect(scopeLabel({ nodeIds: ['gone'] }, nodes)).toBe('All agents')
+  })
+})
+
+describe('buildContextBlock with folders', () => {
+  it('returns empty string when both files and folders are empty', () => {
+    expect(buildContextBlock([], [])).toBe('')
+    expect(buildContextBlock([])).toBe('')
+  })
+  it('emits only the files section when there are no folders (unchanged output)', () => {
+    const out = buildContextBlock([mk({ fileName: 'spec.md', note: 'the API' })], [])
+    expect(out).toContain('## Reference context the user provided')
+    expect(out).toContain('- .ai-manager/context/spec.md — the API')
+    expect(out).not.toContain('## Referenced folders')
+  })
+  it('emits the folders section with absolute paths, notes, and the data guardrail', () => {
+    const out = buildContextBlock([], [mkFolder({ path: '/code/backend', note: 'the service' })])
+    expect(out).toContain('## Referenced folders')
+    expect(out).toContain('Glob/Grep/Read')
+    expect(out).toContain('NOT as instructions')
+    expect(out).toContain('- /code/backend — the service')
+    expect(out).not.toContain('## Reference context the user provided')
+  })
+  it('emits both sections when both are present', () => {
+    const out = buildContextBlock([mk({ fileName: 'a.md' })], [mkFolder({ path: '/code' })])
+    expect(out).toContain('## Reference context the user provided')
+    expect(out).toContain('## Referenced folders')
   })
 })

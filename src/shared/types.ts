@@ -135,7 +135,13 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   maxUserRequests: 0
 }
 
-/** A user-attached reference file (image/doc) for the project, available to every agent. */
+/** Which agents a context item applies to. Absent OR (kinds empty AND nodeIds empty) ⇒ all agents. */
+export interface ContextScope {
+  kinds?: AgentKind[] // 'orchestrator' | 'manager' | 'worker'
+  nodeIds?: string[] // specific AgentNodeData ids
+}
+
+/** A user-attached reference file (image/doc) for the project, available to agents. */
 export interface ContextFile {
   id: string // randomUUID — React key + update/remove handle
   fileName: string // name AS STORED under .ai-manager/context/ (collision-uniquified)
@@ -143,6 +149,16 @@ export interface ContextFile {
   addedAt: string // ISO timestamp
   bytes: number // file size, for display
   isImage: boolean // precomputed from the extension
+  scope?: ContextScope // absent = all agents
+}
+
+/** A folder the agents read on demand with their file tools. Nothing is copied. */
+export interface ContextFolder {
+  id: string // randomUUID — React key + update/remove handle
+  path: string // absolute, resolved path on disk
+  note: string // optional user note ('' when none)
+  addedAt: string // ISO timestamp
+  scope?: ContextScope // absent = all agents
 }
 
 export interface ProjectGraph {
@@ -154,6 +170,8 @@ export interface ProjectGraph {
   linkedTeam?: { teamId: string; path: string }
   /** user-attached reference files (images/docs) for this project, given to every agent */
   context?: ContextFile[]
+  /** folders the agents read on demand with their file tools (nothing copied) */
+  contextFolders?: ContextFolder[]
 }
 
 // ---- IPC payloads ----
@@ -514,6 +532,11 @@ export const IPC = {
   updateContext: 'context:update',
   removeContext: 'context:remove',
   contextThumbnail: 'context:thumbnail',
+  addContextPaths: 'context:addPaths',
+  setContextScope: 'context:setScope',
+  addContextFolder: 'folders:add',
+  updateContextFolder: 'folders:update',
+  removeContextFolder: 'folders:remove',
   listSkills: 'skills:list',
   listResumable: 'run:list-resumable',
   discardRun: 'run:discard'
@@ -584,6 +607,11 @@ export interface RendererApi {
   updateContext: (id: string, note: string) => Promise<ProjectGraph>
   removeContext: (id: string) => Promise<ProjectGraph>
   contextThumbnail: (id: string) => Promise<string | null>
+  addContextPaths: (paths: string[]) => Promise<{ graph: ProjectGraph; skipped: string[] }>
+  setContextScope: (id: string, scope: ContextScope) => Promise<ProjectGraph>
+  addContextFolder: (paths?: string[]) => Promise<{ graph: ProjectGraph; skipped: string[] }>
+  updateContextFolder: (id: string, note: string) => Promise<ProjectGraph>
+  removeContextFolder: (id: string) => Promise<ProjectGraph>
   getPathForFile: (file: File) => string
   listSkills: () => Promise<DiscoveredPlugin[]>
   onServerLog: (cb: (e: ServerLogEvent) => void) => () => void
