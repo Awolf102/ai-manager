@@ -12,6 +12,7 @@ export default function TeamSpawnModal({
   onClose: () => void
 }) {
   const setGraph = useStore((s) => s.setGraph)
+  const notify = useStore((s) => s.notify)
   const [edited, setEdited] = useState<SpawnedMember[]>(members)
   const [applying, setApplying] = useState(false)
 
@@ -33,7 +34,7 @@ export default function TeamSpawnModal({
       setGraph(await window.api.applySpawnedTeam({ members: edited, orchestratorId }))
       onClose()
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Could not create the team.')
+      notify({ kind: 'error', message: err instanceof Error ? err.message : 'Could not create the team.' })
     } finally {
       setApplying(false)
     }

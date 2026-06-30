@@ -33,12 +33,13 @@ function Thumb({ file }: { file: ContextFile }) {
 export default function ContextModal({ onClose }: { onClose: () => void }) {
   const graph = useStore((s) => s.graph)
   const setGraph = useStore((s) => s.setGraph)
+  const notify = useStore((s) => s.notify)
   const files = graph?.context ?? []
 
   const add = async (): Promise<void> => {
     const r = await window.api.addContext()
     setGraph(r.graph)
-    if (r.skipped.length) window.alert(`Skipped (not a readable file): ${r.skipped.join(', ')}`)
+    if (r.skipped.length) notify({ kind: 'info', message: `Skipped (not a readable file): ${r.skipped.join(', ')}` })
   }
   const remove = async (id: string): Promise<void> => {
     setGraph(await window.api.removeContext(id))
