@@ -1,10 +1,11 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { useStore } from '../store'
 import { effortOfWorker, cappedFromDisplay } from '../../shared/effort'
 import type { ProjectGraph } from '../../shared/types'
 import ActivityFeed from './ActivityFeed'
+import { runBanner } from './run-status'
 
 function buildChain(graph: ProjectGraph, rootId: string | null): { id: string; depth: number }[] {
   if (!rootId) return []
@@ -34,6 +35,14 @@ export default function RunView() {
   const graph = useStore((s) => s.graph)
   const run = useStore((s) => s.run)
   const selectStep = useStore((s) => s.selectStep)
+
+  const [rightTab, setRightTab] = useState<'narration' | 'terminal' | 'result'>('narration')
+  const prevRunning = useRef(run.running)
+  // Land on the Result tab when a run finishes successfully with a report.
+  useEffect(() => {
+    if (prevRunning.current && !run.running && run.final && !run.error) setRightTab('result')
+    prevRunning.current = run.running
+  }, [run.running, run.final, run.error])
 
   const hostRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<Terminal | null>(null)
@@ -99,79 +108,106 @@ export default function RunView() {
   // Effort is assigned per task and the worker runs at the highest of its batch.
   const allAssignments = Object.values(run.assignments).flat()
 
+  const banner = runBanner(run)
+  const hasResult = !!run.final
+
   return (
     <div className="runview">
-      <div className="run-tree">
-        {chain.length === 0 && <div className="run-empty">No run yet — enter a goal and Run.</div>}
-        {run.reviewAttempt > 0 &&
-          (() => {
-            const all = Object.values(run.verdict)
-            const pass = all.filter((v) => v.verdict === 'pass').length
+      {banner && (
+        <div className={`run-banner ${banner.kind}`}>
+          {banner.kind === 'success' ? '✓' : '✗'} {banner.text}
+        </div>
+      )}
+      <div className="run-main">
+        <div className="run-tree">
+          {chain.length === 0 && <div className="run-empty">No run yet — enter a goal and Run.</div>}
+          {run.reviewAttempt > 0 &&
+            (() => {
+              const all = Object.values(run.verdict)
+              const pass = all.filter((v) => v.verdict === 'pass').length
+              return (
+                <div className="run-attempt">
+                  Review · {pass}/{all.length} passed
+                  {run.reviewAttempt > 1 ? ` · attempt ${run.reviewAttempt}` : ''}
+                </div>
+              )
+            })()}
+          {run.replans.map((r) => (
+            <div key={r.attempt} className="run-replan" title={r.reason}>
+              ⚡ Re-planned (#{r.attempt}): {r.reason}
+            </div>
+          ))}
+          {run.handoffs.map((hnd, i) => (
+            <div key={i} className="run-handoff" title={hnd.ask}>
+              ↪ Handoff: {nameOf(hnd.askerId)} → {nameOf(hnd.peerId)}: {hnd.ask}
+            </div>
+          ))}
+          {run.userRequests.map((ur, i) => (
+            <div key={`ur-${i}`} className="run-userrequest" title={ur.question}>
+              ❓ Asked you · {nameOf(ur.askerId)}: {ur.question}
+            </div>
+          ))}
+          {chain.map(({ id, depth }) => {
+            const status = run.nodeStatus[id] ?? 'idle'
+            const tasks = run.nodeTasks[id]
+            const verdicts = Object.values(run.verdict).filter((v) => v.nodeId === id)
+            const failed = verdicts.some((v) => v.verdict === 'fail')
+            const mem = run.memoryUpdated[id]
+            // only leaf workers actually execute tasks → show the effort they ran at
+            const isLeaf = !graph?.edges.some((e) => e.source === id)
+            const eff = isLeaf ? effortOfWorker(allAssignments, id) : undefined
+            const capped = isLeaf ? cappedFromDisplay(allAssignments, id) : undefined
             return (
-              <div className="run-attempt">
-                Review · {pass}/{all.length} passed
-                {run.reviewAttempt > 1 ? ` · attempt ${run.reviewAttempt}` : ''}
+              <div
+                key={id}
+                className={`run-row ${run.selectedStepId === id ? 'sel' : ''}`}
+                style={{ paddingLeft: 10 + depth * 16 }}
+                title={tasks?.join(', ')}
+                onClick={() => selectStep(id)}
+              >
+                <span className="run-row-name">{nameOf(id)}</span>
+                <span className={`run-pill st-${status}`}>{STATUS_LABEL[status] ?? status}</span>
+                {eff && (
+                  <span className={`run-eff eff-${eff}`} title={capped ? `effort ${eff} (capped from ${capped} — model limit)` : `assigned effort: ${eff}`}>
+                    {eff}
+                  </span>
+                )}
+                {verdicts.length > 0 && (
+                  <span className={`run-verdict ${failed ? 'fail' : 'pass'}`}>
+                    {failed ? '✗' : '✓'}
+                  </span>
+                )}
+                {mem != null && (
+                  <span className="run-mem" title="memory updated">
+                    🧠+{mem}
+                  </span>
+                )}
               </div>
             )
-          })()}
-        {run.replans.map((r) => (
-          <div key={r.attempt} className="run-replan" title={r.reason}>
-            ⚡ Re-planned (#{r.attempt}): {r.reason}
+          })}
+        </div>
+        <div className="run-right">
+          <div className="run-tabs">
+            <button className={`run-tab ${rightTab === 'narration' ? 'active' : ''}`} onClick={() => setRightTab('narration')}>Narration</button>
+            <button className={`run-tab ${rightTab === 'terminal' ? 'active' : ''}`} onClick={() => setRightTab('terminal')}>Terminal</button>
+            {hasResult && (
+              <button className={`run-tab ${rightTab === 'result' ? 'active' : ''}`} onClick={() => setRightTab('result')}>Result</button>
+            )}
           </div>
-        ))}
-        {run.handoffs.map((hnd, i) => (
-          <div key={i} className="run-handoff" title={hnd.ask}>
-            ↪ Handoff: {nameOf(hnd.askerId)} → {nameOf(hnd.peerId)}: {hnd.ask}
-          </div>
-        ))}
-        {run.userRequests.map((ur, i) => (
-          <div key={`ur-${i}`} className="run-userrequest" title={ur.question}>
-            ❓ Asked you · {nameOf(ur.askerId)}: {ur.question}
-          </div>
-        ))}
-        {chain.map(({ id, depth }) => {
-          const status = run.nodeStatus[id] ?? 'idle'
-          const tasks = run.nodeTasks[id]
-          const verdicts = Object.values(run.verdict).filter((v) => v.nodeId === id)
-          const failed = verdicts.some((v) => v.verdict === 'fail')
-          const mem = run.memoryUpdated[id]
-          // only leaf workers actually execute tasks → show the effort they ran at
-          const isLeaf = !graph?.edges.some((e) => e.source === id)
-          const eff = isLeaf ? effortOfWorker(allAssignments, id) : undefined
-          const capped = isLeaf ? cappedFromDisplay(allAssignments, id) : undefined
-          return (
-            <div
-              key={id}
-              className={`run-row ${run.selectedStepId === id ? 'sel' : ''}`}
-              style={{ paddingLeft: 10 + depth * 16 }}
-              title={tasks?.join(', ')}
-              onClick={() => selectStep(id)}
-            >
-              <span className="run-row-name">{nameOf(id)}</span>
-              <span className={`run-pill st-${status}`}>{STATUS_LABEL[status] ?? status}</span>
-              {eff && (
-                <span className={`run-eff eff-${eff}`} title={capped ? `effort ${eff} (capped from ${capped} — model limit)` : `assigned effort: ${eff}`}>
-                  {eff}
-                </span>
-              )}
-              {verdicts.length > 0 && (
-                <span className={`run-verdict ${failed ? 'fail' : 'pass'}`}>
-                  {failed ? '✗' : '✓'}
-                </span>
-              )}
-              {mem != null && (
-                <span className="run-mem" title="memory updated">
-                  🧠+{mem}
-                </span>
-              )}
+          <div className="run-slots">
+            <div className={`run-slot ${rightTab === 'narration' ? 'active' : ''}`}>
+              <ActivityFeed runId={run.runId} />
             </div>
-          )
-        })}
-        {run.error && <div className="run-error">✗ {run.error}</div>}
-      </div>
-      <div className="run-right">
-        <ActivityFeed runId={run.runId} />
-        <div className="run-output" ref={hostRef} />
+            <div className={`run-slot ${rightTab === 'terminal' ? 'active' : ''}`}>
+              <div className="run-output" ref={hostRef} />
+            </div>
+            {hasResult && (
+              <div className={`run-slot ${rightTab === 'result' ? 'active' : ''}`}>
+                <pre className="run-result">{run.final}</pre>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )
