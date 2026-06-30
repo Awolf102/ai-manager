@@ -27,19 +27,19 @@ export default function RecentPrompts({ onPick }: { onPick: (goal: string) => vo
   }
 
   return (
-    <div className="recent-menu" ref={ref}>
+    <div className="recent-prompts-menu" ref={ref}>
       <button className="btn" onClick={() => void toggle()} title="Reuse a recent prompt">
         <Clock size={14} /> Recent
       </button>
       {open && (
-        <div className="recent-list">
+        <div className="recent-prompts-list">
           {goals.length === 0 ? (
-            <div className="recent-empty">No past prompts yet.</div>
+            <div className="recent-prompts-empty">No past prompts yet.</div>
           ) : (
             goals.map((g, i) => (
               <button
                 key={i}
-                className="recent-item"
+                className="recent-prompts-item"
                 title={g}
                 onClick={() => {
                   onPick(g)

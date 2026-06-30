@@ -1514,18 +1514,18 @@ button {
 .coachmarks li { margin-bottom: 6px; }
 
 /* ---- recent prompts picker ---- */
-.recent-menu { position: relative; display: inline-flex; }
-.recent-list {
+.recent-prompts-menu { position: relative; display: inline-flex; }
+.recent-prompts-list {
   position: absolute; top: 100%; left: 0; margin-top: 4px;
   background: var(--surface-2); border: 1px solid var(--hairline-strong);
   border-radius: var(--radius); box-shadow: var(--elev-2); padding: 4px;
   display: flex; flex-direction: column; min-width: 240px; max-width: 360px;
   max-height: 320px; overflow-y: auto; z-index: 60;
 }
-.recent-item {
+.recent-prompts-item {
   display: block; width: 100%; padding: 7px 10px; background: none; border: none;
   color: var(--fg); font-size: var(--text-sm); border-radius: var(--radius-sm);
   text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.recent-item:hover { background: var(--surface-hover); }
-.recent-empty { padding: 8px 10px; color: var(--fg-dim); font-size: var(--text-sm); }
+.recent-prompts-item:hover { background: var(--surface-hover); }
+.recent-prompts-empty { padding: 8px 10px; color: var(--fg-dim); font-size: var(--text-sm); }
