@@ -13,6 +13,8 @@ import {
   hasManagers,
   reviewerIdsOf,
   formatUserRequests,
+  assignPrompt,
+  workerPrompt,
   type Eng,
   type AgentRunner
 } from './nodes'
@@ -1819,5 +1821,29 @@ describe('workerModelOverride', () => {
   })
   it('returns undefined when off (byte-for-byte dispatch)', () => {
     expect(workerModelOverride({ cheapModelWorkers: false, cheapModelTier: 'claude-haiku-4-5' })).toBeUndefined()
+  })
+})
+
+describe('lighter internal prompts', () => {
+  const tasks = [{ id: 't1', title: 'Do a thing', description: 'details' }]
+  const roles = [{ id: 'w1', name: 'Worker', kind: 'worker' as const, role: 'does things', lessons: [] as string[] }]
+
+  it('assignPrompt: light=false is unchanged and both keep the JSON block marker', () => {
+    const full = assignPrompt(tasks, roles)
+    const light = assignPrompt(tasks, roles, true)
+    expect(assignPrompt(tasks, roles, false)).toBe(full) // default === explicit false
+    expect(full).toContain('```json')
+    expect(light).toContain('```json')
+    expect(light.length).toBeLessThan(full.length)
+    expect(light).not.toBe(full)
+  })
+
+  it('workerPrompt: light=false is unchanged; light keeps the goal and is shorter', () => {
+    const full = workerPrompt('build X', tasks)
+    const light = workerPrompt('build X', tasks, true)
+    expect(workerPrompt('build X', tasks, false)).toBe(full)
+    expect(light).toContain('build X')
+    expect(light.length).toBeLessThan(full.length)
+    expect(light).not.toBe(full)
   })
 })

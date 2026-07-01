@@ -320,7 +320,7 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
       const base: StreamAgentOptions = {
         wc: eng.wc,
         agentId: ownerId,
-        prompt: workerPrompt(state.goal, group.map((t) => t.task)) + (asksAvailable() ? askUserSection() : ''),
+        prompt: workerPrompt(state.goal, group.map((t) => t.task), es.lightPrompts) + (asksAvailable() ? askUserSection() : ''),
         runId: eng.runId,
         stepId: ownerId,
         permissionMode: state.actingMode,
@@ -783,7 +783,7 @@ async function assignStep(
   const parsed = await runStructured(
     eng,
     nodeId,
-    assignPrompt(tasks, childRoles),
+    assignPrompt(tasks, childRoles, getSettings().lightPrompts),
     (v): v is { assignments: unknown[] } => Array.isArray((v as { assignments?: unknown })?.assignments),
     { permissionMode: 'default', disallowedTools: THINK_DISALLOW }
   )
@@ -1338,7 +1338,7 @@ Reply with ONLY this JSON code block (no other text):
 \`\`\``
 }
 
-function assignPrompt(tasks: RunTask[], childRoles: ChildBrief[]): string {
+export function assignPrompt(tasks: RunTask[], childRoles: ChildBrief[], light = false): string {
   const specialists = childRoles
     .map((c) => {
       const head = `- id: ${c.id}\n  name: ${c.name} (${c.kind})\n  role: ${c.role.replace(/\s+/g, ' ').slice(0, 600)}`
@@ -1349,6 +1349,20 @@ function assignPrompt(tasks: RunTask[], childRoles: ChildBrief[]): string {
     })
     .join('\n')
   const taskList = tasks.map((t) => `- id: ${t.id} — ${t.title}: ${t.description}`).join('\n')
+  if (light) {
+    return `Route each task to the ONE specialist whose role best fits (prefer relevant track record); childId null if none fit. Also assign an effort level (low|medium|high|xhigh|max) per task by difficulty — reserve xhigh/max for genuinely hard work. Do NOT edit files.
+
+SPECIALISTS:
+${specialists}
+
+TASKS:
+${taskList}
+
+Reply with ONLY this JSON code block (no other text):
+\`\`\`json
+{ "assignments": [ { "taskId": "t1", "childId": "<specialist id, or null>", "effort": "low|medium|high|xhigh|max", "reason": "why" } ] }
+\`\`\``
+  }
   return `You route planned tasks to the specialists who report to you. For each specialist you can see their role AND their track record (lessons they've recorded from past work). Assign every task to the ONE specialist whose role best matches it — and when more than one role fits, prefer the specialist whose track record shows the most relevant, reliable experience for that task. If no specialist fits a task, set childId to null. Do NOT make changes to files.
 
 For EACH task, also assess its difficulty and assign a reasoning "effort" level for the specialist who will do it:
@@ -1371,8 +1385,17 @@ Reply with ONLY this JSON code block (no other text):
 \`\`\``
 }
 
-function workerPrompt(goal: string, tasks: RunTask[]): string {
+export function workerPrompt(goal: string, tasks: RunTask[], light = false): string {
   const list = tasks.map((t, i) => `${i + 1}. ${t.title}\n   ${t.description}`).join('\n\n')
+  if (light) {
+    return `Team goal: ${goal}
+
+Complete the following task(s) in this project folder, making the necessary changes. Apply any relevant lessons from your memory.
+
+${list}
+
+If your work serves web pages, actually run it and confirm the entry page AND every asset it references return 200 before reporting success. When finished, briefly report what you changed and flag anything you could not complete.`
+  }
   return `You are working as part of a team to achieve this overall goal:
 ${goal}
 
