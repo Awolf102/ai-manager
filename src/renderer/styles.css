@@ -1950,3 +1950,66 @@ input[type='checkbox'] {
   accent-color: var(--accent);
   cursor: pointer;
 }
+
+/* ---- Canvas empty-state onboarding ---- */
+.canvas-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none; /* let the canvas pan/zoom around the card */
+}
+.canvas-empty-card {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 380px;
+  padding: 24px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elev-2);
+  animation: picker-rise var(--motion-slow) var(--ease-out) backwards;
+}
+.canvas-empty-card h2 {
+  margin: 4px 0 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+.canvas-empty-card p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.canvas-empty-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+/* ---- Inspector empty hint ---- */
+.inspector-empty {
+  padding: 20px 16px;
+  color: var(--muted);
+}
+.inspector-empty-icon {
+  color: var(--muted);
+  opacity: 0.7;
+  margin-bottom: 10px;
+}
+.inspector-empty p {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.inspector-empty .dim {
+  font-size: 12px;
+  color: var(--fg-dim, var(--muted));
+}
+@media (prefers-reduced-motion: reduce) {
+  .canvas-empty-card { animation: none; }
+}
