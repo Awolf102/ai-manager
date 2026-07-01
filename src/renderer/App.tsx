@@ -194,6 +194,7 @@ export default function App() {
           <button
             className={`btn ${showDock ? 'active' : ''}`}
             title={showDock ? 'Hide the bottom panel' : 'Show the bottom panel'}
+            aria-expanded={showDock}
             onClick={() => toggleDock()}
           >
             <Terminal size={14} /> Terminal
@@ -204,7 +205,7 @@ export default function App() {
           <TeamMenu />
           {graph.linkedTeam && (<span className="team-link" title={`Linked team brain: ${graph.linkedTeam.path}`}><Users size={12} /> {graph.linkedTeam.path.split(/[\\/]/).pop()}</span>)}
           <button className={`btn ${showSettings ? 'active' : ''}`} title="Settings" onClick={() => setShowSettings(true)}><SettingsIcon size={14} /> Settings</button>
-          <button className={`btn faq-btn ${showFaq ? 'active' : ''}`} title="How to prompt" onClick={() => setShowFaq(true)}><CircleHelp size={15} /></button>
+          <button className={`btn faq-btn ${showFaq ? 'active' : ''}`} title="How to prompt" aria-label="How to prompt" onClick={() => setShowFaq(true)}><CircleHelp size={15} /></button>
         </div>
         <span className="topbar-sep" aria-hidden="true" />
         <button className="btn primary" onClick={() => setShowAdd(true)}><Plus size={14} /> Add agent</button>
@@ -240,8 +241,8 @@ export default function App() {
           <div className="zone-head">
             <span>Inspector</span>
             <span className="spacer" />
-            <button className="btn tiny" title="Move left/right" onClick={() => setZonePlacement('inspector', layout.inspector.placement === 'right' ? 'left' : 'right')}>⇄</button>
-            <button className="btn tiny" title="Collapse" onClick={() => toggleZoneCollapsed('inspector')}>×</button>
+            <button className="btn tiny" title="Move left/right" aria-label="Move panel left or right" onClick={() => setZonePlacement('inspector', layout.inspector.placement === 'right' ? 'left' : 'right')}>⇄</button>
+            <button className="btn tiny" title="Collapse" aria-label="Collapse panel" onClick={() => toggleZoneCollapsed('inspector')}>×</button>
           </div>
           <div className="zone-body">
             {selectedId ? (<><AgentConfigPanel /><RoleMemoryEditor /></>) : (
@@ -357,7 +358,7 @@ export default function App() {
 
         {/* collapsed dock re-open affordance (inspector re-open lives next to Run in the goal bar) */}
         {showDock && layout.dock.collapsed && (
-          <button className="zone-reopen reopen-dock" onClick={() => toggleZoneCollapsed('dock')} title="Show dock">▴</button>
+          <button className="zone-reopen reopen-dock" onClick={() => toggleZoneCollapsed('dock')} title="Show dock" aria-label="Show dock">▴</button>
         )}
       </div>
 
@@ -504,9 +505,22 @@ function AddAgentModal({
         </div>
         <div className="field">
           <label>Role in the chain</label>
-          <div className="seg">
-            {AGENT_KINDS.map((k) => (
-              <button key={k} className={kind === k ? 'active' : ''} onClick={() => setKind(k)}>
+          <div className="seg" role="radiogroup" aria-label="Role in the chain">
+            {AGENT_KINDS.map((k, i) => (
+              <button
+                key={k}
+                role="radio"
+                aria-checked={kind === k}
+                tabIndex={kind === k ? 0 : -1}
+                className={kind === k ? 'active' : ''}
+                onClick={() => setKind(k)}
+                onKeyDown={(e) => {
+                  const ni = rovingIndex(e.key, i, AGENT_KINDS.length, 'horizontal')
+                  if (ni == null) return
+                  e.preventDefault()
+                  setKind(AGENT_KINDS[ni])
+                }}
+              >
                 {k}
               </button>
             ))}
