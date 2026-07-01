@@ -39,7 +39,7 @@ export default function TeamMenu() {
 
   return (
     <div className="topmenu" ref={ref}>
-      <button className="btn" onClick={() => setOpen((v) => !v)}>Team <ChevronDown size={12} /></button>
+      <button className={`btn ${open ? 'active' : ''}`} onClick={() => setOpen((v) => !v)}>Team <ChevronDown size={12} /></button>
       {open && (
         <div className="topmenu-list">
           <button onClick={() => void exportTeam()}><Upload size={14} /> Export team…</button>
