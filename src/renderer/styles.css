@@ -1277,6 +1277,7 @@ button {
   gap: 0;
 }
 .draft-list > .field {
+  margin-bottom: 0; /* neutralize base .field margin so padding is the sole row spacing */
   padding-top: 14px;
   padding-bottom: 14px;
   border-bottom: 1px solid var(--hairline);
