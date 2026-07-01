@@ -126,6 +126,8 @@ export interface ProjectSettings {
   cheapModelTier: string
   /** use trimmed variants of the app's internal scaffolding prompts */
   lightPrompts: boolean
+  /** how workers handle an under-specified feature: 'off' = no change, 'headless' = infer + build + record */
+  followThrough: 'off' | 'headless'
 }
 
 export const DEFAULT_SETTINGS: ProjectSettings = {
@@ -150,7 +152,8 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   effortThriftCeiling: 'medium',
   cheapModelWorkers: false,
   cheapModelTier: 'claude-haiku-4-5',
-  lightPrompts: false
+  lightPrompts: false,
+  followThrough: 'off'
 }
 
 /** Which agents a context item applies to. Absent OR (kinds empty AND nodeIds empty) ⇒ all agents. */
@@ -302,6 +305,7 @@ export type OrchestrationEvent =
   | { runId: string; type: 'verdict'; attempt: number; tasks: TaskVerdict[] }
   | { runId: string; type: 'replan'; attempt: number; reason: string; tasks: RunTask[] }
   | { runId: string; type: 'handoff'; askerId: string; peerId: string; ask: string }
+  | { runId: string; type: 'follow-up'; workerId: string; summary: string; decision: string }
   | { runId: string; type: 'interrupt'; interrupt: Interrupt }
   | {
       runId: string
@@ -338,6 +342,7 @@ export interface RunRecord {
   replans?: { attempt: number; reason: string }[]
   handoffs?: { askerId: string; peerId: string; ask: string }[]
   userRequests?: { askerId: string; question: string }[]
+  followUps?: { workerId: string; summary: string; decision: string }[]
   final: string
   error?: string
 }
@@ -462,6 +467,8 @@ export interface RunState {
   handoffs?: { askerId: string; peerId: string; ask: string }[]
   /** asks the user made this run, recorded for the run view + History (questions only — never answers) */
   userRequests?: { askerId: string; question: string }[]
+  /** headless follow-through: features workers inferred + built for under-specified parts */
+  followUps?: { workerId: string; summary: string; decision: string }[]
   /** bounds worker→user questions this run (mirrors replanAttempts) */
   userRequestCount: number
   /** the worker waiting on a user answer; carries its session id across resume (never the answer) */
