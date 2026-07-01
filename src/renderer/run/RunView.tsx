@@ -6,6 +6,7 @@ import { effortOfWorker, cappedFromDisplay } from '../../shared/effort'
 import type { ProjectGraph } from '../../shared/types'
 import ActivityFeed from './ActivityFeed'
 import { runBanner } from './run-status'
+import { rovingIndex } from '../roving'
 
 function buildChain(graph: ProjectGraph, rootId: string | null): { id: string; depth: number }[] {
   if (!rootId) return []
@@ -117,6 +118,24 @@ export default function RunView() {
   const banner = runBanner(run)
   const hasResult = !!run.final
 
+  const TAB_LABEL: Record<'narration' | 'terminal' | 'result', string> = {
+    narration: 'Narration',
+    terminal: 'Terminal',
+    result: 'Result'
+  }
+  const tabs: Array<'narration' | 'terminal' | 'result'> = hasResult
+    ? ['narration', 'terminal', 'result']
+    : ['narration', 'terminal']
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({})
+  const onTabKeyDown = (e: React.KeyboardEvent): void => {
+    const ni = rovingIndex(e.key, tabs.indexOf(rightTab), tabs.length, 'horizontal')
+    if (ni == null) return
+    e.preventDefault()
+    const t = tabs[ni]
+    setRightTab(t)
+    tabRefs.current[t]?.focus()
+  }
+
   return (
     <div className="runview">
       {banner && (
@@ -193,22 +212,35 @@ export default function RunView() {
           })}
         </div>
         <div className="run-right">
-          <div className="run-tabs">
-            <button className={`run-tab ${rightTab === 'narration' ? 'active' : ''}`} onClick={() => setRightTab('narration')}>Narration</button>
-            <button className={`run-tab ${rightTab === 'terminal' ? 'active' : ''}`} onClick={() => setRightTab('terminal')}>Terminal</button>
-            {hasResult && (
-              <button className={`run-tab ${rightTab === 'result' ? 'active' : ''}`} onClick={() => setRightTab('result')}>Result</button>
-            )}
+          <div className="run-tabs" role="tablist" aria-label="Run view">
+            {tabs.map((t) => (
+              <button
+                key={t}
+                ref={(el) => {
+                  tabRefs.current[t] = el
+                }}
+                className={`run-tab ${rightTab === t ? 'active' : ''}`}
+                role="tab"
+                id={`run-tab-${t}`}
+                aria-selected={rightTab === t}
+                aria-controls={`run-panel-${t}`}
+                tabIndex={rightTab === t ? 0 : -1}
+                onClick={() => setRightTab(t)}
+                onKeyDown={onTabKeyDown}
+              >
+                {TAB_LABEL[t]}
+              </button>
+            ))}
           </div>
           <div className="run-slots">
-            <div className={`run-slot ${rightTab === 'narration' ? 'active' : ''}`}>
+            <div className={`run-slot ${rightTab === 'narration' ? 'active' : ''}`} role="tabpanel" id="run-panel-narration" aria-labelledby="run-tab-narration" tabIndex={0}>
               <ActivityFeed runId={run.runId} />
             </div>
-            <div className={`run-slot ${rightTab === 'terminal' ? 'active' : ''}`}>
+            <div className={`run-slot ${rightTab === 'terminal' ? 'active' : ''}`} role="tabpanel" id="run-panel-terminal" aria-labelledby="run-tab-terminal" tabIndex={0}>
               <div className="run-output" ref={hostRef} />
             </div>
             {hasResult && (
-              <div className={`run-slot ${rightTab === 'result' ? 'active' : ''}`}>
+              <div className={`run-slot ${rightTab === 'result' ? 'active' : ''}`} role="tabpanel" id="run-panel-result" aria-labelledby="run-tab-result" tabIndex={0}>
                 <pre className={`run-result ${revealResult ? 'reveal' : ''}`}>{run.final}</pre>
               </div>
             )}
