@@ -40,6 +40,7 @@ import {
 import { parseHandoff } from '../../shared/handoff'
 import { parseAskUser, redactUserAnswer } from '../../shared/ask-user'
 import { clampEffort } from '../../shared/model-caps'
+import { capEffort } from '../../shared/token-efficiency'
 
 export const MAX_PARALLEL = 3
 
@@ -313,7 +314,8 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
       tasks[t.task.id].attempts += 1
     }
     setStatus(eng, steps, ownerId, 'working', titles)
-    const effort = getSettings().adaptiveEffort ? maxEffort(group.map((t) => t.effort)) : undefined
+    const es = getSettings()
+    const effort = es.adaptiveEffort || es.effortThrift ? maxEffort(group.map((t) => t.effort)) : undefined
     try {
       const base: StreamAgentOptions = {
         wc: eng.wc,
@@ -558,7 +560,8 @@ async function repairNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeRe
     const ownerId = t.ownerId!
     setStatus(eng, steps, ownerId, 'working', [t.task.title])
     tasks[t.task.id].attempts += 1
-    const effort = getSettings().adaptiveEffort ? t.effort : undefined
+    const rs = getSettings()
+    const effort = rs.adaptiveEffort || rs.effortThrift ? t.effort : undefined
     try {
       const { text, sessionId } = await eng.runAgent({
         wc: eng.wc,
@@ -787,7 +790,8 @@ async function assignStep(
     const childId = typeof a.childId === 'string' && a.childId !== 'null' ? a.childId : null
     const model = childId && validChildIds.has(childId) ? getAgent(childId).model : undefined
     const requested = parseEffort(a.effort)
-    const effort = effortForModel(model, requested, getSettings().adaptiveEffort)
+    const s = getSettings()
+    const effort = assignEffort({ model, requested, adaptive: s.adaptiveEffort, thrift: s.effortThrift, ceiling: s.effortThriftCeiling })
     const out: Assignment = { taskId: String(a.taskId ?? ''), childId, effort, reason: String(a.reason ?? '') }
     if (requested && effort && requested !== effort) out.assignedEffort = requested
     return out
@@ -1182,6 +1186,25 @@ export function effortForModel(
 ): Effort | undefined {
   if (!adaptiveEnabled || !model) return requested
   return clampEffort(model, requested)
+}
+
+/** The final per-assignment effort: model-clamp the router's requested effort,
+ *  then (when thrift is on and a worker/model is known) cap it DOWN to the
+ *  ceiling — clamped back to what the model supports. Thrift forces an effort
+ *  even when adaptive routing is off. thrift off => identical to effortForModel. */
+export function assignEffort(args: {
+  model: string | undefined
+  requested: Effort | undefined
+  adaptive: boolean
+  thrift: boolean
+  ceiling: Effort
+}): Effort | undefined {
+  let effort = effortForModel(args.model, args.requested, args.adaptive)
+  if (args.thrift && args.model) {
+    const base = effort ?? args.requested ?? args.ceiling
+    effort = clampEffort(args.model, capEffort(base, args.ceiling))
+  }
+  return effort
 }
 
 /** The highest effort in a worker's batch (so the hardest task is served), or undefined. */

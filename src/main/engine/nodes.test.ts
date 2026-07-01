@@ -5,6 +5,7 @@ import {
   seedRunState,
   maxEffort,
   effortForModel,
+  assignEffort,
   lessonsDigest,
   depsSatisfied,
   normalizeLessonInput,
@@ -1786,5 +1787,27 @@ describe('formatUserRequests', () => {
     } as unknown as RunState)
     expect(out).toContain('ghost')
     expect(out).toContain('Q')
+  })
+})
+
+describe('assignEffort (thrift)', () => {
+  it('off (thrift=false) matches effortForModel: adaptive on, model clamp only', () => {
+    // Sonnet has no xhigh -> effortForModel rounds up to max
+    expect(assignEffort({ model: 'claude-sonnet-4-6', requested: 'xhigh', adaptive: true, thrift: false, ceiling: 'medium' })).toBe('max')
+  })
+  it('off + adaptive off returns the request unchanged (as today)', () => {
+    expect(assignEffort({ model: 'claude-opus-4-8', requested: 'max', adaptive: false, thrift: false, ceiling: 'medium' })).toBe('max')
+  })
+  it('thrift caps down to the ceiling (adaptive on)', () => {
+    expect(assignEffort({ model: 'claude-opus-4-8', requested: 'max', adaptive: true, thrift: true, ceiling: 'medium' })).toBe('medium')
+  })
+  it('thrift forces the ceiling even when adaptive is off', () => {
+    expect(assignEffort({ model: 'claude-opus-4-8', requested: undefined, adaptive: false, thrift: true, ceiling: 'low' })).toBe('low')
+  })
+  it('thrift result is clamped to the model (Haiku -> undefined)', () => {
+    expect(assignEffort({ model: 'claude-haiku-4-5', requested: 'high', adaptive: true, thrift: true, ceiling: 'high' })).toBeUndefined()
+  })
+  it('no model (unassigned task): thrift is skipped, request passes through', () => {
+    expect(assignEffort({ model: undefined, requested: 'high', adaptive: true, thrift: true, ceiling: 'low' })).toBe('high')
   })
 })
