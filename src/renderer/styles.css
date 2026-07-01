@@ -544,7 +544,7 @@ button {
 .terminal-dock {
   height: 100%;
   border-top: 1px solid var(--border);
-  background: #0b0c10;
+  background: #141019;
   display: grid;
   grid-template-rows: 34px 1fr;
   overflow: hidden;
@@ -571,7 +571,7 @@ button {
 }
 
 .term-tab.active {
-  background: #0b0c10;
+  background: #141019;
   color: var(--text);
 }
 
@@ -924,7 +924,7 @@ button {
   padding: 10px 12px;
 }
 
-.run-output { position: absolute; inset: 0; padding: 6px 8px; background: #0b0c10; }
+.run-output { position: absolute; inset: 0; padding: 6px 8px; background: #141019; }
 
 .run-row-name {
   flex: 1;

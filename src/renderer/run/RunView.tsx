@@ -56,7 +56,7 @@ export default function RunView() {
       fontSize: 12,
       convertEol: false,
       cursorBlink: false,
-      theme: { background: '#0b0c10', foreground: '#e6e8ee' }
+      theme: { background: '#141019', foreground: '#EAD7D1', cursor: '#DD99BB' }
     })
     const fit = new FitAddon()
     term.loadAddon(fit)
