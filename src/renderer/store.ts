@@ -41,6 +41,7 @@ export interface RunState {
   reviewAttempt: number
   replans: { attempt: number; reason: string }[]
   handoffs: { askerId: string; peerId: string; ask: string }[]
+  followUps: { workerId: string; summary: string; decision: string }[]
   userRequests: { askerId: string; question: string }[]
   pendingInterrupt: { question: string; askerName: string; askerId: string } | null
   interruptMinimized: boolean
@@ -63,6 +64,7 @@ const emptyRun: RunState = {
   reviewAttempt: 0,
   replans: [],
   handoffs: [],
+  followUps: [],
   userRequests: [],
   pendingInterrupt: null,
   interruptMinimized: false,
@@ -279,6 +281,9 @@ export const useStore = create<AppState>((set, get) => ({
           return { run }
         case 'handoff':
           run.handoffs = [...run.handoffs, { askerId: e.askerId, peerId: e.peerId, ask: e.ask }]
+          return { run }
+        case 'follow-up':
+          run.followUps = [...run.followUps, { workerId: e.workerId, summary: e.summary, decision: e.decision }]
           return { run }
         case 'interrupt': {
           const pl = e.interrupt.payload as { askerId: string; askerName: string; question: string } | undefined

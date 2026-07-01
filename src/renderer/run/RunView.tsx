@@ -172,6 +172,11 @@ export default function RunView() {
               ❓ Asked you · {nameOf(ur.askerId)}: {ur.question}
             </div>
           ))}
+          {run.followUps.map((fu, i) => (
+            <div key={`fu-${i}`} className="run-userrequest" title={fu.decision}>
+              ✎ Assumed · {nameOf(fu.workerId)}: {fu.summary} → {fu.decision}
+            </div>
+          ))}
           {chain.map(({ id, depth }) => {
             const status = run.nodeStatus[id] ?? 'idle'
             const tasks = run.nodeTasks[id]
