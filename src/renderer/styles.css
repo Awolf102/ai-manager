@@ -975,7 +975,7 @@ button {
 .run-replan {
   padding: 6px 12px;
   font-size: 11px;
-  color: #d6a44c;
+  color: var(--orchestrator);
   border-bottom: 1px solid var(--border);
   margin-bottom: 4px;
 }
@@ -983,7 +983,7 @@ button {
 .run-handoff {
   padding: 6px 12px;
   font-size: 11px;
-  color: #d6a44c;
+  color: var(--orchestrator);
   border-bottom: 1px solid var(--border);
   margin-bottom: 4px;
 }
@@ -1362,7 +1362,7 @@ button {
   padding: 0 4px;
   border-radius: 8px;
   background: var(--accent);
-  color: #0b0c10;
+  color: var(--on-signal);
   font-size: 10px;
   font-weight: 700;
   line-height: 16px;
