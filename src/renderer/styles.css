@@ -718,7 +718,9 @@ button {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
   display: grid;
   place-items: center;
   z-index: 50;
@@ -732,10 +734,12 @@ button {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--surface-2);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
   border: 1px solid var(--hairline-strong);
   border-radius: var(--radius-lg);
-  box-shadow: var(--elev-2);
+  box-shadow: var(--glass-highlight), var(--elev-3);
 }
 
 .modal-title {
@@ -1745,7 +1749,7 @@ button {
 .term-tab .run-live { margin-left: 6px; color: var(--state-good); font-size: var(--text-xs); }
 
 .topmenu { position: relative; -webkit-app-region: no-drag; }
-.topmenu-list { position: absolute; top: 100%; right: 0; margin-top: 4px; background: var(--surface-2); border: 1px solid var(--hairline-strong); border-radius: var(--radius); box-shadow: var(--elev-2); padding: 4px; display: flex; flex-direction: column; min-width: 200px; z-index: 60; }
+.topmenu-list { position: absolute; top: 100%; right: 0; margin-top: 4px; background: var(--glass-bg); backdrop-filter: blur(var(--glass-blur)); -webkit-backdrop-filter: blur(var(--glass-blur)); border: 1px solid var(--hairline-strong); border-radius: var(--radius); box-shadow: var(--glass-highlight), var(--elev-3); padding: 4px; display: flex; flex-direction: column; min-width: 200px; z-index: 60; }
 .topmenu-list button { display: flex; align-items: center; gap: var(--space-3); padding: 7px 10px; background: none; border: none; color: var(--fg); font-size: var(--text-sm); border-radius: var(--radius-sm); text-align: left; }
 .topmenu-list button:hover { background: var(--surface-hover); }
 /* ---- Team ▾ dropdown: origin-aware enter (the one earned animation) ---- */
@@ -1798,8 +1802,9 @@ button {
 .recent-prompts-menu { position: relative; display: inline-flex; }
 .recent-prompts-list {
   position: absolute; top: 100%; left: 0; margin-top: 4px;
-  background: var(--surface-2); border: 1px solid var(--hairline-strong);
-  border-radius: var(--radius); box-shadow: var(--elev-2); padding: 4px;
+  background: var(--glass-bg); backdrop-filter: blur(var(--glass-blur)); -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius); box-shadow: var(--glass-highlight), var(--elev-3); padding: 4px;
   display: flex; flex-direction: column; min-width: 240px; max-width: 360px;
   max-height: 320px; overflow-y: auto; z-index: 60;
 }
