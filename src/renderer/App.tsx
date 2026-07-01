@@ -59,6 +59,15 @@ export default function App() {
   // Must be declared with the other hooks, ABOVE the `if (!graph)` early return —
   // a hook after a conditional return violates the Rules of Hooks (crashes on project open).
   const dockTabRefs = useRef<Record<string, HTMLButtonElement | null>>({})
+  // APG: closing a dock tab must move DOM focus to the tab that becomes active
+  // (the store reassigns activeDockId on close), not let it drop to <body>. Set on a
+  // close gesture; the effect below focuses the new active tab after the re-render.
+  const pendingDockFocus = useRef(false)
+  useEffect(() => {
+    if (!pendingDockFocus.current) return
+    pendingDockFocus.current = false
+    if (activeDockId) dockTabRefs.current[activeDockId]?.focus()
+  }, [activeDockId, terminals.length])
 
   const [auth, setAuth] = useState<AuthStatus | null>(null)
   const [authChecking, setAuthChecking] = useState(true)
@@ -123,6 +132,7 @@ export default function App() {
   const onDockTabKeyDown = (e: React.KeyboardEvent, id: string): void => {
     if ((e.key === 'Delete' || e.key === 'Backspace') && id !== 'run' && id !== 'history') {
       e.preventDefault()
+      pendingDockFocus.current = true
       closeTerminal(id)
       return
     }
@@ -329,6 +339,7 @@ export default function App() {
                       aria-label={`Close ${t.agentName} terminal`}
                       onClick={(e) => {
                         e.stopPropagation()
+                        pendingDockFocus.current = true
                         closeTerminal(t.id)
                       }}
                     >
