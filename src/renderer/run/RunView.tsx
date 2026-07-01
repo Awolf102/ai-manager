@@ -105,6 +105,7 @@ export default function RunView() {
 
   const chain = graph ? buildChain(graph, run.orchestratorId) : []
   const nameOf = (id: string): string => graph?.nodes.find((n) => n.id === id)?.name ?? id
+  const kindOf = (id: string): string => graph?.nodes.find((n) => n.id === id)?.kind ?? 'unknown'
   // Effort is assigned per task and the worker runs at the highest of its batch.
   const allAssignments = Object.values(run.assignments).flat()
 
@@ -165,7 +166,7 @@ export default function RunView() {
                 title={tasks?.join(', ')}
                 onClick={() => selectStep(id)}
               >
-                <span className="run-row-name">{nameOf(id)}</span>
+                <span className={`run-row-name kind-${kindOf(id)}`}>{nameOf(id)}</span>
                 <span className={`run-pill st-${status}`}>{STATUS_LABEL[status] ?? status}</span>
                 {eff && (
                   <span className={`run-eff eff-${eff}`} title={capped ? `effort ${eff} (capped from ${capped} — model limit)` : `assigned effort: ${eff}`}>
