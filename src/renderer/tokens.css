@@ -10,7 +10,6 @@
   --surface-1: #121417;      /* panels, dock, top bar */
   --surface-2: #191C20;      /* raised cards, inputs, modals */
   --surface-hover: #22262B;
-  --surface-selected: #16332599; /* emerald-tinted raise for selected rows */
 
   /* ===== White (auxiliary) — type + hairlines ===== */
   --fg: #F4F6F5;
