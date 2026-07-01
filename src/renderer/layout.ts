@@ -13,9 +13,15 @@ export const DEFAULT_LAYOUT: LayoutState = {
 
 const clamp = (px: number, min: number, max: number): number => Math.max(min, Math.min(max, px))
 
-export const clampInspector = (px: number): number => clamp(px, 280, 560)
-export const clampDockHeight = (px: number, viewportH: number): number => clamp(px, 160, Math.round(viewportH * 0.6))
-export const clampDockWidth = (px: number): number => clamp(px, 240, 640)
+export const INSPECTOR_MIN = 280
+export const INSPECTOR_MAX = 560
+export const DOCK_HEIGHT_MIN = 160
+export const DOCK_WIDTH_MIN = 240
+export const DOCK_WIDTH_MAX = 640
+
+export const clampInspector = (px: number): number => clamp(px, INSPECTOR_MIN, INSPECTOR_MAX)
+export const clampDockHeight = (px: number, viewportH: number): number => clamp(px, DOCK_HEIGHT_MIN, Math.round(viewportH * 0.6))
+export const clampDockWidth = (px: number): number => clamp(px, DOCK_WIDTH_MIN, DOCK_WIDTH_MAX)
 
 export function computeBodyGrid(layout: LayoutState): { columns: string; rows: string; areas: string } {
   const insW = layout.inspector.collapsed ? '0px' : `${layout.inspector.size}px`

@@ -1,18 +1,27 @@
 import { useCallback } from 'react'
+import { splitterResize } from './splitter-keys'
 
-/** A draggable divider. `axis='x'` resizes width, `axis='y'` resizes height.
- * `invert` is true when the panel grows opposite the drag direction
- * (e.g. a right inspector grows as the mouse moves left). Calls onResize(px). */
+/** A draggable + keyboard-resizable divider. `axis='x'` resizes width, `axis='y'`
+ * resizes height. `invert` is true when the panel grows opposite the drag
+ * direction (e.g. a right inspector grows as the mouse moves left). */
 export default function PanelDivider({
   axis,
   invert,
   getStart,
-  onResize
+  onResize,
+  size,
+  min,
+  max,
+  label
 }: {
   axis: 'x' | 'y'
   invert: boolean
-  getStart: () => number // current panel size in px at drag start
+  getStart: () => number
   onResize: (px: number) => void
+  size: number
+  min: number
+  max: number
+  label: string
 }) {
   const onMouseDown = useCallback(
     (e: React.MouseEvent) => {
@@ -33,5 +42,28 @@ export default function PanelDivider({
     },
     [axis, invert, getStart, onResize]
   )
-  return <div className={`panel-divider panel-divider-${axis}`} onMouseDown={onMouseDown} role="separator" />
+  const onKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      const next = splitterResize(e.key, { axis, invert, size, min, max })
+      if (next != null) {
+        e.preventDefault()
+        onResize(next)
+      }
+    },
+    [axis, invert, size, min, max, onResize]
+  )
+  return (
+    <div
+      className={`panel-divider panel-divider-${axis}`}
+      onMouseDown={onMouseDown}
+      onKeyDown={onKeyDown}
+      role="separator"
+      aria-orientation={axis === 'x' ? 'vertical' : 'horizontal'}
+      aria-label={label}
+      aria-valuenow={Math.round(size)}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      tabIndex={0}
+    />
+  )
 }

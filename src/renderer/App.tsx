@@ -18,7 +18,7 @@ import HitlModal from './HitlModal'
 import ConfirmDialog from './ConfirmDialog'
 import ToastViewport from './ToastViewport'
 import PanelDivider from './PanelDivider'
-import { computeBodyGrid } from './layout'
+import { computeBodyGrid, INSPECTOR_MIN, INSPECTOR_MAX, DOCK_HEIGHT_MIN, DOCK_WIDTH_MIN, DOCK_WIDTH_MAX } from './layout'
 import { AGENT_KINDS } from '../shared/types'
 import type { AgentKind, AuthStatus, ProjectGraph, ProjectMeta } from '../shared/types'
 import { Modal } from './Modal'
@@ -210,6 +210,10 @@ export default function App() {
               invert={layout.inspector.placement === 'right'}
               getStart={() => layout.inspector.size}
               onResize={(px) => setZoneSize('inspector', px, window.innerHeight)}
+              size={layout.inspector.size}
+              min={INSPECTOR_MIN}
+              max={INSPECTOR_MAX}
+              label="Resize inspector panel"
             />
           )}
           <div className="zone-head">
@@ -234,14 +238,21 @@ export default function App() {
 
         {showDock && (
           <div className={`zone-dock ${layout.dock.collapsed ? 'collapsed' : ''}`} style={{ gridArea: 'dock' }}>
-            {!layout.dock.collapsed && (
-              <PanelDivider
-                axis={layout.dock.placement === 'right' ? 'x' : 'y'}
-                invert={true}
-                getStart={() => layout.dock.size}
-                onResize={(px) => setZoneSize('dock', px, window.innerHeight)}
-              />
-            )}
+            {!layout.dock.collapsed && (() => {
+                const dockAxis = layout.dock.placement === 'right' ? 'x' : 'y'
+                return (
+                  <PanelDivider
+                    axis={dockAxis}
+                    invert={true}
+                    getStart={() => layout.dock.size}
+                    onResize={(px) => setZoneSize('dock', px, window.innerHeight)}
+                    size={layout.dock.size}
+                    min={dockAxis === 'x' ? DOCK_WIDTH_MIN : DOCK_HEIGHT_MIN}
+                    max={dockAxis === 'x' ? DOCK_WIDTH_MAX : Math.round(window.innerHeight * 0.6)}
+                    label="Resize terminal panel"
+                  />
+                )
+              })()}
             <div className="terminal-dock">
               <div className="term-tabs">
                 {showRunView && (
