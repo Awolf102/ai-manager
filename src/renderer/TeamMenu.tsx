@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, CloudDownload, CloudUpload, Download, Upload } from 'lucide-react'
 import { useStore } from './store'
 import { buildImportConfirmBody } from './import-confirm'
+import { rovingIndex } from './roving'
 
 export default function TeamMenu() {
   const [open, setOpen] = useState(false)
@@ -37,15 +38,58 @@ export default function TeamMenu() {
     else if (r.error) notify({ kind: 'error', message: r.error })
   }
 
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const items = [
+    { label: 'Export team…', icon: <Upload size={14} />, run: exportTeam },
+    { label: 'Import team…', icon: <Download size={14} />, run: importTeam },
+    { label: 'Sync to team brain', icon: <CloudUpload size={14} />, run: syncUp },
+    { label: 'Refresh from team brain', icon: <CloudDownload size={14} />, run: syncDown }
+  ]
+  const onItemKeyDown = (e: React.KeyboardEvent, i: number): void => {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      setOpen(false)
+      document.getElementById('team-menu-trigger')?.focus()
+      return
+    }
+    const ni = rovingIndex(e.key, i, items.length, 'vertical')
+    if (ni == null) return
+    e.preventDefault()
+    itemRefs.current[ni]?.focus()
+  }
+
   return (
     <div className="topmenu" ref={ref}>
-      <button className={`btn ${open ? 'active' : ''}`} onClick={() => setOpen((v) => !v)}>Team <ChevronDown size={12} /></button>
+      <button
+        className={`btn ${open ? 'active' : ''}`}
+        id="team-menu-trigger"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            setOpen(true)
+            requestAnimationFrame(() => itemRefs.current[0]?.focus())
+          }
+        }}
+      >
+        Team <ChevronDown size={12} />
+      </button>
       {open && (
-        <div className="topmenu-list">
-          <button onClick={() => void exportTeam()}><Upload size={14} /> Export team…</button>
-          <button onClick={() => void importTeam()}><Download size={14} /> Import team…</button>
-          <button onClick={() => void syncUp()}><CloudUpload size={14} /> Sync to team brain</button>
-          <button onClick={() => void syncDown()}><CloudDownload size={14} /> Refresh from team brain</button>
+        <div className="topmenu-list" role="menu" aria-labelledby="team-menu-trigger">
+          {items.map((it, i) => (
+            <button
+              key={it.label}
+              ref={(el) => { itemRefs.current[i] = el }}
+              role="menuitem"
+              tabIndex={-1}
+              onClick={() => void it.run()}
+              onKeyDown={(e) => onItemKeyDown(e, i)}
+            >
+              {it.icon} {it.label}
+            </button>
+          ))}
         </div>
       )}
     </div>
