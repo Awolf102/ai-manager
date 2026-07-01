@@ -105,13 +105,15 @@ export default function ContextModal({ onClose }: { onClose: () => void }) {
     setGraph(await window.api.setContextScope(id, scope))
 
   return (
-    <Modal onClose={onClose} className="ctx-modal">{(close) => (<>
-        <h2>Project context</h2>
-        <p className="ctx-hint">
-          Reference material for this project. Every item goes to all agents by default — use "Applies to"
-          to narrow it to specific agents.
-        </p>
-
+    <Modal onClose={onClose} className="ctx-modal" labelledBy="context-title">{(close) => (<>
+        <div className="modal-header">
+          <h2 id="context-title" className="modal-title">Project context</h2>
+          <p className="ctx-hint">
+            Reference material for this project. Every item goes to all agents by default — use "Applies to"
+            to narrow it to specific agents.
+          </p>
+        </div>
+        <div className="modal-body">
         <div className="ctx-section-head">
           <span>Attached files</span>
           <button className="btn tiny" onClick={() => void addFiles()}>
@@ -190,6 +192,7 @@ export default function ContextModal({ onClose }: { onClose: () => void }) {
           ))}
         </div>
 
+        </div>
         <div className="modal-actions">
           <span className="spacer" />
           <button className="btn primary" onClick={() => close()}>
