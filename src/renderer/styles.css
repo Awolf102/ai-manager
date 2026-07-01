@@ -167,21 +167,25 @@ button {
 /* ---------- buttons ---------- */
 
 .btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   padding: 6px 11px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--hairline-strong);
-  background: var(--surface-2);
+  background-color: rgba(255, 255, 255, 0.04);
+  background-image: var(--gloss);
+  box-shadow: var(--glass-highlight);
   color: var(--fg);
   font-size: var(--text-sm);
   transition: border-color var(--motion-fast) var(--ease-standard),
-              background var(--motion-fast) var(--ease-standard),
+              background-color var(--motion-fast) var(--ease-standard),
+              box-shadow var(--motion-fast) var(--ease-out),
               transform var(--motion-fast) var(--ease-out);
 }
 .btn:active { transform: scale(0.97); }
-.btn:hover { border-color: var(--signal); background: var(--surface-hover); }
+.btn:hover { border-color: var(--signal); background-color: rgba(63, 190, 134, 0.08); }
 .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
 .run-tab:focus-visible,
 .term-tab:focus-visible,
@@ -194,12 +198,19 @@ button {
   box-shadow: 0 0 0 3px var(--focus-ring);
 }
 .btn.primary {
-  background: var(--signal);
-  border-color: var(--signal);
-  color: var(--on-signal);
+  background-color: var(--brand);
+  background-image: var(--gloss);
+  border-color: var(--brand-hi);
+  box-shadow: var(--glass-highlight);
+  color: var(--fg);
   font-weight: var(--weight-medium);
 }
-.btn.primary:hover { background: var(--signal-hover); border-color: var(--signal-hover); }
+.btn.primary:hover {
+  background-color: var(--brand-hi);
+  border-color: var(--brand-hi);
+  box-shadow: var(--glass-highlight), 0 0 0 3px var(--accent-tint), 0 4px 14px rgba(15, 107, 69, 0.45);
+}
+.btn.primary:active { background-color: var(--brand-press); }
 .btn.danger { background: transparent; border-color: var(--hairline-strong); color: var(--state-danger); }
 .btn.danger:hover { border-color: var(--state-danger); background: var(--surface-hover); }
 .btn.tiny { padding: 3px 8px; font-size: var(--text-xs); border-radius: var(--radius-sm); }
