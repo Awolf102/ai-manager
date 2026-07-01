@@ -153,24 +153,39 @@ export default function App() {
         </div>
       )}
       <div className="topbar">
-        <button className="btn faq-btn" title="How to prompt" onClick={() => setShowFaq(true)}><CircleHelp size={15} /></button>
-        <span className="brand">Orkestr</span>
+        <div className="topbar-brand">
+          <BrandMark size={20} />
+          <span className="topbar-wordmark">Orkestr</span>
+        </div>
+        <span className="topbar-sep" aria-hidden="true" />
         <span className="project">{graph.project.name}</span>
+        <button className="btn" title="Switch to another project" onClick={async () => { const g = await window.api.pickProjectFolder(); if (g) { setGraph(g); void refreshResumable(true) } }}><FolderOpen size={14} /> Switch project</button>
+
         <span className="spacer" />
-        <AuthPill checking={authChecking} status={auth} onClick={() => void recheckAuth()} />
-        <button className="btn" onClick={async () => { const g = await window.api.pickProjectFolder(); if (g) { setGraph(g); void refreshResumable(true) } }}><FolderOpen size={14} /> Switch project</button>
-        <button className="btn" title="Run history" onClick={() => openHistory()}><Clock size={14} /> History{resumable.length > 0 && <span className="resume-badge">{resumable.length}</span>}</button>
-        <button
-          className={`btn ${showDock ? 'active' : ''}`}
-          title={showDock ? 'Hide the bottom panel' : 'Show the bottom panel'}
-          onClick={() => toggleDock()}
-        >
-          <Terminal size={14} /> Terminal
-        </button>
-        <TeamMenu />
-        {graph.linkedTeam && (<span className="team-link" title={`Linked team brain: ${graph.linkedTeam.path}`}><Users size={12} /> {graph.linkedTeam.path.split(/[\\/]/).pop()}</span>)}
-        <button className="btn ctx-btn" title="Project context — files & folders for the team" onClick={() => setShowContext(true)}><Paperclip size={14} /> Context{((graph.context?.length ?? 0) + (graph.contextFolders?.length ?? 0)) > 0 && <span className="ctx-badge">{(graph.context?.length ?? 0) + (graph.contextFolders?.length ?? 0)}</span>}</button>
-        <button className="btn" title="Settings" onClick={() => setShowSettings(true)}><SettingsIcon size={14} /> Settings</button>
+
+        <div className="topbar-group">
+          <AuthPill checking={authChecking} status={auth} onClick={() => void recheckAuth()} />
+        </div>
+        <span className="topbar-sep" aria-hidden="true" />
+        <div className="topbar-group">
+          <button className="btn" title="Run history" onClick={() => openHistory()}><Clock size={14} /> History{resumable.length > 0 && <span className="resume-badge">{resumable.length}</span>}</button>
+          <button className={`btn ctx-btn ${showContext ? 'active' : ''}`} title="Project context — files & folders for the team" onClick={() => setShowContext(true)}><Paperclip size={14} /> Context{((graph.context?.length ?? 0) + (graph.contextFolders?.length ?? 0)) > 0 && <span className="ctx-badge">{(graph.context?.length ?? 0) + (graph.contextFolders?.length ?? 0)}</span>}</button>
+          <button
+            className={`btn ${showDock ? 'active' : ''}`}
+            title={showDock ? 'Hide the bottom panel' : 'Show the bottom panel'}
+            onClick={() => toggleDock()}
+          >
+            <Terminal size={14} /> Terminal
+          </button>
+        </div>
+        <span className="topbar-sep" aria-hidden="true" />
+        <div className="topbar-group">
+          <TeamMenu />
+          {graph.linkedTeam && (<span className="team-link" title={`Linked team brain: ${graph.linkedTeam.path}`}><Users size={12} /> {graph.linkedTeam.path.split(/[\\/]/).pop()}</span>)}
+          <button className={`btn ${showSettings ? 'active' : ''}`} title="Settings" onClick={() => setShowSettings(true)}><SettingsIcon size={14} /> Settings</button>
+          <button className={`btn faq-btn ${showFaq ? 'active' : ''}`} title="How to prompt" onClick={() => setShowFaq(true)}><CircleHelp size={15} /></button>
+        </div>
+        <span className="topbar-sep" aria-hidden="true" />
         <button className="btn primary" onClick={() => setShowAdd(true)}><Plus size={14} /> Add agent</button>
       </div>
 

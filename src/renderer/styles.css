@@ -40,14 +40,42 @@ button {
   -webkit-app-region: drag;
 }
 
-.topbar .brand {
+/* ---- identity cluster ---- */
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.topbar-wordmark {
   font-weight: 650;
   letter-spacing: 0.2px;
-  padding-left: 64px;
+  font-size: var(--text-md);
+  color: var(--text);
 }
-
 .topbar .project {
   color: var(--muted);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- action groups + hairline separators ---- */
+.topbar-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.topbar-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--hairline-strong);
+  flex: none;
+}
+
+/* auth pill crossfades on state change (rare) instead of snapping */
+.auth-pill {
+  transition: color var(--motion) var(--ease-out), border-color var(--motion) var(--ease-out);
 }
 
 .topbar .spacer {
