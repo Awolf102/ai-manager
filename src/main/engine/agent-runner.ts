@@ -14,6 +14,7 @@ import { buildContextBlock } from '../../shared/context-files'
 import { buildAgentContext, getSettings, updateAgent } from './project-store'
 import { buildPermissionOptions } from './permission-options'
 import { actingModeFor } from './acting-mode'
+import { outputModeInstruction } from '../../shared/token-efficiency'
 
 /** Role + persistent memory + the user's project context (files + folders), appended onto the preset prompt. */
 function composeAppend(role: string, memory: string, context: ContextFile[], folders: ContextFolder[]): string {
@@ -72,6 +73,8 @@ export interface StreamAgentOptions {
   permissionMode?: PermissionMode
   /** reasoning effort for this run (manager-assigned by task difficulty) */
   effort?: Effort
+  /** run this call on a different model than the agent's configured one (e.g. cheap-model workers); transient, never persisted */
+  modelOverride?: string
   /** tools to withhold from the agent this step (e.g. edit tools for read-only steps) */
   disallowedTools?: string[]
   resume?: boolean
@@ -105,7 +108,7 @@ export async function streamAgent(
   try {
     const { query } = await import('@anthropic-ai/claude-agent-sdk')
     if (opts.header !== false) {
-      send('system', `\x1b[2m▶ ${agent.name} · ${agent.model}\x1b[0m\r\n`)
+      send('system', `\x1b[2m▶ ${agent.name} · ${opts.modelOverride ?? agent.model}\x1b[0m\r\n`)
     }
 
     const pack = await packSkills()
@@ -113,8 +116,8 @@ export async function streamAgent(
     const mode = opts.permissionMode ?? actingModeFor(getSettings().autonomy)
     const options: Options = {
       cwd: projectPath,
-      model: agent.model,
-      systemPrompt: { type: 'preset', preset: 'claude_code', append: composeAppend(role, memory, context, folders) + headlessNote(pack.names) },
+      model: opts.modelOverride ?? agent.model,
+      systemPrompt: { type: 'preset', preset: 'claude_code', append: composeAppend(role, memory, context, folders) + headlessNote(pack.names) + outputModeInstruction(getSettings().outputMode) },
       ...buildPermissionOptions(mode, { lockBypass: getSettings().lockBypassPermissions }),
       settingSources: ['project'],
       abortController: abort

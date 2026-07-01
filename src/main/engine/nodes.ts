@@ -40,6 +40,7 @@ import {
 import { parseHandoff } from '../../shared/handoff'
 import { parseAskUser, redactUserAnswer } from '../../shared/ask-user'
 import { clampEffort } from '../../shared/model-caps'
+import { capEffort } from '../../shared/token-efficiency'
 
 export const MAX_PARALLEL = 3
 
@@ -242,7 +243,8 @@ async function resumeAsker(
       permissionMode: actingMode,
       resume: true,
       resumeSessionId: ask.sessionId,
-      abort: eng.abort
+      abort: eng.abort,
+      modelOverride: workerModelOverride(getSettings())
     })
     if (r.sessionId) await updateAgent({ id: ask.ownerId, sessionId: r.sessionId })
     const out = redactUserAnswer(r.text || '(no output)', answer)
@@ -313,18 +315,20 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
       tasks[t.task.id].attempts += 1
     }
     setStatus(eng, steps, ownerId, 'working', titles)
-    const effort = getSettings().adaptiveEffort ? maxEffort(group.map((t) => t.effort)) : undefined
+    const es = getSettings()
+    const effort = es.adaptiveEffort || es.effortThrift ? maxEffort(group.map((t) => t.effort)) : undefined
     try {
       const base: StreamAgentOptions = {
         wc: eng.wc,
         agentId: ownerId,
-        prompt: workerPrompt(state.goal, group.map((t) => t.task)) + (asksAvailable() ? askUserSection() : ''),
+        prompt: workerPrompt(state.goal, group.map((t) => t.task), es.lightPrompts) + (asksAvailable() ? askUserSection() : ''),
         runId: eng.runId,
         stepId: ownerId,
         permissionMode: state.actingMode,
         effort,
         resume: false,
-        abort: eng.abort
+        abort: eng.abort,
+        modelOverride: workerModelOverride(es)
       }
       const { text, sessionId } = await runWithHandoffs(
         eng,
@@ -558,7 +562,8 @@ async function repairNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeRe
     const ownerId = t.ownerId!
     setStatus(eng, steps, ownerId, 'working', [t.task.title])
     tasks[t.task.id].attempts += 1
-    const effort = getSettings().adaptiveEffort ? t.effort : undefined
+    const rs = getSettings()
+    const effort = rs.adaptiveEffort || rs.effortThrift ? t.effort : undefined
     try {
       const { text, sessionId } = await eng.runAgent({
         wc: eng.wc,
@@ -569,7 +574,8 @@ async function repairNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeRe
         permissionMode: state.actingMode,
         effort,
         resume: true,
-        abort: eng.abort
+        abort: eng.abort,
+        modelOverride: workerModelOverride(rs)
       })
       if (sessionId) await updateAgent({ id: ownerId, sessionId })
       tasks[t.task.id].output = text || tasks[t.task.id].output
@@ -778,7 +784,7 @@ async function assignStep(
   const parsed = await runStructured(
     eng,
     nodeId,
-    assignPrompt(tasks, childRoles),
+    assignPrompt(tasks, childRoles, getSettings().lightPrompts),
     (v): v is { assignments: unknown[] } => Array.isArray((v as { assignments?: unknown })?.assignments),
     { permissionMode: 'default', disallowedTools: THINK_DISALLOW }
   )
@@ -787,7 +793,8 @@ async function assignStep(
     const childId = typeof a.childId === 'string' && a.childId !== 'null' ? a.childId : null
     const model = childId && validChildIds.has(childId) ? getAgent(childId).model : undefined
     const requested = parseEffort(a.effort)
-    const effort = effortForModel(model, requested, getSettings().adaptiveEffort)
+    const s = getSettings()
+    const effort = assignEffort({ model, requested, adaptive: s.adaptiveEffort, thrift: s.effortThrift, ceiling: s.effortThriftCeiling })
     const out: Assignment = { taskId: String(a.taskId ?? ''), childId, effort, reason: String(a.reason ?? '') }
     if (requested && effort && requested !== effort) out.assignedEffort = requested
     return out
@@ -1184,6 +1191,31 @@ export function effortForModel(
   return clampEffort(model, requested)
 }
 
+/** The final per-assignment effort: model-clamp the router's requested effort,
+ *  then (when thrift is on and a worker/model is known) cap it DOWN to the
+ *  ceiling — clamped back to what the model supports. Thrift forces an effort
+ *  even when adaptive routing is off. thrift off => identical to effortForModel. */
+export function assignEffort(args: {
+  model: string | undefined
+  requested: Effort | undefined
+  adaptive: boolean
+  thrift: boolean
+  ceiling: Effort
+}): Effort | undefined {
+  let effort = effortForModel(args.model, args.requested, args.adaptive)
+  if (args.thrift && args.model) {
+    const base = effort ?? args.requested ?? args.ceiling
+    effort = clampEffort(args.model, capEffort(base, args.ceiling))
+  }
+  return effort
+}
+
+/** The model override to dispatch WORKER steps on when cheap-model-workers is on
+ *  (managers/orchestrator never get an override). undefined => byte-for-byte. */
+export function workerModelOverride(s: { cheapModelWorkers: boolean; cheapModelTier: string }): string | undefined {
+  return s.cheapModelWorkers ? s.cheapModelTier : undefined
+}
+
 /** The highest effort in a worker's batch (so the hardest task is served), or undefined. */
 export function maxEffort(efforts: (Effort | undefined)[]): Effort | undefined {
   const present = efforts.filter((e): e is Effort => !!e)
@@ -1307,7 +1339,7 @@ Reply with ONLY this JSON code block (no other text):
 \`\`\``
 }
 
-function assignPrompt(tasks: RunTask[], childRoles: ChildBrief[]): string {
+export function assignPrompt(tasks: RunTask[], childRoles: ChildBrief[], light = false): string {
   const specialists = childRoles
     .map((c) => {
       const head = `- id: ${c.id}\n  name: ${c.name} (${c.kind})\n  role: ${c.role.replace(/\s+/g, ' ').slice(0, 600)}`
@@ -1318,6 +1350,20 @@ function assignPrompt(tasks: RunTask[], childRoles: ChildBrief[]): string {
     })
     .join('\n')
   const taskList = tasks.map((t) => `- id: ${t.id} — ${t.title}: ${t.description}`).join('\n')
+  if (light) {
+    return `Route each task to the ONE specialist whose role best fits (prefer relevant track record); childId null if none fit. Also assign an effort level (low|medium|high|xhigh|max) per task by difficulty — reserve xhigh/max for genuinely hard work. Do NOT edit files.
+
+SPECIALISTS:
+${specialists}
+
+TASKS:
+${taskList}
+
+Reply with ONLY this JSON code block (no other text):
+\`\`\`json
+{ "assignments": [ { "taskId": "t1", "childId": "<specialist id, or null>", "effort": "low|medium|high|xhigh|max", "reason": "why" } ] }
+\`\`\``
+  }
   return `You route planned tasks to the specialists who report to you. For each specialist you can see their role AND their track record (lessons they've recorded from past work). Assign every task to the ONE specialist whose role best matches it — and when more than one role fits, prefer the specialist whose track record shows the most relevant, reliable experience for that task. If no specialist fits a task, set childId to null. Do NOT make changes to files.
 
 For EACH task, also assess its difficulty and assign a reasoning "effort" level for the specialist who will do it:
@@ -1340,8 +1386,17 @@ Reply with ONLY this JSON code block (no other text):
 \`\`\``
 }
 
-function workerPrompt(goal: string, tasks: RunTask[]): string {
+export function workerPrompt(goal: string, tasks: RunTask[], light = false): string {
   const list = tasks.map((t, i) => `${i + 1}. ${t.title}\n   ${t.description}`).join('\n\n')
+  if (light) {
+    return `Team goal: ${goal}
+
+Complete the following task(s) in this project folder, making the necessary changes. Apply any relevant lessons from your memory.
+
+${list}
+
+If your work serves web pages, actually run it and confirm the entry page AND every asset it references return 200 before reporting success. When finished, briefly report what you changed and flag anything you could not complete.`
+  }
   return `You are working as part of a team to achieve this overall goal:
 ${goal}
 

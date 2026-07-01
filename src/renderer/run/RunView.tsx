@@ -193,7 +193,7 @@ export default function RunView() {
                 <span className={`run-row-name kind-${kindOf(id)}`}>{nameOf(id)}</span>
                 <span className={`run-pill st-${status}`}>{STATUS_LABEL[status] ?? status}</span>
                 {eff && (
-                  <span className={`run-eff eff-${eff}`} title={capped ? `effort ${eff} (capped from ${capped} — model limit)` : `assigned effort: ${eff}`}>
+                  <span className={`run-eff eff-${eff}`} title={capped ? `effort ${eff} (capped from ${capped})` : `assigned effort: ${eff}`}>
                     {eff}
                   </span>
                 )}

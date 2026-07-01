@@ -1,15 +1,16 @@
 import { useState, type ReactNode } from 'react'
-import { AlertTriangle, ClipboardCheck, Coins, Shield, Users, Workflow, X, type LucideIcon } from 'lucide-react'
+import { AlertTriangle, ClipboardCheck, Coins, Gauge, Shield, Users, Workflow, X, type LucideIcon } from 'lucide-react'
 import { useStore } from './store'
 import { Switch } from './Switch'
 import { Modal } from './Modal'
 import type { Autonomy, ProjectSettings, ReviewMode } from '../shared/types'
 
-type CategoryId = 'safety' | 'cost' | 'review' | 'run' | 'team'
+type CategoryId = 'safety' | 'cost' | 'efficiency' | 'review' | 'run' | 'team'
 
 const CATEGORIES: { id: CategoryId; label: string; icon: LucideIcon; subtitle: string }[] = [
   { id: 'safety', label: 'Safety', icon: Shield, subtitle: 'Autonomy, permissions, and which skills agents may load' },
   { id: 'cost', label: 'Cost', icon: Coins, subtitle: 'Where the team may spend more for better results' },
+  { id: 'efficiency', label: 'Token Efficiency', icon: Gauge, subtitle: 'Opt-in ways to spend fewer tokens per run — all off by default' },
   { id: 'review', label: 'Review & repair', icon: ClipboardCheck, subtitle: 'What happens after work is produced' },
   { id: 'run', label: 'Run behavior', icon: Workflow, subtitle: 'Optional mid-run behaviors, off by default' },
   { id: 'team', label: 'Team', icon: Users, subtitle: 'Shared team knowledge and the skills available to agents' }
@@ -228,6 +229,95 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                     checked={s.adaptiveEffort}
                     label="Adaptive effort"
                     onChange={(v) => void update({ adaptiveEffort: v })}
+                  />
+                }
+              />
+            </SettingSection>
+          )}
+
+          {active === 'efficiency' && (
+            <SettingSection>
+              <SettingRow
+                label="Concise output"
+                desc={
+                  s.outputMode === 'normal'
+                    ? 'Agents write normally. Turn on to instruct every agent to minimize prose (required code/JSON is always kept in full).'
+                    : s.outputMode === 'terse'
+                      ? 'Agents minimize prose — no preamble or summaries, just the essential result.'
+                      : 'Agents output only code and essential results, omitting explanations.'
+                }
+                control={
+                  <div className="gated-control">
+                    {s.outputMode !== 'normal' && (
+                      <select
+                        value={s.outputMode}
+                        onChange={(e) => void update({ outputMode: e.target.value as ProjectSettings['outputMode'] })}
+                      >
+                        <option value="terse">Terse</option>
+                        <option value="code-only">Code only</option>
+                      </select>
+                    )}
+                    <Switch
+                      checked={s.outputMode !== 'normal'}
+                      label="Concise output"
+                      onChange={(on) => void update({ outputMode: on ? 'terse' : 'normal' })}
+                    />
+                  </div>
+                }
+              />
+              <SettingRow
+                label="Effort thrift"
+                desc="Cap every task's reasoning effort at a ceiling. Lower reasoning effort spends fewer thinking tokens — the biggest cost driver. Applies even when Adaptive effort is off."
+                control={
+                  <div className="gated-control">
+                    {s.effortThrift && (
+                      <select
+                        value={s.effortThriftCeiling}
+                        onChange={(e) => void update({ effortThriftCeiling: e.target.value as ProjectSettings['effortThriftCeiling'] })}
+                      >
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                      </select>
+                    )}
+                    <Switch
+                      checked={s.effortThrift}
+                      label="Effort thrift"
+                      onChange={(v) => void update({ effortThrift: v })}
+                    />
+                  </div>
+                }
+              />
+              <SettingRow
+                label="Cheap-model workers"
+                desc="Run all workers on a cheaper model. Managers and the orchestrator keep their own model, so planning, routing, and review quality are unaffected."
+                control={
+                  <div className="gated-control">
+                    {s.cheapModelWorkers && (
+                      <select
+                        value={s.cheapModelTier}
+                        onChange={(e) => void update({ cheapModelTier: e.target.value })}
+                      >
+                        <option value="claude-sonnet-4-6">Sonnet 4.6</option>
+                        <option value="claude-haiku-4-5">Haiku 4.5</option>
+                      </select>
+                    )}
+                    <Switch
+                      checked={s.cheapModelWorkers}
+                      label="Cheap-model workers"
+                      onChange={(v) => void update({ cheapModelWorkers: v })}
+                    />
+                  </div>
+                }
+              />
+              <SettingRow
+                label="Lighter internal prompts"
+                desc="Send trimmed versions of the app's own routing and worker instructions — fewer input tokens per step. Slightly less guidance to the agents."
+                control={
+                  <Switch
+                    checked={s.lightPrompts}
+                    label="Lighter internal prompts"
+                    onChange={(v) => void update({ lightPrompts: v })}
                   />
                 }
               />

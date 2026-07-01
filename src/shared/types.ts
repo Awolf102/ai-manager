@@ -114,6 +114,18 @@ export interface ProjectSettings {
   maxHandoffs: number
   /** max times a worker may pause the run to ask the user a question (0 = off) */
   maxUserRequests: number
+  /** system-prompt output mode for every headless agent: 'normal' = no change */
+  outputMode: 'normal' | 'terse' | 'code-only'
+  /** cap every acting task's effort down to `effortThriftCeiling` (forces effort even when adaptiveEffort is off) */
+  effortThrift: boolean
+  /** the ceiling used when effortThrift is on */
+  effortThriftCeiling: Effort
+  /** run all WORKER dispatches on `cheapModelTier` (managers/orchestrator unaffected) */
+  cheapModelWorkers: boolean
+  /** the model workers run on when cheapModelWorkers is on */
+  cheapModelTier: string
+  /** use trimmed variants of the app's internal scaffolding prompts */
+  lightPrompts: boolean
 }
 
 export const DEFAULT_SETTINGS: ProjectSettings = {
@@ -132,7 +144,13 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   skillsPackPath: '',
   maxReplans: 0,
   maxHandoffs: 0,
-  maxUserRequests: 0
+  maxUserRequests: 0,
+  outputMode: 'normal',
+  effortThrift: false,
+  effortThriftCeiling: 'medium',
+  cheapModelWorkers: false,
+  cheapModelTier: 'claude-haiku-4-5',
+  lightPrompts: false
 }
 
 /** Which agents a context item applies to. Absent OR (kinds empty AND nodeIds empty) ⇒ all agents. */

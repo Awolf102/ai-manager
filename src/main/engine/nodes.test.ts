@@ -5,12 +5,16 @@ import {
   seedRunState,
   maxEffort,
   effortForModel,
+  assignEffort,
+  workerModelOverride,
   lessonsDigest,
   depsSatisfied,
   normalizeLessonInput,
   hasManagers,
   reviewerIdsOf,
   formatUserRequests,
+  assignPrompt,
+  workerPrompt,
   type Eng,
   type AgentRunner
 } from './nodes'
@@ -1786,5 +1790,60 @@ describe('formatUserRequests', () => {
     } as unknown as RunState)
     expect(out).toContain('ghost')
     expect(out).toContain('Q')
+  })
+})
+
+describe('assignEffort (thrift)', () => {
+  it('off (thrift=false) matches effortForModel: adaptive on, model clamp only', () => {
+    // Sonnet has no xhigh -> effortForModel rounds up to max
+    expect(assignEffort({ model: 'claude-sonnet-4-6', requested: 'xhigh', adaptive: true, thrift: false, ceiling: 'medium' })).toBe('max')
+  })
+  it('off + adaptive off returns the request unchanged (as today)', () => {
+    expect(assignEffort({ model: 'claude-opus-4-8', requested: 'max', adaptive: false, thrift: false, ceiling: 'medium' })).toBe('max')
+  })
+  it('thrift caps down to the ceiling (adaptive on)', () => {
+    expect(assignEffort({ model: 'claude-opus-4-8', requested: 'max', adaptive: true, thrift: true, ceiling: 'medium' })).toBe('medium')
+  })
+  it('thrift forces the ceiling even when adaptive is off', () => {
+    expect(assignEffort({ model: 'claude-opus-4-8', requested: undefined, adaptive: false, thrift: true, ceiling: 'low' })).toBe('low')
+  })
+  it('thrift result is clamped to the model (Haiku -> undefined)', () => {
+    expect(assignEffort({ model: 'claude-haiku-4-5', requested: 'high', adaptive: true, thrift: true, ceiling: 'high' })).toBeUndefined()
+  })
+  it('no model (unassigned task): thrift is skipped, request passes through', () => {
+    expect(assignEffort({ model: undefined, requested: 'high', adaptive: true, thrift: true, ceiling: 'low' })).toBe('high')
+  })
+})
+
+describe('workerModelOverride', () => {
+  it('returns the cheap tier when cheapModelWorkers is on', () => {
+    expect(workerModelOverride({ cheapModelWorkers: true, cheapModelTier: 'claude-haiku-4-5' })).toBe('claude-haiku-4-5')
+  })
+  it('returns undefined when off (byte-for-byte dispatch)', () => {
+    expect(workerModelOverride({ cheapModelWorkers: false, cheapModelTier: 'claude-haiku-4-5' })).toBeUndefined()
+  })
+})
+
+describe('lighter internal prompts', () => {
+  const tasks = [{ id: 't1', title: 'Do a thing', description: 'details' }]
+  const roles = [{ id: 'w1', name: 'Worker', kind: 'worker' as const, role: 'does things', lessons: [] as string[] }]
+
+  it('assignPrompt: light=false is unchanged and both keep the JSON block marker', () => {
+    const full = assignPrompt(tasks, roles)
+    const light = assignPrompt(tasks, roles, true)
+    expect(assignPrompt(tasks, roles, false)).toBe(full) // default === explicit false
+    expect(full).toContain('```json')
+    expect(light).toContain('```json')
+    expect(light.length).toBeLessThan(full.length)
+    expect(light).not.toBe(full)
+  })
+
+  it('workerPrompt: light=false is unchanged; light keeps the goal and is shorter', () => {
+    const full = workerPrompt('build X', tasks)
+    const light = workerPrompt('build X', tasks, true)
+    expect(workerPrompt('build X', tasks, false)).toBe(full)
+    expect(light).toContain('build X')
+    expect(light.length).toBeLessThan(full.length)
+    expect(light).not.toBe(full)
   })
 })
