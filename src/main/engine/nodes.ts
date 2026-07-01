@@ -1318,6 +1318,31 @@ export function formatUserRequests(state: RunState): string {
   return `\n\n## User consultations during this run\n${lines.join('\n')}\nThese questions were answered by the user during the run and the answers were incorporated — report them as resolved, not as open questions or placeholder assumptions.`
 }
 
+export function followThroughSection(): string {
+  return `\n\nFOLLOW-THROUGH: If you encounter a feature whose intended behavior was not clearly specified (for example a button or control with no described action), do NOT leave a bare placeholder. Infer the most reasonable behavior from the overall goal and surrounding context, implement it fully, and keep working — do not stop or ask. Record each such decision by including a block of exactly this form (in addition to your normal report):
+\`\`\`followup
+{ "summary": "<what was under-specified>", "decision": "<what you built and why>" }
+\`\`\`
+You may include more than one followup block if you made several such decisions.`
+}
+
+/** Synthesis section listing headless follow-through decisions, so the final report
+ *  treats inferred features as completed scope. '' when none (byte-for-byte off). */
+export function formatFollowUps(state: RunState): string {
+  const fus = state.followUps ?? []
+  if (fus.length === 0) return ''
+  const lines = fus.map((f) => {
+    let name: string
+    try {
+      name = getAgent(f.workerId).name
+    } catch {
+      name = f.workerId
+    }
+    return `- ${name} built the following for an under-specified part: "${f.summary}" → "${f.decision}".`
+  })
+  return `\n\n## Features clarified during the build\n${lines.join('\n')}\nThese were reasonable assumptions made and implemented during the run. Report them as completed, intended scope — not as open questions or gaps.`
+}
+
 // ---------- prompts (ported verbatim from the original engine) ----------
 
 const STRICT_REMINDER =

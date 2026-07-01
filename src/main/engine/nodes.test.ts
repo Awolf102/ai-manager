@@ -13,6 +13,8 @@ import {
   hasManagers,
   reviewerIdsOf,
   formatUserRequests,
+  followThroughSection,
+  formatFollowUps,
   assignPrompt,
   workerPrompt,
   type Eng,
@@ -1845,5 +1847,28 @@ describe('lighter internal prompts', () => {
     expect(light).toContain('build X')
     expect(light.length).toBeLessThan(full.length)
     expect(light).not.toBe(full)
+  })
+})
+
+describe('followThroughSection', () => {
+  it('is a non-empty instruction that references the followup block', () => {
+    const s = followThroughSection()
+    expect(s.length).toBeGreaterThan(0)
+    expect(s).toContain('followup')
+  })
+})
+
+describe('formatFollowUps', () => {
+  it('returns empty string when there are no follow-ups', () => {
+    expect(formatFollowUps({ followUps: [] } as unknown as RunState)).toBe('')
+    expect(formatFollowUps({} as unknown as RunState)).toBe('')
+  })
+  it('renders a section naming the worker + summary and decision', () => {
+    const out = formatFollowUps({
+      followUps: [{ workerId: 'w1', summary: 'chat icon unspecified', decision: 'built a chat panel' }]
+    } as unknown as RunState)
+    expect(out).toContain('chat icon unspecified')
+    expect(out).toContain('built a chat panel')
+    expect(out).toContain('W1') // getAgent('w1').name is 'W1' in the test topology
   })
 })
