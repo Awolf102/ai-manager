@@ -346,12 +346,13 @@ button {
 
 .agent-node {
   width: 200px;
-  background: var(--surface-2);
+  background-color: var(--surface-2);
+  background-image: var(--gloss);
   border: 1px solid var(--hairline-strong);
   border-left: 3px solid var(--hairline-strong);
   border-radius: var(--radius);
   padding: var(--space-4) var(--space-4);
-  box-shadow: var(--elev-1);
+  box-shadow: var(--glass-highlight), var(--elev-1);
   transition: border-color var(--motion-fast) var(--ease-standard),
     box-shadow var(--motion) var(--ease-out),
     transform var(--motion) var(--ease-out);
