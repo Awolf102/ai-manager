@@ -23,6 +23,7 @@ export default function RecentPrompts({ onPick }: { onPick: (goal: string) => vo
       return
     }
     const runs = await window.api.listRuns()
+    itemRefs.current = []
     setGoals(recentGoals(runs))
     setOpen(true)
   }

@@ -67,7 +67,7 @@ export default function TeamMenu() {
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         onKeyDown={(e) => {
-          if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+          if ((e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') && !open) {
             e.preventDefault()
             setOpen(true)
             requestAnimationFrame(() => itemRefs.current[0]?.focus())
