@@ -56,6 +56,9 @@ export default function App() {
   const [showContext, setShowContext] = useState(false)
   const [showFaq, setShowFaq] = useState(false)
   const [dragDepth, setDragDepth] = useState(0)
+  // Must be declared with the other hooks, ABOVE the `if (!graph)` early return —
+  // a hook after a conditional return violates the Rules of Hooks (crashes on project open).
+  const dockTabRefs = useRef<Record<string, HTMLButtonElement | null>>({})
 
   const [auth, setAuth] = useState<AuthStatus | null>(null)
   const [authChecking, setAuthChecking] = useState(true)
@@ -117,7 +120,6 @@ export default function App() {
     ...(showHistory ? ['history'] : []),
     ...terminals.map((t) => t.id)
   ]
-  const dockTabRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const onDockTabKeyDown = (e: React.KeyboardEvent, id: string): void => {
     if ((e.key === 'Delete' || e.key === 'Backspace') && id !== 'run' && id !== 'history') {
       e.preventDefault()
