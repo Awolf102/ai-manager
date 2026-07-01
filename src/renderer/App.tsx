@@ -217,7 +217,7 @@ export default function App() {
       >
         <div className="zone-main" style={{ gridArea: 'main' }}>
           <GoalBar />
-          <div className="canvas-wrap">
+          <div className="canvas-wrap" role="group" aria-label="Agent org chart">
             <OrgChart />
             {graph.nodes.length === 0 && (
               <CanvasEmptyState onBuild={() => void handleBuild()} onAdd={() => setShowAdd(true)} />

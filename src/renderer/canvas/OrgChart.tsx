@@ -28,6 +28,7 @@ function toNodes(graph: ProjectGraph): AgentFlowNode[] {
     id: a.id,
     type: 'agent',
     position: a.position,
+    ariaLabel: `${a.name}, ${a.kind}`,
     data: { agent: a, enterDelay: delays[a.id] ?? 0 }
   }))
 }
