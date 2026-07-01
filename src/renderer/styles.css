@@ -586,16 +586,23 @@ button {
   background: var(--accent);
 }
 
-.term-tab .close {
+.term-tab-wrap {
+  display: flex;
+  align-items: stretch;
+}
+.term-tab-wrap:has(.term-tab.active) {
+  background: #141019;
+}
+.term-tab-close {
   border: none;
   background: transparent;
   color: var(--muted);
   font-size: 14px;
   line-height: 1;
-  padding: 2px;
+  padding: 0 8px;
+  cursor: pointer;
 }
-
-.term-tab .close:hover {
+.term-tab-close:hover {
   color: var(--danger);
 }
 

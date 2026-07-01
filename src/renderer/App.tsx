@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { CircleHelp, Clock, Folder, FolderOpen, PanelRight, Paperclip, Plus, Settings as SettingsIcon, Terminal, Users } from 'lucide-react'
 import { useStore } from './store'
 import TeamMenu from './TeamMenu'
@@ -22,6 +22,7 @@ import { computeBodyGrid, INSPECTOR_MIN, INSPECTOR_MAX, DOCK_HEIGHT_MIN, DOCK_WI
 import { AGENT_KINDS } from '../shared/types'
 import type { AgentKind, AuthStatus, ProjectGraph, ProjectMeta } from '../shared/types'
 import { Modal } from './Modal'
+import { rovingIndex } from './roving'
 
 export default function App() {
   const graph = useStore((s) => s.graph)
@@ -110,6 +111,26 @@ export default function App() {
   // The grid must not reserve the dock's track when the dock isn't shown,
   // otherwise an empty strip remains at the bottom. Treat it as collapsed.
   const grid = computeBodyGrid({ ...layout, dock: { ...layout.dock, collapsed: layout.dock.collapsed || !showDock } })
+
+  const dockTabIds: string[] = [
+    ...(showRunView ? ['run'] : []),
+    ...(showHistory ? ['history'] : []),
+    ...terminals.map((t) => t.id)
+  ]
+  const dockTabRefs = useRef<Record<string, HTMLButtonElement | null>>({})
+  const onDockTabKeyDown = (e: React.KeyboardEvent, id: string): void => {
+    if ((e.key === 'Delete' || e.key === 'Backspace') && id !== 'run' && id !== 'history') {
+      e.preventDefault()
+      closeTerminal(id)
+      return
+    }
+    const ni = rovingIndex(e.key, dockTabIds.indexOf(id), dockTabIds.length, 'horizontal')
+    if (ni == null) return
+    e.preventDefault()
+    const next = dockTabIds[ni]
+    setActiveDock(next)
+    dockTabRefs.current[next]?.focus()
+  }
 
   const hasFiles = (e: React.DragEvent): boolean => Array.from(e.dataTransfer.types).includes('Files')
   const onDragEnter = (e: React.DragEvent): void => {
@@ -254,32 +275,55 @@ export default function App() {
                 )
               })()}
             <div className="terminal-dock">
-              <div className="term-tabs">
+              <div className="term-tabs" role="tablist" aria-label="Terminal dock">
                 {showRunView && (
-                  <div
+                  <button
+                    ref={(el) => { dockTabRefs.current['run'] = el }}
                     className={`term-tab mode-run ${activeDockId === 'run' ? 'active' : ''} ${runRunning ? 'running' : ''}`}
+                    role="tab"
+                    id="dock-tab-run"
+                    aria-selected={activeDockId === 'run'}
+                    aria-controls="dock-panel-run"
+                    tabIndex={activeDockId === 'run' ? 0 : -1}
                     onClick={() => setActiveDock('run')}
+                    onKeyDown={(e) => onDockTabKeyDown(e, 'run')}
                   >
                     <span className="dot" /> Run{runRunning && <span className="run-live" title="Run in progress">● running</span>}
-                  </div>
+                  </button>
                 )}
                 {showHistory && (
-                  <div
+                  <button
+                    ref={(el) => { dockTabRefs.current['history'] = el }}
                     className={`term-tab mode-run ${activeDockId === 'history' ? 'active' : ''}`}
+                    role="tab"
+                    id="dock-tab-history"
+                    aria-selected={activeDockId === 'history'}
+                    aria-controls="dock-panel-history"
+                    tabIndex={activeDockId === 'history' ? 0 : -1}
                     onClick={() => setActiveDock('history')}
+                    onKeyDown={(e) => onDockTabKeyDown(e, 'history')}
                   >
                     <span className="dot" /> History
-                  </div>
+                  </button>
                 )}
                 {terminals.map((t) => (
-                  <div
-                    key={t.id}
-                    className={`term-tab mode-${t.mode} ${activeDockId === t.id ? 'active' : ''}`}
-                    onClick={() => setActiveDock(t.id)}
-                  >
-                    <span className="dot" /> {t.agentName} · {t.mode === 'headless' ? 'run' : 'shell'}
+                  <div key={t.id} className="term-tab-wrap" role="presentation">
                     <button
-                      className="close"
+                      ref={(el) => { dockTabRefs.current[t.id] = el }}
+                      className={`term-tab mode-${t.mode} ${activeDockId === t.id ? 'active' : ''}`}
+                      role="tab"
+                      id={`dock-tab-${t.id}`}
+                      aria-selected={activeDockId === t.id}
+                      aria-controls={`dock-panel-${t.id}`}
+                      tabIndex={activeDockId === t.id ? 0 : -1}
+                      onClick={() => setActiveDock(t.id)}
+                      onKeyDown={(e) => onDockTabKeyDown(e, t.id)}
+                    >
+                      <span className="dot" /> {t.agentName} · {t.mode === 'headless' ? 'run' : 'shell'}
+                    </button>
+                    <button
+                      className="term-tab-close"
+                      aria-label={`Close ${t.agentName} terminal`}
                       onClick={(e) => {
                         e.stopPropagation()
                         closeTerminal(t.id)
@@ -292,17 +336,17 @@ export default function App() {
               </div>
               <div className="term-stack">
                 {showRunView && (
-                  <div className={`term-slot ${activeDockId === 'run' ? 'active' : ''}`}>
+                  <div className={`term-slot ${activeDockId === 'run' ? 'active' : ''}`} role="tabpanel" id="dock-panel-run" aria-labelledby="dock-tab-run" tabIndex={0}>
                     <RunView />
                   </div>
                 )}
                 {showHistory && (
-                  <div className={`term-slot ${activeDockId === 'history' ? 'active' : ''}`}>
+                  <div className={`term-slot ${activeDockId === 'history' ? 'active' : ''}`} role="tabpanel" id="dock-panel-history" aria-labelledby="dock-tab-history" tabIndex={0}>
                     <HistoryView />
                   </div>
                 )}
                 {terminals.map((t) => (
-                  <div key={t.id} className={`term-slot ${activeDockId === t.id ? 'active' : ''}`}>
+                  <div key={t.id} className={`term-slot ${activeDockId === t.id ? 'active' : ''}`} role="tabpanel" id={`dock-panel-${t.id}`} aria-labelledby={`dock-tab-${t.id}`} tabIndex={0}>
                     <TerminalPane tab={t} />
                   </div>
                 ))}
