@@ -26,33 +26,25 @@ export default function HitlModal() {
 
   // dismissable={false}: backdrop/Escape can't close; onClose is the minimize fallback by design
   return (
-    <Modal dismissable={false} onClose={() => minimizeInterrupt(true)}>
+    <Modal dismissable={false} onClose={() => minimizeInterrupt(true)} labelledBy="hitl-title">
       {(close) => (<>
-        <h2>{pending.askerName} has a question</h2>
-        <div className="hitl-question">{pending.question}</div>
-        <div className="field">
-          <textarea
-            autoFocus
-            rows={4}
-            value={text}
-            placeholder="Your answer…"
-            onChange={(e) => setText(e.target.value)}
-          />
-          <div className="radio-desc" style={{ marginTop: 4 }}>
-            Your answer is sent to the agent and saved in its session transcript (like any prompt). We redact it
-            from the run history — but don't paste true secrets (API keys, passwords).
+        <div className="modal-header">
+          <h2 id="hitl-title" className="modal-title">{pending.askerName} has a question</h2>
+        </div>
+        <div className="modal-body">
+          <div className="hitl-question">{pending.question}</div>
+          <div className="field">
+            <textarea autoFocus rows={4} value={text} placeholder="Your answer…" onChange={(e) => setText(e.target.value)} />
+            <div className="radio-desc" style={{ marginTop: 4 }}>
+              Your answer is sent to the agent and saved in its session transcript (like any prompt). We redact it
+              from the run history — but don't paste true secrets (API keys, passwords).
+            </div>
           </div>
         </div>
         <div className="modal-actions">
-          <button className="btn" onClick={() => close(() => minimizeInterrupt(true))}>
-            Minimize
-          </button>
-          <button className="btn" onClick={() => close(() => submit(''))}>
-            Skip
-          </button>
-          <button className="btn primary" disabled={!text.trim()} onClick={() => close(() => submit(text.trim()))}>
-            Submit
-          </button>
+          <button className="btn" onClick={() => close(() => minimizeInterrupt(true))}>Minimize</button>
+          <button className="btn" onClick={() => close(() => submit(''))}>Skip</button>
+          <button className="btn primary" disabled={!text.trim()} onClick={() => close(() => submit(text.trim()))}>Submit</button>
         </div>
       </>)}
     </Modal>
