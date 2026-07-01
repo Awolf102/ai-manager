@@ -131,6 +131,21 @@ describe('sweepTmpFiles', () => {
     await store.put(state)
     expect(await store.get('xyz')).toEqual(state)
   })
+
+  // Regression: the init-time tmp-sweep must not clobber an immediate first put.
+  // createRunStore fires sweepTmpFiles(dir), which removes every *.tmp it sees; a put's
+  // atomicWrite creates a <runId>.json.<pid>.<n>.tmp then renames it. If the sweep runs
+  // concurrently it can rm that in-flight tmp mid-rename (ENOENT -> put rejects / checkpoint
+  // lost) — the source of the intermittent full-suite flake. put must await the sweep.
+  it('an immediate put survives the init tmp-sweep, even with orphan tmps present', async () => {
+    await fs.writeFile(join(dir, 'prev.json.123.0.tmp'), 'partial', 'utf8') // post-crash orphan
+    const store = createRunStore(dir)
+    const state = mkState({ runId: 'xyz', final: 'ok' })
+    await store.put(state) // must not be clobbered by the concurrent init sweep
+    expect(await store.get('xyz')).toEqual(state) // checkpoint intact
+    const files = await fs.readdir(dir)
+    expect(files.some((f) => f.endsWith('.tmp'))).toBe(false) // orphan swept + our tmp renamed away
+  })
 })
 
 describe('gcCheckpoints', () => {

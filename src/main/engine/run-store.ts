@@ -43,7 +43,14 @@ export async function sweepTmpFiles(dir: string): Promise<void> {
 export function createRunStore(dir: string): RunStore {
   const fileFor = (runId: string): string => join(dir, `${runId}.json`)
 
+  // Clean up temp files orphaned by a prior crash, ONCE at init before any write.
+  // sweepTmpFiles snapshots the dir then rm's every *.tmp it saw; puts must wait for it
+  // so its snapshot can never include (and delete) a live atomicWrite's in-flight tmp.
+  // Best-effort — a sweep failure must never block writes.
+  const swept = sweepTmpFiles(dir).catch(() => {})
+
   async function put(state: RunState): Promise<void> {
+    await swept
     await fs.mkdir(dir, { recursive: true })
     await atomicWrite(fileFor(state.runId), JSON.stringify(state, null, 2))
   }
@@ -105,7 +112,6 @@ export function createRunStore(dir: string): RunStore {
     return removed
   }
 
-  void sweepTmpFiles(dir) // clean up temp files orphaned by a prior crash (init-time, before any run)
   return { put, get, remove, listResumable, gcCheckpoints }
 }
 
