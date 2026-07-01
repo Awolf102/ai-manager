@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { CircleHelp, Clock, Folder, FolderOpen, PanelRight, Paperclip, Plus, Settings as SettingsIcon, Terminal, Users } from 'lucide-react'
 import { useStore } from './store'
 import TeamMenu from './TeamMenu'
@@ -18,10 +18,11 @@ import HitlModal from './HitlModal'
 import ConfirmDialog from './ConfirmDialog'
 import ToastViewport from './ToastViewport'
 import PanelDivider from './PanelDivider'
-import { computeBodyGrid } from './layout'
+import { computeBodyGrid, INSPECTOR_MIN, INSPECTOR_MAX, DOCK_HEIGHT_MIN, DOCK_WIDTH_MIN, DOCK_WIDTH_MAX } from './layout'
 import { AGENT_KINDS } from '../shared/types'
 import type { AgentKind, AuthStatus, ProjectGraph, ProjectMeta } from '../shared/types'
 import { Modal } from './Modal'
+import { rovingIndex } from './roving'
 
 export default function App() {
   const graph = useStore((s) => s.graph)
@@ -111,6 +112,26 @@ export default function App() {
   // otherwise an empty strip remains at the bottom. Treat it as collapsed.
   const grid = computeBodyGrid({ ...layout, dock: { ...layout.dock, collapsed: layout.dock.collapsed || !showDock } })
 
+  const dockTabIds: string[] = [
+    ...(showRunView ? ['run'] : []),
+    ...(showHistory ? ['history'] : []),
+    ...terminals.map((t) => t.id)
+  ]
+  const dockTabRefs = useRef<Record<string, HTMLButtonElement | null>>({})
+  const onDockTabKeyDown = (e: React.KeyboardEvent, id: string): void => {
+    if ((e.key === 'Delete' || e.key === 'Backspace') && id !== 'run' && id !== 'history') {
+      e.preventDefault()
+      closeTerminal(id)
+      return
+    }
+    const ni = rovingIndex(e.key, dockTabIds.indexOf(id), dockTabIds.length, 'horizontal')
+    if (ni == null) return
+    e.preventDefault()
+    const next = dockTabIds[ni]
+    setActiveDock(next)
+    dockTabRefs.current[next]?.focus()
+  }
+
   const hasFiles = (e: React.DragEvent): boolean => Array.from(e.dataTransfer.types).includes('Files')
   const onDragEnter = (e: React.DragEvent): void => {
     if (hasFiles(e)) {
@@ -173,6 +194,7 @@ export default function App() {
           <button
             className={`btn ${showDock ? 'active' : ''}`}
             title={showDock ? 'Hide the bottom panel' : 'Show the bottom panel'}
+            aria-expanded={showDock}
             onClick={() => toggleDock()}
           >
             <Terminal size={14} /> Terminal
@@ -183,7 +205,7 @@ export default function App() {
           <TeamMenu />
           {graph.linkedTeam && (<span className="team-link" title={`Linked team brain: ${graph.linkedTeam.path}`}><Users size={12} /> {graph.linkedTeam.path.split(/[\\/]/).pop()}</span>)}
           <button className={`btn ${showSettings ? 'active' : ''}`} title="Settings" onClick={() => setShowSettings(true)}><SettingsIcon size={14} /> Settings</button>
-          <button className={`btn faq-btn ${showFaq ? 'active' : ''}`} title="How to prompt" onClick={() => setShowFaq(true)}><CircleHelp size={15} /></button>
+          <button className={`btn faq-btn ${showFaq ? 'active' : ''}`} title="How to prompt" aria-label="How to prompt" onClick={() => setShowFaq(true)}><CircleHelp size={15} /></button>
         </div>
         <span className="topbar-sep" aria-hidden="true" />
         <button className="btn primary" onClick={() => setShowAdd(true)}><Plus size={14} /> Add agent</button>
@@ -195,7 +217,7 @@ export default function App() {
       >
         <div className="zone-main" style={{ gridArea: 'main' }}>
           <GoalBar />
-          <div className="canvas-wrap">
+          <div className="canvas-wrap" role="group" aria-label="Agent org chart">
             <OrgChart />
             {graph.nodes.length === 0 && (
               <CanvasEmptyState onBuild={() => void handleBuild()} onAdd={() => setShowAdd(true)} />
@@ -210,13 +232,17 @@ export default function App() {
               invert={layout.inspector.placement === 'right'}
               getStart={() => layout.inspector.size}
               onResize={(px) => setZoneSize('inspector', px, window.innerHeight)}
+              size={layout.inspector.size}
+              min={INSPECTOR_MIN}
+              max={INSPECTOR_MAX}
+              label="Resize inspector panel"
             />
           )}
           <div className="zone-head">
             <span>Inspector</span>
             <span className="spacer" />
-            <button className="btn tiny" title="Move left/right" onClick={() => setZonePlacement('inspector', layout.inspector.placement === 'right' ? 'left' : 'right')}>⇄</button>
-            <button className="btn tiny" title="Collapse" onClick={() => toggleZoneCollapsed('inspector')}>×</button>
+            <button className="btn tiny" title="Move left/right" aria-label="Move panel left or right" onClick={() => setZonePlacement('inspector', layout.inspector.placement === 'right' ? 'left' : 'right')}>⇄</button>
+            <button className="btn tiny" title="Collapse" aria-label="Collapse panel" onClick={() => toggleZoneCollapsed('inspector')}>×</button>
           </div>
           <div className="zone-body">
             {selectedId ? (<><AgentConfigPanel /><RoleMemoryEditor /></>) : (
@@ -234,41 +260,71 @@ export default function App() {
 
         {showDock && (
           <div className={`zone-dock ${layout.dock.collapsed ? 'collapsed' : ''}`} style={{ gridArea: 'dock' }}>
-            {!layout.dock.collapsed && (
-              <PanelDivider
-                axis={layout.dock.placement === 'right' ? 'x' : 'y'}
-                invert={true}
-                getStart={() => layout.dock.size}
-                onResize={(px) => setZoneSize('dock', px, window.innerHeight)}
-              />
-            )}
+            {!layout.dock.collapsed && (() => {
+                const dockAxis = layout.dock.placement === 'right' ? 'x' : 'y'
+                return (
+                  <PanelDivider
+                    axis={dockAxis}
+                    invert={true}
+                    getStart={() => layout.dock.size}
+                    onResize={(px) => setZoneSize('dock', px, window.innerHeight)}
+                    size={layout.dock.size}
+                    min={dockAxis === 'x' ? DOCK_WIDTH_MIN : DOCK_HEIGHT_MIN}
+                    max={dockAxis === 'x' ? DOCK_WIDTH_MAX : Math.round(window.innerHeight * 0.6)}
+                    label="Resize terminal panel"
+                  />
+                )
+              })()}
             <div className="terminal-dock">
-              <div className="term-tabs">
+              <div className="term-tabs" role="tablist" aria-label="Terminal dock">
                 {showRunView && (
-                  <div
+                  <button
+                    ref={(el) => { dockTabRefs.current['run'] = el }}
                     className={`term-tab mode-run ${activeDockId === 'run' ? 'active' : ''} ${runRunning ? 'running' : ''}`}
+                    role="tab"
+                    id="dock-tab-run"
+                    aria-selected={activeDockId === 'run'}
+                    aria-controls="dock-panel-run"
+                    tabIndex={activeDockId === 'run' ? 0 : -1}
                     onClick={() => setActiveDock('run')}
+                    onKeyDown={(e) => onDockTabKeyDown(e, 'run')}
                   >
                     <span className="dot" /> Run{runRunning && <span className="run-live" title="Run in progress">● running</span>}
-                  </div>
+                  </button>
                 )}
                 {showHistory && (
-                  <div
+                  <button
+                    ref={(el) => { dockTabRefs.current['history'] = el }}
                     className={`term-tab mode-run ${activeDockId === 'history' ? 'active' : ''}`}
+                    role="tab"
+                    id="dock-tab-history"
+                    aria-selected={activeDockId === 'history'}
+                    aria-controls="dock-panel-history"
+                    tabIndex={activeDockId === 'history' ? 0 : -1}
                     onClick={() => setActiveDock('history')}
+                    onKeyDown={(e) => onDockTabKeyDown(e, 'history')}
                   >
                     <span className="dot" /> History
-                  </div>
+                  </button>
                 )}
                 {terminals.map((t) => (
-                  <div
-                    key={t.id}
-                    className={`term-tab mode-${t.mode} ${activeDockId === t.id ? 'active' : ''}`}
-                    onClick={() => setActiveDock(t.id)}
-                  >
-                    <span className="dot" /> {t.agentName} · {t.mode === 'headless' ? 'run' : 'shell'}
+                  <div key={t.id} className="term-tab-wrap" role="presentation">
                     <button
-                      className="close"
+                      ref={(el) => { dockTabRefs.current[t.id] = el }}
+                      className={`term-tab mode-${t.mode} ${activeDockId === t.id ? 'active' : ''}`}
+                      role="tab"
+                      id={`dock-tab-${t.id}`}
+                      aria-selected={activeDockId === t.id}
+                      aria-controls={`dock-panel-${t.id}`}
+                      tabIndex={activeDockId === t.id ? 0 : -1}
+                      onClick={() => setActiveDock(t.id)}
+                      onKeyDown={(e) => onDockTabKeyDown(e, t.id)}
+                    >
+                      <span className="dot" /> {t.agentName} · {t.mode === 'headless' ? 'run' : 'shell'}
+                    </button>
+                    <button
+                      className="term-tab-close"
+                      aria-label={`Close ${t.agentName} terminal`}
                       onClick={(e) => {
                         e.stopPropagation()
                         closeTerminal(t.id)
@@ -281,17 +337,17 @@ export default function App() {
               </div>
               <div className="term-stack">
                 {showRunView && (
-                  <div className={`term-slot ${activeDockId === 'run' ? 'active' : ''}`}>
+                  <div className={`term-slot ${activeDockId === 'run' ? 'active' : ''}`} role="tabpanel" id="dock-panel-run" aria-labelledby="dock-tab-run" tabIndex={0}>
                     <RunView />
                   </div>
                 )}
                 {showHistory && (
-                  <div className={`term-slot ${activeDockId === 'history' ? 'active' : ''}`}>
+                  <div className={`term-slot ${activeDockId === 'history' ? 'active' : ''}`} role="tabpanel" id="dock-panel-history" aria-labelledby="dock-tab-history" tabIndex={0}>
                     <HistoryView />
                   </div>
                 )}
                 {terminals.map((t) => (
-                  <div key={t.id} className={`term-slot ${activeDockId === t.id ? 'active' : ''}`}>
+                  <div key={t.id} className={`term-slot ${activeDockId === t.id ? 'active' : ''}`} role="tabpanel" id={`dock-panel-${t.id}`} aria-labelledby={`dock-tab-${t.id}`} tabIndex={0}>
                     <TerminalPane tab={t} />
                   </div>
                 ))}
@@ -302,7 +358,7 @@ export default function App() {
 
         {/* collapsed dock re-open affordance (inspector re-open lives next to Run in the goal bar) */}
         {showDock && layout.dock.collapsed && (
-          <button className="zone-reopen reopen-dock" onClick={() => toggleZoneCollapsed('dock')} title="Show dock">▴</button>
+          <button className="zone-reopen reopen-dock" onClick={() => toggleZoneCollapsed('dock')} title="Show dock" aria-label="Show dock">▴</button>
         )}
       </div>
 
@@ -424,6 +480,7 @@ function AddAgentModal({
 }) {
   const [name, setName] = useState('')
   const [kind, setKind] = useState<AgentKind>('worker')
+  const kindRefs = useRef<(HTMLButtonElement | null)[]>([])
 
   const create = async (): Promise<void> => {
     if (!name.trim()) return
@@ -449,9 +506,24 @@ function AddAgentModal({
         </div>
         <div className="field">
           <label>Role in the chain</label>
-          <div className="seg">
-            {AGENT_KINDS.map((k) => (
-              <button key={k} className={kind === k ? 'active' : ''} onClick={() => setKind(k)}>
+          <div className="seg" role="radiogroup" aria-label="Role in the chain">
+            {AGENT_KINDS.map((k, i) => (
+              <button
+                key={k}
+                ref={(el) => { kindRefs.current[i] = el }}
+                role="radio"
+                aria-checked={kind === k}
+                tabIndex={kind === k ? 0 : -1}
+                className={kind === k ? 'active' : ''}
+                onClick={() => setKind(k)}
+                onKeyDown={(e) => {
+                  const ni = rovingIndex(e.key, i, AGENT_KINDS.length, 'horizontal')
+                  if (ni == null) return
+                  e.preventDefault()
+                  setKind(AGENT_KINDS[ni])
+                  kindRefs.current[ni]?.focus()
+                }}
+              >
                 {k}
               </button>
             ))}

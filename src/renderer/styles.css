@@ -183,6 +183,16 @@ button {
 .btn:active { transform: scale(0.97); }
 .btn:hover { border-color: var(--signal); background: var(--surface-hover); }
 .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
+.run-tab:focus-visible,
+.term-tab:focus-visible,
+.term-tab-close:focus-visible,
+.seg button:focus-visible,
+.panel-divider:focus-visible,
+.topmenu-list button:focus-visible,
+.recent-prompts-item:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
 .btn.primary {
   background: var(--signal);
   border-color: var(--signal);
@@ -563,6 +573,8 @@ button {
   align-items: center;
   gap: 7px;
   padding: 0 12px;
+  background: none;
+  border: none;
   border-right: 1px solid var(--border);
   color: var(--muted);
   font-size: 12px;
@@ -586,16 +598,23 @@ button {
   background: var(--accent);
 }
 
-.term-tab .close {
+.term-tab-wrap {
+  display: flex;
+  align-items: stretch;
+}
+.term-tab-wrap:has(.term-tab.active) {
+  background: #141019;
+}
+.term-tab-close {
   border: none;
   background: transparent;
   color: var(--muted);
   font-size: 14px;
   line-height: 1;
-  padding: 2px;
+  padding: 0 8px;
+  cursor: pointer;
 }
-
-.term-tab .close:hover {
+.term-tab-close:hover {
   color: var(--danger);
 }
 
