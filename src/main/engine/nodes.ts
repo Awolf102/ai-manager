@@ -326,7 +326,8 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
         permissionMode: state.actingMode,
         effort,
         resume: false,
-        abort: eng.abort
+        abort: eng.abort,
+        modelOverride: workerModelOverride(es)
       }
       const { text, sessionId } = await runWithHandoffs(
         eng,
@@ -572,7 +573,8 @@ async function repairNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeRe
         permissionMode: state.actingMode,
         effort,
         resume: true,
-        abort: eng.abort
+        abort: eng.abort,
+        modelOverride: workerModelOverride(rs)
       })
       if (sessionId) await updateAgent({ id: ownerId, sessionId })
       tasks[t.task.id].output = text || tasks[t.task.id].output
@@ -1205,6 +1207,12 @@ export function assignEffort(args: {
     effort = clampEffort(args.model, capEffort(base, args.ceiling))
   }
   return effort
+}
+
+/** The model override to dispatch WORKER steps on when cheap-model-workers is on
+ *  (managers/orchestrator never get an override). undefined => byte-for-byte. */
+export function workerModelOverride(s: { cheapModelWorkers: boolean; cheapModelTier: string }): string | undefined {
+  return s.cheapModelWorkers ? s.cheapModelTier : undefined
 }
 
 /** The highest effort in a worker's batch (so the hardest task is served), or undefined. */

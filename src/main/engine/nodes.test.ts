@@ -6,6 +6,7 @@ import {
   maxEffort,
   effortForModel,
   assignEffort,
+  workerModelOverride,
   lessonsDigest,
   depsSatisfied,
   normalizeLessonInput,
@@ -1809,5 +1810,14 @@ describe('assignEffort (thrift)', () => {
   })
   it('no model (unassigned task): thrift is skipped, request passes through', () => {
     expect(assignEffort({ model: undefined, requested: 'high', adaptive: true, thrift: true, ceiling: 'low' })).toBe('high')
+  })
+})
+
+describe('workerModelOverride', () => {
+  it('returns the cheap tier when cheapModelWorkers is on', () => {
+    expect(workerModelOverride({ cheapModelWorkers: true, cheapModelTier: 'claude-haiku-4-5' })).toBe('claude-haiku-4-5')
+  })
+  it('returns undefined when off (byte-for-byte dispatch)', () => {
+    expect(workerModelOverride({ cheapModelWorkers: false, cheapModelTier: 'claude-haiku-4-5' })).toBeUndefined()
   })
 })
