@@ -73,11 +73,6 @@ button {
   flex: none;
 }
 
-/* auth pill crossfades on state change (rare) instead of snapping */
-.auth-pill {
-  transition: color var(--motion) var(--ease-out), border-color var(--motion) var(--ease-out);
-}
-
 .topbar .spacer {
   flex: 1;
 }
@@ -1055,6 +1050,8 @@ button {
   border: 1px solid var(--border-strong);
   background: var(--panel-2);
   color: var(--muted);
+  /* crossfade on state change (rare) instead of snapping */
+  transition: color var(--motion) var(--ease-out), border-color var(--motion) var(--ease-out);
 }
 
 .auth-pill.auth-ok {
