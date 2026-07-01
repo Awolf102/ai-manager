@@ -37,10 +37,14 @@ export default function RunView() {
   const selectStep = useStore((s) => s.selectStep)
 
   const [rightTab, setRightTab] = useState<'narration' | 'terminal' | 'result'>('narration')
+  const [revealResult, setRevealResult] = useState(false)
   const prevRunning = useRef(run.running)
   // Land on the Result tab when a run finishes successfully with a report.
   useEffect(() => {
-    if (prevRunning.current && !run.running && run.final && !run.error) setRightTab('result')
+    if (prevRunning.current && !run.running && run.final && !run.error) {
+      setRightTab('result')
+      setRevealResult(true)
+    }
     prevRunning.current = run.running
   }, [run.running, run.final, run.error])
 
@@ -92,6 +96,7 @@ export default function RunView() {
   useEffect(() => {
     buffers.current.clear()
     termRef.current?.clear()
+    setRevealResult(false)
   }, [run.runId])
 
   // selection change → repaint from buffer
@@ -116,7 +121,7 @@ export default function RunView() {
     <div className="runview">
       {banner && (
         <div className={`run-banner ${banner.kind}`}>
-          {banner.kind === 'success' ? '✓' : '✗'} {banner.text}
+          <span className="run-banner-mark">{banner.kind === 'success' ? '✓' : '✗'}</span> {banner.text}
         </div>
       )}
       <div className="run-main">
@@ -204,7 +209,7 @@ export default function RunView() {
             </div>
             {hasResult && (
               <div className={`run-slot ${rightTab === 'result' ? 'active' : ''}`}>
-                <pre className="run-result">{run.final}</pre>
+                <pre className={`run-result ${revealResult ? 'reveal' : ''}`}>{run.final}</pre>
               </div>
             )}
           </div>
