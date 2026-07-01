@@ -349,7 +349,6 @@ button {
   background-color: var(--surface-2);
   background-image: var(--gloss);
   border: 1px solid var(--hairline-strong);
-  border-left: 3px solid var(--hairline-strong);
   border-radius: var(--radius);
   padding: var(--space-4) var(--space-4);
   box-shadow: var(--glass-highlight), var(--elev-1);
@@ -361,14 +360,17 @@ button {
 }
 .agent-node:hover { box-shadow: var(--elev-2); transform: translateY(-2px); }
 
+/* Role identity through integrated material — a soft role-tinted corner wash
+   layered under the gloss (retired the flat side-tab border), reinforced by the
+   role-tinted icon chip + kind label below. */
 .agent-node.kind-orchestrator {
-  border-left-color: var(--orchestrator);
+  background-image: var(--gloss), radial-gradient(140% 90% at 0% 0%, var(--orchestrator-tint), transparent 62%);
 }
 .agent-node.kind-manager {
-  border-left-color: var(--manager);
+  background-image: var(--gloss), radial-gradient(140% 90% at 0% 0%, var(--manager-tint), transparent 62%);
 }
 .agent-node.kind-worker {
-  border-left-color: var(--worker);
+  background-image: var(--gloss), radial-gradient(140% 90% at 0% 0%, var(--worker-tint), transparent 62%);
 }
 
 .agent-node.selected {
@@ -404,6 +406,9 @@ button {
 }
 
 .agent-kind { font-size: var(--text-xs); color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.kind-orchestrator .agent-kind { color: var(--orchestrator); }
+.kind-manager .agent-kind { color: var(--manager); }
+.kind-worker .agent-kind { color: var(--worker); }
 
 .agent-node-actions { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
 .agent-node-actions button {
