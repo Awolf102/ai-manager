@@ -1274,7 +1274,19 @@ button {
 .draft-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0;
+}
+.draft-list > .field {
+  padding-top: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--hairline);
+}
+.draft-list > .field:first-child {
+  padding-top: 0;
+}
+.draft-list > .field:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
 }
 .draft-role {
   width: 100%;
