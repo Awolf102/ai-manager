@@ -1,39 +1,49 @@
 :root {
-  /* ===== Brand anchors (locked) ===== */
-  --indigo: #1F1A38;
-  --plum: #7B506F;
-  --rose: #DD99BB;
-  --cream: #EAD7D1;
-  --greige: #DBCDC6;
+  /* ===== Brand anchors (Obsidian & Emerald) ===== */
+  --obsidian: #0B0C0E;
+  --racing-green: #0F6B45;   /* Deep Racing Green — brand fill */
+  --emerald: #3FBE86;        /* legible on-black emerald — accent/signal */
+  --white: #F4F6F5;
 
-  /* ===== Surfaces (indigo→plum ramp; plum reserved for selected/active) ===== */
-  --surface-0: #1F1A38;      /* app background / canvas — deepest */
-  --surface-1: #25203F;      /* panels, dock, top bar */
-  --surface-2: #2E2749;      /* raised cards, inputs, modals */
-  --surface-hover: #3A2F54;
-  --surface-selected: #7B506F;
+  /* ===== Obsidian surfaces (layered near-black, NOT pure #000) ===== */
+  --surface-0: #0B0C0E;      /* app base / canvas — deepest */
+  --surface-1: #121417;      /* panels, dock, top bar */
+  --surface-2: #191C20;      /* raised cards, inputs, modals */
+  --surface-hover: #22262B;
+  --surface-selected: #16332599; /* emerald-tinted raise for selected rows */
 
-  /* ===== Text & borders ===== */
-  --fg: #EAD7D1;
-  --fg-muted: #C9BEC2;
-  --fg-dim: #9C8F96;
-  --hairline: rgba(234, 215, 209, 0.10);
-  --hairline-strong: rgba(234, 215, 209, 0.18);
+  /* ===== White (auxiliary) — type + hairlines ===== */
+  --fg: #F4F6F5;
+  --fg-muted: #AAB2AF;       /* AA on all surfaces */
+  --fg-dim: #727B77;
+  --hairline: rgba(255, 255, 255, 0.08);
+  --hairline-strong: rgba(255, 255, 255, 0.15);
 
-  /* ===== Signal & states ===== */
-  --signal: #DD99BB;
-  --signal-hover: #E7ADC8;
-  --signal-press: #C97FA6;
-  --signal-tint: rgba(221, 153, 187, 0.16);
-  --focus-ring: rgba(221, 153, 187, 0.45);
-  --on-signal: #1F1A38;      /* text/icon on a rose fill */
+  /* ===== Emerald ACCENT family (on-black legible — borders/focus/run-state/green-text) ===== */
+  --signal: #3FBE86;
+  --signal-hover: #5AD6A0;
+  --signal-press: #2FA372;
+  --signal-tint: rgba(63, 190, 134, 0.16);
+  --accent-tint: rgba(63, 190, 134, 0.14);   /* softer glow/halo */
+  --focus-ring: rgba(63, 190, 134, 0.48);
+  --on-signal: #07130D;      /* dark text/icon on an emerald (light) fill */
 
-  /* ===== Agent roles ===== */
-  --orchestrator: #F0B54A;   /* gold — kept */
-  --manager: #8EA2F0;        /* periwinkle — re-mapped off lavender #b08cff */
-  --worker: #4FD1C5;         /* teal — kept */
-  --state-danger: #F0726F;
-  --state-good: #6FD08A;
+  /* ===== Emerald BRAND-FILL family (Deep Racing Green — glossy primary fill only, white text) ===== */
+  --brand: #0F6B45;
+  --brand-hi: #128052;
+  --brand-press: #0B5638;
+
+  /* ===== Agent roles (retuned for obsidian; all clearly ≠ emerald-action) ===== */
+  --orchestrator: #E6B23C;   /* gold */
+  --manager: #8FA6E6;        /* periwinkle/steel */
+  --worker: #B8C2CE;         /* silver-slate (moved OFF teal so it can't read as emerald) */
+  --orchestrator-tint: rgba(230, 178, 60, 0.14);
+  --manager-tint: rgba(143, 166, 230, 0.14);
+  --worker-tint: rgba(184, 194, 206, 0.14);
+
+  /* ===== Semantic states ===== */
+  --state-danger: #F06A6A;
+  --state-good: #4FD08A;     /* emerald-adjacent success, distinct from the deep brand */
 
   /* ===== Typography ===== */
   --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -51,22 +61,32 @@
   --weight-semibold: 600;
   --tracking-tight: -0.01em;
 
-  /* ===== Spacing / radius / elevation / motion ===== */
+  /* ===== Spacing / radius ===== */
   --space-1: 2px; --space-2: 4px; --space-3: 8px; --space-4: 12px;
   --space-5: 16px; --space-6: 24px; --space-7: 32px;
   --radius-sm: 6px; --radius: 10px; --radius-lg: 14px; --radius-pill: 999px;
-  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.30);
-  --elev-2: 0 8px 24px rgba(0, 0, 0, 0.38);
+
+  /* ===== Elevation (soft, dark, layered — deepened for near-black) ===== */
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.40);
+  --elev-2: 0 8px 24px rgba(0, 0, 0, 0.50);
+  --elev-3: 0 12px 40px rgba(0, 0, 0, 0.55);
+
+  /* ===== Materials — glass + gloss ===== */
+  --glass-bg: rgba(18, 20, 23, 0.72);          /* dark & opaque enough for AA text */
+  --glass-blur: 16px;                          /* within the 10–20px safe band */
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  --gloss: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0) 45%);
+
+  /* ===== Motion ===== */
   --motion-fast: 120ms; --motion: 180ms; --motion-slow: 260ms;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
-  --canvas-dot: #322A4D; /* warm canvas dot-grid colour (mirrored to the React Flow <Background color> prop, which can't read CSS vars) */
-  --orchestrator-tint: rgba(240, 181, 74, 0.14);
-  --manager-tint: rgba(142, 162, 240, 0.14);
-  --worker-tint: rgba(79, 209, 197, 0.14);
 
-  /* ===== Legacy aliases — map OLD names onto the warm-dark system so the
+  /* Cool obsidian canvas dot-grid (mirrored to the React Flow <Background color> prop, which can't read CSS vars). */
+  --canvas-dot: #1E2329;
+
+  /* ===== Legacy aliases — map OLD names onto the obsidian/emerald system so the
      existing styles.css re-tints with zero churn. Later cycles migrate
      individual rules to the semantic names above. ===== */
   --bg: var(--surface-0);
