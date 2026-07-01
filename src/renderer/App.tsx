@@ -480,6 +480,7 @@ function AddAgentModal({
 }) {
   const [name, setName] = useState('')
   const [kind, setKind] = useState<AgentKind>('worker')
+  const kindRefs = useRef<(HTMLButtonElement | null)[]>([])
 
   const create = async (): Promise<void> => {
     if (!name.trim()) return
@@ -509,6 +510,7 @@ function AddAgentModal({
             {AGENT_KINDS.map((k, i) => (
               <button
                 key={k}
+                ref={(el) => { kindRefs.current[i] = el }}
                 role="radio"
                 aria-checked={kind === k}
                 tabIndex={kind === k ? 0 : -1}
@@ -519,6 +521,7 @@ function AddAgentModal({
                   if (ni == null) return
                   e.preventDefault()
                   setKind(AGENT_KINDS[ni])
+                  kindRefs.current[ni]?.focus()
                 }}
               >
                 {k}
