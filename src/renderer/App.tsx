@@ -492,43 +492,47 @@ function AddAgentModal({
   }
 
   return (
-    <Modal onClose={onClose}>{(close) => (<>
-        <h2>Add agent</h2>
-        <div className="field">
-          <label>Name</label>
-          <input
-            autoFocus
-            value={name}
-            placeholder="e.g. Data Engineer"
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') void create()
-            }}
-          />
+    <Modal onClose={onClose} labelledBy="addagent-title">{(close) => (<>
+        <div className="modal-header">
+          <h2 id="addagent-title" className="modal-title">Add agent</h2>
         </div>
-        <div className="field">
-          <label>Role in the chain</label>
-          <div className="seg" role="radiogroup" aria-label="Role in the chain">
-            {AGENT_KINDS.map((k, i) => (
-              <button
-                key={k}
-                ref={(el) => { kindRefs.current[i] = el }}
-                role="radio"
-                aria-checked={kind === k}
-                tabIndex={kind === k ? 0 : -1}
-                className={kind === k ? 'active' : ''}
-                onClick={() => setKind(k)}
-                onKeyDown={(e) => {
-                  const ni = rovingIndex(e.key, i, AGENT_KINDS.length, 'horizontal')
-                  if (ni == null) return
-                  e.preventDefault()
-                  setKind(AGENT_KINDS[ni])
-                  kindRefs.current[ni]?.focus()
-                }}
-              >
-                {k}
-              </button>
-            ))}
+        <div className="modal-body">
+          <div className="field">
+            <label>Name</label>
+            <input
+              autoFocus
+              value={name}
+              placeholder="e.g. Data Engineer"
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void create()
+              }}
+            />
+          </div>
+          <div className="field">
+            <label>Role in the chain</label>
+            <div className="seg" role="radiogroup" aria-label="Role in the chain">
+              {AGENT_KINDS.map((k, i) => (
+                <button
+                  key={k}
+                  ref={(el) => { kindRefs.current[i] = el }}
+                  role="radio"
+                  aria-checked={kind === k}
+                  tabIndex={kind === k ? 0 : -1}
+                  className={kind === k ? 'active' : ''}
+                  onClick={() => setKind(k)}
+                  onKeyDown={(e) => {
+                    const ni = rovingIndex(e.key, i, AGENT_KINDS.length, 'horizontal')
+                    if (ni == null) return
+                    e.preventDefault()
+                    setKind(AGENT_KINDS[ni])
+                    kindRefs.current[ni]?.focus()
+                  }}
+                >
+                  {k}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
         <div className="modal-actions">

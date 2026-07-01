@@ -31,24 +31,28 @@ export default function RoleDraftModal({ drafts, onClose }: { drafts: Draft[]; o
   }
 
   return (
-    <Modal onClose={onClose} className="modal-wide">{(close) => (<>
-        <h2>Draft roles ({edited.length})</h2>
-        <div className="draft-list">
-          {edited.map((d, i) => (
-            <div key={d.agentId} className="field">
-              <label>{d.name}</label>
-              <textarea
-                className="draft-role"
-                value={d.role}
-                onChange={(e) =>
-                  setEdited((prev) => prev.map((x, j) => (j === i ? { ...x, role: e.target.value } : x)))
-                }
-              />
-              {d.skills && d.skills.length > 0 && (
-                <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>skills: {d.skills.join(', ')}</div>
-              )}
-            </div>
-          ))}
+    <Modal onClose={onClose} className="modal-wide" labelledBy="roledraft-title">{(close) => (<>
+        <div className="modal-header">
+          <h2 id="roledraft-title" className="modal-title">Draft roles ({edited.length})</h2>
+        </div>
+        <div className="modal-body">
+          <div className="draft-list">
+            {edited.map((d, i) => (
+              <div key={d.agentId} className="field">
+                <label>{d.name}</label>
+                <textarea
+                  className="draft-role"
+                  value={d.role}
+                  onChange={(e) =>
+                    setEdited((prev) => prev.map((x, j) => (j === i ? { ...x, role: e.target.value } : x)))
+                  }
+                />
+                {d.skills && d.skills.length > 0 && (
+                  <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>skills: {d.skills.join(', ')}</div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
         <div className="modal-actions">
           <button className="btn" onClick={() => close()} disabled={applying}>

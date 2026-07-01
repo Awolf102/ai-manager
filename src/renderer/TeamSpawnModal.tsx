@@ -42,35 +42,40 @@ export default function TeamSpawnModal({
   }
 
   return (
-    <Modal onClose={onClose} className="modal-wide">{(close) => (<>
-        <h2>Proposed team ({edited.length})</h2>
-        <div className="draft-list">
-          {edited.map((m, i) => (
-            <div key={m.id} className="field" style={{ marginLeft: depthOf(m) * 20 }}>
-              <label>
-                <span className="spawn-kind">{m.kind}</span>
-                <input
-                  className="spawn-name"
-                  value={m.name}
+    <Modal onClose={onClose} className="modal-wide" labelledBy="teamspawn-title">{(close) => (<>
+        <div className="modal-header">
+          <h2 id="teamspawn-title" className="modal-title">Proposed team ({edited.length})</h2>
+          <p className="modal-desc">Review and edit names and roles before creating the team.</p>
+        </div>
+        <div className="modal-body">
+          <div className="draft-list">
+            {edited.map((m, i) => (
+              <div key={m.id} className="field" style={{ marginLeft: depthOf(m) * 20 }}>
+                <label>
+                  <span className="spawn-kind">{m.kind}</span>
+                  <input
+                    className="spawn-name"
+                    value={m.name}
+                    onChange={(e) =>
+                      setEdited((prev) => prev.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))
+                    }
+                  />
+                </label>
+                <textarea
+                  className="draft-role"
+                  value={m.role}
                   onChange={(e) =>
-                    setEdited((prev) => prev.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))
+                    setEdited((prev) => prev.map((x, j) => (j === i ? { ...x, role: e.target.value } : x)))
                   }
                 />
-              </label>
-              <textarea
-                className="draft-role"
-                value={m.role}
-                onChange={(e) =>
-                  setEdited((prev) => prev.map((x, j) => (j === i ? { ...x, role: e.target.value } : x)))
-                }
-              />
-              {m.skills && m.skills.length > 0 && (
-                <div className="spawn-skills muted" style={{ fontSize: 11, marginTop: 4 }}>
-                  skills: {m.skills.join(', ')}
-                </div>
-              )}
-            </div>
-          ))}
+                {m.skills && m.skills.length > 0 && (
+                  <div className="spawn-skills muted" style={{ fontSize: 11, marginTop: 4 }}>
+                    skills: {m.skills.join(', ')}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
         <div className="modal-actions">
           <button className="btn" onClick={() => close()} disabled={applying}>

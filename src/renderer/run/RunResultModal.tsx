@@ -71,40 +71,44 @@ export default function RunResultModal({
   const running = serverId !== null && status !== 'exited' && status !== 'error'
 
   return (
-    <Modal onClose={onClose} className="modal-wide">{(close) => (<>
-        <h2>Launch app</h2>
-        {launchable ? (
-          <>
-            <div className="field">
-              <label>Start command</label>
-              <input className="spawn-name" value={cmd} onChange={(e) => setCmd(e.target.value)} />
-              {cmdError && <p className="rr-error">{cmdError}</p>}
-            </div>
-            <div className="rr-row">
+    <Modal onClose={onClose} className="modal-wide" labelledBy="runresult-title">{(close) => (<>
+        <div className="modal-header">
+          <h2 id="runresult-title" className="modal-title">Launch app</h2>
+        </div>
+        <div className="modal-body">
+          {launchable ? (
+            <>
               <div className="field">
-                <label>Port</label>
-                <input className="spawn-name" value={port} onChange={(e) => setPort(e.target.value)} placeholder="e.g. 5173" />
+                <label>Start command</label>
+                <input className="spawn-name" value={cmd} onChange={(e) => setCmd(e.target.value)} />
+                {cmdError && <p className="rr-error">{cmdError}</p>}
               </div>
-              <div className="field">
-                <label>Entry path</label>
-                <input className="spawn-name" value={path} onChange={(e) => setPath(e.target.value)} />
+              <div className="rr-row">
+                <div className="field">
+                  <label>Port</label>
+                  <input className="spawn-name" value={port} onChange={(e) => setPort(e.target.value)} placeholder="e.g. 5173" />
+                </div>
+                <div className="field">
+                  <label>Entry path</label>
+                  <input className="spawn-name" value={path} onChange={(e) => setPath(e.target.value)} />
+                </div>
               </div>
-            </div>
-            {manifest.notes && <p className="rr-notes">{manifest.notes}</p>}
-            <div className="rr-status">
-              {status === 'idle' ? 'Not started' : `Status: ${status}`}
-              {url && <> — opened {url}</>}
-            </div>
-            <pre className="server-log" ref={logRef}>
-              {log || '(no output yet)'}
-            </pre>
-          </>
-        ) : (
-          <p className="rr-notes">
-            This project doesn't look like a runnable web app (detected: {manifest.type}).{' '}
-            {manifest.notes ?? 'Open the project folder to run it yourself.'}
-          </p>
-        )}
+              {manifest.notes && <p className="rr-notes">{manifest.notes}</p>}
+              <div className="rr-status">
+                {status === 'idle' ? 'Not started' : `Status: ${status}`}
+                {url && <> — opened {url}</>}
+              </div>
+              <pre className="server-log" ref={logRef}>
+                {log || '(no output yet)'}
+              </pre>
+            </>
+          ) : (
+            <p className="rr-notes">
+              This project doesn't look like a runnable web app (detected: {manifest.type}).{' '}
+              {manifest.notes ?? 'Open the project folder to run it yourself.'}
+            </p>
+          )}
+        </div>
         <div className="modal-actions">
           <button className="btn" onClick={() => close()}>
             Close
