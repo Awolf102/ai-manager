@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { CircleHelp, Clock, FolderOpen, Paperclip, Plus, Settings as SettingsIcon, Terminal, Users } from 'lucide-react'
+import { CircleHelp, Clock, Folder, FolderOpen, Paperclip, Plus, Settings as SettingsIcon, Terminal, Users } from 'lucide-react'
 import { useStore } from './store'
 import TeamMenu from './TeamMenu'
 import FaqModal from './FaqModal'
@@ -12,6 +12,7 @@ import RunView from './run/RunView'
 import HistoryView from './run/HistoryView'
 import SettingsModal from './SettingsModal'
 import ContextModal from './ContextModal'
+import { BrandMark } from './BrandMark'
 import HitlModal from './HitlModal'
 import ConfirmDialog from './ConfirmDialog'
 import ToastViewport from './ToastViewport'
@@ -335,10 +336,13 @@ function ProjectPicker({ onOpen }: { onOpen: (g: ProjectGraph) => void }) {
   return (
     <div className="picker">
       <div className="picker-card">
-        <h1>Orkestr</h1>
-        <p>Choose a project folder — all your agents will work inside it.</p>
+        <div className="picker-identity">
+          <BrandMark size={48} />
+          <h1 className="picker-wordmark">Orkestr</h1>
+          <p className="picker-tagline">Conduct a team of agents.</p>
+        </div>
         <button
-          className="btn primary"
+          className="btn primary picker-open"
           onClick={async () => {
             const g = await window.api.pickProjectFolder()
             if (g) onOpen(g)
@@ -346,12 +350,11 @@ function ProjectPicker({ onOpen }: { onOpen: (g: ProjectGraph) => void }) {
         >
           <FolderOpen size={14} /> Open project folder…
         </button>
-
         {recents.length > 0 && (
           <div className="recent-list">
             <div className="label">Recent</div>
             {recents.map((r) => (
-              <div
+              <button
                 className="recent-item"
                 key={r.path}
                 onClick={async () => {
@@ -359,9 +362,12 @@ function ProjectPicker({ onOpen }: { onOpen: (g: ProjectGraph) => void }) {
                   if (g) onOpen(g)
                 }}
               >
-                <span>{r.name}</span>
-                <span className="path">{r.path}</span>
-              </div>
+                <Folder size={16} className="recent-icon" />
+                <span className="recent-meta">
+                  <span className="recent-name">{r.name}</span>
+                  <span className="path">{r.path}</span>
+                </span>
+              </button>
             ))}
           </div>
         )}
