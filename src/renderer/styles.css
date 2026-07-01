@@ -1644,6 +1644,18 @@ button {
 .topmenu-list { position: absolute; top: 100%; right: 0; margin-top: 4px; background: var(--surface-2); border: 1px solid var(--hairline-strong); border-radius: var(--radius); box-shadow: var(--elev-2); padding: 4px; display: flex; flex-direction: column; min-width: 200px; z-index: 60; }
 .topmenu-list button { display: flex; align-items: center; gap: var(--space-3); padding: 7px 10px; background: none; border: none; color: var(--fg); font-size: var(--text-sm); border-radius: var(--radius-sm); text-align: left; }
 .topmenu-list button:hover { background: var(--surface-hover); }
+/* ---- Team ▾ dropdown: origin-aware enter (the one earned animation) ---- */
+.topmenu-list {
+  transform-origin: top right;
+  transition: opacity var(--motion) var(--ease-out), transform var(--motion) var(--ease-out);
+}
+@starting-style {
+  .topmenu-list { opacity: 0; transform: scale(0.97); }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* opacity-only: transform snaps, no sustained movement */
+  .topmenu-list { transition-property: opacity; transform: none; }
+}
 .faq-body { font-size: var(--text-base); line-height: var(--lh-normal); color: var(--fg); }
 .faq-body p { margin: 0 0 10px; }
 .faq-btn { padding: 5px; }
