@@ -52,7 +52,8 @@ const h = vi.hoisted(() => {
       adaptiveEffort: true,
       maxReplans: 0,
       maxHandoffs: 0,
-      maxUserRequests: 0
+      maxUserRequests: 0,
+      followThrough: 'off'
     },
     memory: {} as Record<string, string>,
     reflections: [] as { id: string }[]
@@ -172,7 +173,8 @@ function eng(runAgent: AgentRunner): Eng {
     runId: 'run1',
     runAgent,
     emit: () => {},
-    handoffs: []
+    handoffs: [],
+    followUps: []
   }
 }
 
@@ -1870,5 +1872,46 @@ describe('formatFollowUps', () => {
     expect(out).toContain('chat icon unspecified')
     expect(out).toContain('built a chat panel')
     expect(out).toContain('W1') // getAgent('w1').name is 'W1' in the test topology
+  })
+})
+
+describe('headless follow-through (engine)', () => {
+  afterEach(() => { h.settings.followThrough = 'off' })
+
+  const fuBlock = '\n```followup\n{ "summary": "chat icon unspecified", "decision": "built a chat panel" }\n```'
+  function agentWithFollowUp(): AgentRunner {
+    const base = cannedAgent()
+    return async (opts) => {
+      const r = await base.runAgent(opts)
+      return opts.prompt.includes('You have been assigned') ? { ...r, text: r.text + fuBlock } : r
+    }
+  }
+  async function runOnce(): Promise<{ e: Eng; emitted: unknown[] }> {
+    const emitted: unknown[] = []
+    const e = eng(agentWithFollowUp())
+    e.emit = (ev) => { emitted.push(ev) }
+    const store = fakeStore()
+    await runGraph(
+      buildOrchestratorGraph(e),
+      seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 't' }),
+      store,
+      makeIO(e.abort.signal, store)
+    )
+    return { e, emitted }
+  }
+
+  it('records + emits follow-ups when headless', async () => {
+    h.settings.followThrough = 'headless'
+    const { e, emitted } = await runOnce()
+    expect(e.followUps.length).toBeGreaterThan(0)
+    expect(e.followUps[0]).toMatchObject({ summary: 'chat icon unspecified', decision: 'built a chat panel' })
+    expect(emitted.some((ev) => (ev as { type?: string }).type === 'follow-up')).toBe(true)
+  })
+
+  it('off: records nothing even when a worker emits a followup block', async () => {
+    h.settings.followThrough = 'off'
+    const { e, emitted } = await runOnce()
+    expect(e.followUps).toEqual([])
+    expect(emitted.some((ev) => (ev as { type?: string }).type === 'follow-up')).toBe(false)
   })
 })

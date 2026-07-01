@@ -39,6 +39,7 @@ import {
 } from './project-store'
 import { parseHandoff } from '../../shared/handoff'
 import { parseAskUser, redactUserAnswer } from '../../shared/ask-user'
+import { parseFollowUps } from '../../shared/follow-through'
 import { clampEffort } from '../../shared/model-caps'
 import { capEffort } from '../../shared/token-efficiency'
 
@@ -59,6 +60,8 @@ export interface Eng {
   emit: (e: OrchestrationEvent) => void
   /** per-run cumulative record of peer handoffs (persisted via NodeIO.collectExtras) */
   handoffs: { askerId: string; peerId: string; ask: string }[]
+  /** per-run cumulative record of headless follow-through decisions (persisted via NodeIO.collectExtras) */
+  followUps: { workerId: string; summary: string; decision: string }[]
 }
 
 export { actingModeFor } from './acting-mode'
@@ -321,7 +324,7 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
       const base: StreamAgentOptions = {
         wc: eng.wc,
         agentId: ownerId,
-        prompt: workerPrompt(state.goal, group.map((t) => t.task), es.lightPrompts) + (asksAvailable() ? askUserSection() : ''),
+        prompt: workerPrompt(state.goal, group.map((t) => t.task), es.lightPrompts) + (asksAvailable() ? askUserSection() : '') + (es.followThrough === 'headless' ? followThroughSection() : ''),
         runId: eng.runId,
         stepId: ownerId,
         permissionMode: state.actingMode,
@@ -335,6 +338,13 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
         base,
         consultFor(ownerId, state.goal, state.actingMode)
       )
+      // ── HEADLESS FOLLOW-THROUGH: record inferred features (no pause). ──
+      if (es.followThrough === 'headless') {
+        for (const fu of parseFollowUps(text)) {
+          eng.followUps.push({ workerId: ownerId, summary: fu.summary, decision: fu.decision })
+          eng.emit({ runId: eng.runId, type: 'follow-up', workerId: ownerId, summary: fu.summary, decision: fu.decision })
+        }
+      }
       // ── ASK DETECTION: a worker asked → leave its group pending, record the ask. ──
       if (asksAvailable()) {
         const req = parseAskUser(text)
@@ -724,7 +734,8 @@ async function synthNode(state: RunState, _io: NodeIO, eng: Eng): Promise<NodeRe
   const owned = ownedTasks(state)
   const results =
     (owned.length > 0 ? formatResults(state) + formatVerdicts(state) : '(no work was assigned)') +
-    formatUserRequests(state)
+    formatUserRequests(state) +
+    formatFollowUps(state)
   const final = await synthesizeStep(eng, state.goal, state.actingMode, state.orchestratorId, state.plan, results)
   eng.emit({ runId: eng.runId, type: 'final', text: final })
   setStatus(eng, steps, state.orchestratorId, 'done')
