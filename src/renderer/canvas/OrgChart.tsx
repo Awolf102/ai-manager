@@ -256,7 +256,7 @@ export default function OrgChart() {
         </button>
       </Panel>
       {/* color mirrors --canvas-dot in tokens.css (React Flow can't read CSS vars) */}
-      <Background gap={22} color="#322A4D" />
+      <Background gap={22} color="#1E2329" />
       <Controls showInteractive={false} />
       <Panel position="bottom-left"><CanvasLegend /></Panel>
       <Panel position="top-center"><CoachMarks /></Panel>

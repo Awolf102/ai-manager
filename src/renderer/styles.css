@@ -167,21 +167,25 @@ button {
 /* ---------- buttons ---------- */
 
 .btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   padding: 6px 11px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--hairline-strong);
-  background: var(--surface-2);
+  background-color: rgba(255, 255, 255, 0.04);
+  background-image: var(--gloss);
+  box-shadow: var(--glass-highlight);
   color: var(--fg);
   font-size: var(--text-sm);
   transition: border-color var(--motion-fast) var(--ease-standard),
-              background var(--motion-fast) var(--ease-standard),
+              background-color var(--motion-fast) var(--ease-standard),
+              box-shadow var(--motion-fast) var(--ease-out),
               transform var(--motion-fast) var(--ease-out);
 }
 .btn:active { transform: scale(0.97); }
-.btn:hover { border-color: var(--signal); background: var(--surface-hover); }
+.btn:hover { border-color: var(--signal); background-color: rgba(63, 190, 134, 0.08); }
 .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
 .run-tab:focus-visible,
 .term-tab:focus-visible,
@@ -194,12 +198,19 @@ button {
   box-shadow: 0 0 0 3px var(--focus-ring);
 }
 .btn.primary {
-  background: var(--signal);
-  border-color: var(--signal);
-  color: var(--on-signal);
+  background-color: var(--brand);
+  background-image: var(--gloss);
+  border-color: var(--brand-hi);
+  box-shadow: var(--glass-highlight);
+  color: var(--fg);
   font-weight: var(--weight-medium);
 }
-.btn.primary:hover { background: var(--signal-hover); border-color: var(--signal-hover); }
+.btn.primary:hover {
+  background-color: var(--brand-hi);
+  border-color: var(--brand-hi);
+  box-shadow: var(--glass-highlight), 0 0 0 3px var(--accent-tint), 0 4px 14px rgba(15, 107, 69, 0.45);
+}
+.btn.primary:active { background-color: var(--brand-press); }
 .btn.danger { background: transparent; border-color: var(--hairline-strong); color: var(--state-danger); }
 .btn.danger:hover { border-color: var(--state-danger); background: var(--surface-hover); }
 .btn.tiny { padding: 3px 8px; font-size: var(--text-xs); border-radius: var(--radius-sm); }
@@ -335,12 +346,12 @@ button {
 
 .agent-node {
   width: 200px;
-  background: var(--surface-2);
+  background-color: var(--surface-2);
+  background-image: var(--gloss);
   border: 1px solid var(--hairline-strong);
-  border-left: 3px solid var(--hairline-strong);
   border-radius: var(--radius);
   padding: var(--space-4) var(--space-4);
-  box-shadow: var(--elev-1);
+  box-shadow: var(--glass-highlight), var(--elev-1);
   transition: border-color var(--motion-fast) var(--ease-standard),
     box-shadow var(--motion) var(--ease-out),
     transform var(--motion) var(--ease-out);
@@ -349,14 +360,17 @@ button {
 }
 .agent-node:hover { box-shadow: var(--elev-2); transform: translateY(-2px); }
 
+/* Role identity through integrated material — a soft role-tinted corner wash
+   layered under the gloss (retired the flat side-tab border), reinforced by the
+   role-tinted icon chip + kind label below. */
 .agent-node.kind-orchestrator {
-  border-left-color: var(--orchestrator);
+  background-image: var(--gloss), radial-gradient(140% 90% at 0% 0%, var(--orchestrator-tint), transparent 62%);
 }
 .agent-node.kind-manager {
-  border-left-color: var(--manager);
+  background-image: var(--gloss), radial-gradient(140% 90% at 0% 0%, var(--manager-tint), transparent 62%);
 }
 .agent-node.kind-worker {
-  border-left-color: var(--worker);
+  background-image: var(--gloss), radial-gradient(140% 90% at 0% 0%, var(--worker-tint), transparent 62%);
 }
 
 .agent-node.selected {
@@ -392,6 +406,9 @@ button {
 }
 
 .agent-kind { font-size: var(--text-xs); color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.kind-orchestrator .agent-kind { color: var(--orchestrator); }
+.kind-manager .agent-kind { color: var(--manager); }
+.kind-worker .agent-kind { color: var(--worker); }
 
 .agent-node-actions { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
 .agent-node-actions button {
@@ -554,7 +571,7 @@ button {
 .terminal-dock {
   height: 100%;
   border-top: 1px solid var(--border);
-  background: #141019;
+  background: var(--surface-0);
   display: grid;
   grid-template-rows: 34px 1fr;
   overflow: hidden;
@@ -583,7 +600,7 @@ button {
 }
 
 .term-tab.active {
-  background: #141019;
+  background: var(--surface-0);
   color: var(--text);
 }
 
@@ -603,7 +620,7 @@ button {
   align-items: stretch;
 }
 .term-tab-wrap:has(.term-tab.active) {
-  background: #141019;
+  background: var(--surface-0);
 }
 .term-tab-close {
   border: none;
@@ -707,7 +724,9 @@ button {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
   display: grid;
   place-items: center;
   z-index: 50;
@@ -721,10 +740,12 @@ button {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--surface-2);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
   border: 1px solid var(--hairline-strong);
   border-radius: var(--radius-lg);
-  box-shadow: var(--elev-2);
+  box-shadow: var(--glass-highlight), var(--elev-3);
 }
 
 .modal-title {
@@ -811,47 +832,19 @@ button {
 }
 
 .st-planning,
-.run-pill.st-planning {
-  color: #cfe0ff;
-  background: #1e3358;
-  border-color: #2f5286;
-}
+.run-pill.st-planning { color: #BCD3F5; background: #16233A; border-color: #2C4670; }
 .st-assigning,
-.run-pill.st-assigning {
-  color: #e7dcff;
-  background: #34265c;
-  border-color: #4d3a86;
-}
+.run-pill.st-assigning { color: #D4DEFB; background: #20263D; border-color: #3A4675; }
 .st-working,
-.run-pill.st-working {
-  color: #ffe7b3;
-  background: #4a3a1a;
-  border-color: #806326;
-}
+.run-pill.st-working { color: #F2D89B; background: #2E2611; border-color: #6E5A23; }
 .st-reviewing,
-.run-pill.st-reviewing {
-  color: #bff0ea;
-  background: #163d39;
-  border-color: #28635b;
-}
+.run-pill.st-reviewing { color: #A9E6DE; background: #10322E; border-color: #215048; }
 .st-reflecting,
-.run-pill.st-reflecting {
-  color: #e7dcff;
-  background: #34265c;
-  border-color: #4d3a86;
-}
+.run-pill.st-reflecting { color: #D4DEFB; background: #20263D; border-color: #3A4675; }
 .st-done,
-.run-pill.st-done {
-  color: #c4f0cf;
-  background: #1f3d28;
-  border-color: #2f6a44;
-}
+.run-pill.st-done { color: #B7EFCF; background: #0F3122; border-color: #1D6B45; }
 .st-error,
-.run-pill.st-error {
-  color: #ffc9c9;
-  background: #4a2020;
-  border-color: #80393a;
-}
+.run-pill.st-error { color: #F3B7B7; background: #361717; border-color: #6E2E2F; }
 .st-skipped,
 .run-pill.st-skipped {
   color: var(--muted);
@@ -897,8 +890,8 @@ button {
 .runview { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
 .run-main { display: grid; grid-template-columns: 230px 1fr; flex: 1; min-height: 0; overflow: hidden; }
 .run-banner { display: flex; align-items: center; gap: var(--space-2); padding: 6px 12px; font-size: var(--text-sm); font-weight: var(--weight-medium); border-bottom: 1px solid var(--hairline); }
-.run-banner.success { background: rgba(111, 208, 138, 0.12); color: var(--state-good); }
-.run-banner.failure { background: rgba(240, 114, 111, 0.12); color: var(--state-danger); }
+.run-banner.success { background: rgba(79, 208, 138, 0.12); color: var(--state-good); }
+.run-banner.failure { background: rgba(240, 106, 106, 0.12); color: var(--state-danger); }
 
 .run-tree {
   border-right: 1px solid var(--border);
@@ -962,7 +955,7 @@ button {
   padding: 10px 12px;
 }
 
-.run-output { position: absolute; inset: 0; padding: 6px 8px; background: #141019; }
+.run-output { position: absolute; inset: 0; padding: 6px 8px; background: var(--surface-0); }
 
 .run-row-name {
   flex: 1;
@@ -982,7 +975,7 @@ button {
 .run-replan {
   padding: 6px 12px;
   font-size: 11px;
-  color: #d6a44c;
+  color: var(--orchestrator);
   border-bottom: 1px solid var(--border);
   margin-bottom: 4px;
 }
@@ -990,7 +983,7 @@ button {
 .run-handoff {
   padding: 6px 12px;
   font-size: 11px;
-  color: #d6a44c;
+  color: var(--orchestrator);
   border-bottom: 1px solid var(--border);
   margin-bottom: 4px;
 }
@@ -1118,15 +1111,15 @@ button {
   gap: 12px;
   padding: 9px 14px;
   font-size: 12.5px;
-  background: #3a2f12;
-  color: #ffe7b3;
-  border-top: 1px solid #806326;
+  background: var(--surface-1);
+  color: var(--orchestrator);
+  border-top: 1px solid var(--hairline-strong);
 }
 
 .auth-banner.auth-no-cli {
-  background: #3a1c1c;
-  color: #ffc9c9;
-  border-top-color: #80393a;
+  background: var(--surface-1);
+  color: var(--danger);
+  border-top-color: var(--hairline-strong);
 }
 
 /* ---------- run history ---------- */
@@ -1369,7 +1362,7 @@ button {
   padding: 0 4px;
   border-radius: 8px;
   background: var(--accent);
-  color: #0b0c10;
+  color: var(--on-signal);
   font-size: 10px;
   font-weight: 700;
   line-height: 16px;
@@ -1543,14 +1536,14 @@ button {
   color: var(--text);
 }
 .react-flow__edge.edge-handoff .react-flow__edge-path {
-  stroke: #d6a44c;
+  stroke: var(--orchestrator);
   stroke-width: 2;
 }
 
 /* ---- human-in-the-loop modal ---- */
 .hitl-question {
-  background: #11131a;
-  border: 1px solid #2a2d3a;
+  background: var(--surface-1);
+  border: 1px solid var(--hairline-strong);
   border-radius: 6px;
   padding: 10px 12px;
   margin: 8px 0;
@@ -1561,19 +1554,19 @@ button {
   bottom: 16px;
   right: 16px;
   z-index: 50;
-  background: #2b2150;
-  color: #e6e8ee;
-  border: 1px solid #4b3f86;
+  background: var(--surface-2);
+  color: var(--fg);
+  border: 1px solid var(--accent);
   border-radius: 999px;
   padding: 8px 14px;
   cursor: pointer;
   font-size: 13px;
 }
 .hitl-badge:hover {
-  background: #392b6b;
+  background: var(--surface-hover);
 }
 .run-userrequest {
-  color: #c8b6ff;
+  color: var(--accent);
   font-size: 12px;
   padding: 2px 10px;
   white-space: nowrap;
@@ -1685,8 +1678,8 @@ button {
    overlap or intercept their clicks. .app is `grid-template-rows: 48px 1fr` (topbar, body); when the banner
    shows we add a leading auto row for it. */
 .app.has-resume-banner { grid-template-rows: auto 48px 1fr; }
-.resume-banner { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: #2d2a1e; border-bottom: 1px solid #4a432a; font-size: 13px; }
-.resume-badge { margin-left: 4px; background: #b54; color: #fff; border-radius: 8px; padding: 0 5px; font-size: 11px; }
+.resume-banner { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--surface-2); border-bottom: 1px solid var(--hairline-strong); font-size: 13px; }
+.resume-badge { margin-left: 4px; background: var(--accent); color: var(--on-signal); border-radius: 8px; padding: 0 5px; font-size: 11px; }
 
 /* ---------- toasts ---------- */
 .toast-viewport {
@@ -1734,7 +1727,7 @@ button {
 .term-tab .run-live { margin-left: 6px; color: var(--state-good); font-size: var(--text-xs); }
 
 .topmenu { position: relative; -webkit-app-region: no-drag; }
-.topmenu-list { position: absolute; top: 100%; right: 0; margin-top: 4px; background: var(--surface-2); border: 1px solid var(--hairline-strong); border-radius: var(--radius); box-shadow: var(--elev-2); padding: 4px; display: flex; flex-direction: column; min-width: 200px; z-index: 60; }
+.topmenu-list { position: absolute; top: 100%; right: 0; margin-top: 4px; background: var(--glass-bg); backdrop-filter: blur(var(--glass-blur)); -webkit-backdrop-filter: blur(var(--glass-blur)); border: 1px solid var(--hairline-strong); border-radius: var(--radius); box-shadow: var(--glass-highlight), var(--elev-3); padding: 4px; display: flex; flex-direction: column; min-width: 200px; z-index: 60; }
 .topmenu-list button { display: flex; align-items: center; gap: var(--space-3); padding: 7px 10px; background: none; border: none; color: var(--fg); font-size: var(--text-sm); border-radius: var(--radius-sm); text-align: left; }
 .topmenu-list button:hover { background: var(--surface-hover); }
 /* ---- Team ▾ dropdown: origin-aware enter (the one earned animation) ---- */
@@ -1767,7 +1760,7 @@ button {
 .canvas-legend .legend-row { display: flex; align-items: center; gap: var(--space-2); }
 .legend-line { width: 22px; height: 0; }
 .legend-line.report { border-top: 2px dashed var(--fg-dim); }
-.legend-line.handoff { border-top: 2px solid #d6a44c; }
+.legend-line.handoff { border-top: 2px solid var(--orchestrator); }
 .legend-badge {
   display: inline-grid; place-items: center; width: 16px; height: 16px;
   border-radius: var(--radius-pill); background: var(--signal-tint); color: var(--signal);
@@ -1787,8 +1780,9 @@ button {
 .recent-prompts-menu { position: relative; display: inline-flex; }
 .recent-prompts-list {
   position: absolute; top: 100%; left: 0; margin-top: 4px;
-  background: var(--surface-2); border: 1px solid var(--hairline-strong);
-  border-radius: var(--radius); box-shadow: var(--elev-2); padding: 4px;
+  background: var(--glass-bg); backdrop-filter: blur(var(--glass-blur)); -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius); box-shadow: var(--glass-highlight), var(--elev-3); padding: 4px;
   display: flex; flex-direction: column; min-width: 240px; max-width: 360px;
   max-height: 320px; overflow-y: auto; z-index: 60;
 }
