@@ -243,7 +243,8 @@ async function resumeAsker(
       permissionMode: actingMode,
       resume: true,
       resumeSessionId: ask.sessionId,
-      abort: eng.abort
+      abort: eng.abort,
+      modelOverride: workerModelOverride(getSettings())
     })
     if (r.sessionId) await updateAgent({ id: ask.ownerId, sessionId: r.sessionId })
     const out = redactUserAnswer(r.text || '(no output)', answer)
