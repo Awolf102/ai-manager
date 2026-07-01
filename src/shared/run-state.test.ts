@@ -90,3 +90,20 @@ describe('toRunRecord', () => {
     expect(toRunRecord(withReqs).userRequests).toEqual([{ askerId: 'w1', question: 'Q?' }])
   })
 })
+
+describe('toRunRecord followUps', () => {
+  const base = {
+    runId: 'r', goal: 'g', orchestratorId: 'o', startedAt: 't', updatedAt: 't',
+    status: 'completed', phase: 'done', cursor: 'done', actingMode: 'auto',
+    plan: [], tasks: {}, steps: {}, reviews: [], reflections: [],
+    repairAttempts: 0, replanAttempts: 0, replanStageCursor: 0, userRequestCount: 0, final: ''
+  } as unknown as RunState
+
+  it('omits followUps when absent', () => {
+    expect('followUps' in toRunRecord(base)).toBe(false)
+  })
+  it('includes followUps when present', () => {
+    const fu = [{ workerId: 'w1', summary: 's', decision: 'd' }]
+    expect(toRunRecord({ ...base, followUps: fu }).followUps).toEqual(fu)
+  })
+})

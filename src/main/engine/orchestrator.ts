@@ -88,12 +88,15 @@ function makeDeps(
   const headersPrinted = new Set<string>()
   const runAgent: Eng['runAgent'] = (opts) =>
     streamAgent({ ...opts, header: headerGate(headersPrinted, opts.agentId, opts.header) })
-  const eng: Eng = { wc, abort, runId, runAgent, emit: emitFn, handoffs: [] }
+  const eng: Eng = { wc, abort, runId, runAgent, emit: emitFn, handoffs: [], followUps: [] }
   const io: NodeIO = {
     signal: abort.signal,
     emit: emitFn,
     checkpoint: (s) => store.put(s),
-    collectExtras: () => (eng.handoffs.length ? { handoffs: [...eng.handoffs] } : {})
+    collectExtras: () => ({
+      ...(eng.handoffs.length ? { handoffs: [...eng.handoffs] } : {}),
+      ...(eng.followUps.length ? { followUps: [...eng.followUps] } : {})
+    })
   }
   return { eng, io, store }
 }
@@ -128,6 +131,7 @@ async function resumeDrive(
     return
   }
   eng.handoffs.push(...(saved.handoffs ?? []))
+  eng.followUps.push(...(saved.followUps ?? []))
   // HITL continuation (an answer was supplied) keeps the live run view — don't reset it
   // with a fresh run-started. Crash-recovery (no answer) rebuilds the view from scratch.
   if (resumeInput === undefined) {

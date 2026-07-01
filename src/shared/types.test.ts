@@ -11,3 +11,9 @@ describe('DEFAULT_SETTINGS token-efficiency fields', () => {
     expect(DEFAULT_SETTINGS.lightPrompts).toBe(false)
   })
 })
+
+describe('follow-through setting', () => {
+  it('defaults followThrough to off', () => {
+    expect(DEFAULT_SETTINGS.followThrough).toBe('off')
+  })
+})

@@ -39,6 +39,7 @@ import {
 } from './project-store'
 import { parseHandoff } from '../../shared/handoff'
 import { parseAskUser, redactUserAnswer } from '../../shared/ask-user'
+import { parseFollowUps } from '../../shared/follow-through'
 import { clampEffort } from '../../shared/model-caps'
 import { capEffort } from '../../shared/token-efficiency'
 
@@ -59,6 +60,8 @@ export interface Eng {
   emit: (e: OrchestrationEvent) => void
   /** per-run cumulative record of peer handoffs (persisted via NodeIO.collectExtras) */
   handoffs: { askerId: string; peerId: string; ask: string }[]
+  /** per-run cumulative record of headless follow-through decisions (persisted via NodeIO.collectExtras) */
+  followUps: { workerId: string; summary: string; decision: string }[]
 }
 
 export { actingModeFor } from './acting-mode'
@@ -321,7 +324,7 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
       const base: StreamAgentOptions = {
         wc: eng.wc,
         agentId: ownerId,
-        prompt: workerPrompt(state.goal, group.map((t) => t.task), es.lightPrompts) + (asksAvailable() ? askUserSection() : ''),
+        prompt: workerPrompt(state.goal, group.map((t) => t.task), es.lightPrompts) + (asksAvailable() ? askUserSection() : '') + (es.followThrough === 'headless' ? followThroughSection() : ''),
         runId: eng.runId,
         stepId: ownerId,
         permissionMode: state.actingMode,
@@ -335,6 +338,13 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
         base,
         consultFor(ownerId, state.goal, state.actingMode)
       )
+      // ── HEADLESS FOLLOW-THROUGH: record inferred features (no pause). ──
+      if (es.followThrough === 'headless') {
+        for (const fu of parseFollowUps(text)) {
+          eng.followUps.push({ workerId: ownerId, summary: fu.summary, decision: fu.decision })
+          eng.emit({ runId: eng.runId, type: 'follow-up', workerId: ownerId, summary: fu.summary, decision: fu.decision })
+        }
+      }
       // ── ASK DETECTION: a worker asked → leave its group pending, record the ask. ──
       if (asksAvailable()) {
         const req = parseAskUser(text)
@@ -724,7 +734,8 @@ async function synthNode(state: RunState, _io: NodeIO, eng: Eng): Promise<NodeRe
   const owned = ownedTasks(state)
   const results =
     (owned.length > 0 ? formatResults(state) + formatVerdicts(state) : '(no work was assigned)') +
-    formatUserRequests(state)
+    formatUserRequests(state) +
+    formatFollowUps(state)
   const final = await synthesizeStep(eng, state.goal, state.actingMode, state.orchestratorId, state.plan, results)
   eng.emit({ runId: eng.runId, type: 'final', text: final })
   setStatus(eng, steps, state.orchestratorId, 'done')
@@ -1316,6 +1327,31 @@ export function formatUserRequests(state: RunState): string {
     return `- ${name} paused to ask the user: "${r.question}". The user provided an answer, which ${name} incorporated into its work. (The answer itself is redacted from this record.)`
   })
   return `\n\n## User consultations during this run\n${lines.join('\n')}\nThese questions were answered by the user during the run and the answers were incorporated — report them as resolved, not as open questions or placeholder assumptions.`
+}
+
+export function followThroughSection(): string {
+  return `\n\nFOLLOW-THROUGH: If you encounter a feature whose intended behavior was not clearly specified (for example a button or control with no described action), do NOT leave a bare placeholder. Infer the most reasonable behavior from the overall goal and surrounding context, implement it fully, and keep working — do not stop or ask. Record each such decision by including a block of exactly this form (in addition to your normal report):
+\`\`\`followup
+{ "summary": "<what was under-specified>", "decision": "<what you built and why>" }
+\`\`\`
+You may include more than one followup block if you made several such decisions.`
+}
+
+/** Synthesis section listing headless follow-through decisions, so the final report
+ *  treats inferred features as completed scope. '' when none (byte-for-byte off). */
+export function formatFollowUps(state: RunState): string {
+  const fus = state.followUps ?? []
+  if (fus.length === 0) return ''
+  const lines = fus.map((f) => {
+    let name: string
+    try {
+      name = getAgent(f.workerId).name
+    } catch {
+      name = f.workerId
+    }
+    return `- ${name} built the following for an under-specified part: "${f.summary}" → "${f.decision}".`
+  })
+  return `\n\n## Features clarified during the build\n${lines.join('\n')}\nThese were reasonable assumptions made and implemented during the run. Report them as completed, intended scope — not as open questions or gaps.`
 }
 
 // ---------- prompts (ported verbatim from the original engine) ----------

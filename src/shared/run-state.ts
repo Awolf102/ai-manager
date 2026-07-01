@@ -27,6 +27,7 @@ export function toRunRecord(s: RunState): RunRecord {
     ...(s.error !== undefined ? { error: s.error } : {}),
     ...(s.replans !== undefined ? { replans: s.replans } : {}),
     ...(s.handoffs !== undefined ? { handoffs: s.handoffs } : {}),
-    ...(s.userRequests !== undefined ? { userRequests: s.userRequests } : {})
+    ...(s.userRequests !== undefined ? { userRequests: s.userRequests } : {}),
+    ...(s.followUps !== undefined ? { followUps: s.followUps } : {})
   }
 }

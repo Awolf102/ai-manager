@@ -397,6 +397,23 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                 onChange={(v) => void update({ maxUserRequests: v })}
                 desc="A worker that is blocked may pause the run to ask you one question. Your answer resumes that worker. Workers only — it's sent to the agent, so don't share secrets."
               />
+              <SettingRow
+                label="Follow-through"
+                desc={
+                  s.followThrough === 'headless'
+                    ? "When a worker hits a feature whose behavior wasn’t specified, it builds a reasonable version instead of a placeholder and records what it assumed (shown in the run + History)."
+                    : 'Off — workers may leave placeholders for under-specified features.'
+                }
+                control={
+                  <select
+                    value={s.followThrough}
+                    onChange={(e) => void update({ followThrough: e.target.value as ProjectSettings['followThrough'] })}
+                  >
+                    <option value="off">Off</option>
+                    <option value="headless">Headless (auto-assume)</option>
+                  </select>
+                }
+              />
             </SettingSection>
           )}
 

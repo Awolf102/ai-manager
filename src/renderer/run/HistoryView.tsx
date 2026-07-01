@@ -192,6 +192,19 @@ function RunDetail({ record }: { record: RunRecord }) {
         </div>
       )}
 
+      {(record.followUps ?? []).length > 0 && (
+        <div className="hist-section">
+          <h4>Follow-through ({record.followUps!.length})</h4>
+          <ul>
+            {record.followUps!.map((fu, i) => (
+              <li key={i}>
+                <b>{nameOf(fu.workerId)}</b>: {fu.summary} → {fu.decision}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="hist-section">
         <h4>Agents</h4>
         {record.steps.map((s) => (
