@@ -179,57 +179,118 @@ button {
   display: grid;
   place-items: center;
   height: 100%;
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image: radial-gradient(circle at 1px 1px, var(--canvas-dot) 1px, transparent 0);
+  background-size: 22px 22px;
 }
-
 .picker-card {
   width: 460px;
+  max-width: 92vw;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 28px;
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  box-shadow: var(--elev-2);
 }
-
-.picker-card h1 {
-  margin: 0 0 4px;
-  font-size: 20px;
+.picker-identity {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
 }
-
-.picker-card p {
-  margin: 0 0 18px;
+.brand-mark { display: block; }
+.picker-wordmark {
+  margin: 6px 0 0;
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.picker-tagline {
+  margin: 0;
+  font-size: 14px;
   color: var(--muted);
 }
-
+.picker-open {
+  align-self: flex-start;
+}
 .recent-list {
-  margin-top: 16px;
-  border-top: 1px solid var(--border);
-  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
-
 .recent-list .label {
-  color: var(--muted);
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.6px;
-  margin-bottom: 6px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 4px;
 }
-
 .recent-item {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 8px 10px;
-  border-radius: 8px;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
   cursor: pointer;
+  transition: background var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-out);
 }
-
 .recent-item:hover {
   background: var(--panel-2);
+  border-color: var(--border);
+  transform: translateY(-1px);
+}
+.recent-item:active {
+  transform: scale(0.99);
+}
+.recent-item:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+.recent-icon {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+.recent-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.recent-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+.recent-item .path {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.recent-item .path {
-  color: var(--muted);
-  font-size: 11px;
+/* welcome entrance: identity → open button → recent list rise in */
+.picker-card > * {
+  animation: picker-rise var(--motion-slow) var(--ease-out) backwards;
+}
+.picker-card > *:nth-child(1) { animation-delay: 0ms; }
+.picker-card > *:nth-child(2) { animation-delay: 60ms; }
+.picker-card > *:nth-child(3) { animation-delay: 120ms; }
+@keyframes picker-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .picker-card > * { animation: none; }
 }
 
 /* ---------- agent node ---------- */
@@ -1892,4 +1953,67 @@ button {
 input[type='checkbox'] {
   accent-color: var(--accent);
   cursor: pointer;
+}
+
+/* ---- Canvas empty-state onboarding ---- */
+.canvas-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none; /* let the canvas pan/zoom around the card */
+}
+.canvas-empty-card {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 380px;
+  padding: 24px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elev-2);
+  animation: picker-rise var(--motion-slow) var(--ease-out) backwards;
+}
+.canvas-empty-card h2 {
+  margin: 4px 0 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+.canvas-empty-card p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.canvas-empty-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+/* ---- Inspector empty hint ---- */
+.inspector-empty {
+  padding: 20px 16px;
+  color: var(--muted);
+}
+.inspector-empty-icon {
+  color: var(--muted);
+  opacity: 0.7;
+  margin-bottom: 10px;
+}
+.inspector-empty p {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.inspector-empty .dim {
+  font-size: 12px;
+  color: var(--fg-dim, var(--muted));
+}
+@media (prefers-reduced-motion: reduce) {
+  .canvas-empty-card { animation: none; }
 }

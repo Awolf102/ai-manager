@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { CircleHelp, Clock, FolderOpen, Paperclip, Plus, Settings as SettingsIcon, Terminal, Users } from 'lucide-react'
+import { CircleHelp, Clock, Folder, FolderOpen, PanelRight, Paperclip, Plus, Settings as SettingsIcon, Terminal, Users } from 'lucide-react'
 import { useStore } from './store'
 import TeamMenu from './TeamMenu'
 import FaqModal from './FaqModal'
@@ -12,6 +12,8 @@ import RunView from './run/RunView'
 import HistoryView from './run/HistoryView'
 import SettingsModal from './SettingsModal'
 import ContextModal from './ContextModal'
+import { BrandMark } from './BrandMark'
+import CanvasEmptyState from './CanvasEmptyState'
 import HitlModal from './HitlModal'
 import ConfirmDialog from './ConfirmDialog'
 import ToastViewport from './ToastViewport'
@@ -47,6 +49,7 @@ export default function App() {
   const setZoneSize = useStore((s) => s.setZoneSize)
   const toggleZoneCollapsed = useStore((s) => s.toggleZoneCollapsed)
   const setZonePlacement = useStore((s) => s.setZonePlacement)
+  const focusGoal = useStore((s) => s.focusGoal)
   const [showAdd, setShowAdd] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showContext, setShowContext] = useState(false)
@@ -81,6 +84,16 @@ export default function App() {
   const onOpen = (g: ProjectGraph): void => {
     setGraph(g)
     void refreshResumable(true)
+  }
+
+  const handleBuild = async (): Promise<void> => {
+    try {
+      const g = await window.api.createAgent({ name: 'Orchestrator', kind: 'orchestrator' })
+      setGraph(g)
+      focusGoal()
+    } catch {
+      notify({ kind: 'error', message: 'Could not create the Orchestrator.' })
+    }
   }
 
   if (!graph) {
@@ -167,7 +180,12 @@ export default function App() {
       >
         <div className="zone-main" style={{ gridArea: 'main' }}>
           <GoalBar />
-          <div className="canvas-wrap"><OrgChart /></div>
+          <div className="canvas-wrap">
+            <OrgChart />
+            {graph.nodes.length === 0 && (
+              <CanvasEmptyState onBuild={() => void handleBuild()} onAdd={() => setShowAdd(true)} />
+            )}
+          </div>
         </div>
 
         <div className={`zone-inspector ${layout.inspector.collapsed ? 'collapsed' : ''}`} style={{ gridArea: 'inspector' }}>
@@ -187,7 +205,14 @@ export default function App() {
           </div>
           <div className="zone-body">
             {selectedId ? (<><AgentConfigPanel /><RoleMemoryEditor /></>) : (
-              <div className="empty-hint">Select an agent to edit its role, memory, and settings.<br /><br />Drag from the <b>bottom</b> of one node to the <b>top</b> of another to make it <b>delegate</b> work down the chain.</div>
+              <div className="inspector-empty">
+                <PanelRight size={20} className="inspector-empty-icon" />
+                <p>Select an agent to edit its role, memory, and skills.</p>
+                <p className="dim">
+                  Drag from the <b>bottom</b> of one node to the <b>top</b> of another to make it delegate work
+                  down the chain.
+                </p>
+              </div>
             )}
           </div>
         </div>
@@ -335,10 +360,13 @@ function ProjectPicker({ onOpen }: { onOpen: (g: ProjectGraph) => void }) {
   return (
     <div className="picker">
       <div className="picker-card">
-        <h1>Orkestr</h1>
-        <p>Choose a project folder — all your agents will work inside it.</p>
+        <div className="picker-identity">
+          <BrandMark size={48} />
+          <h1 className="picker-wordmark">Orkestr</h1>
+          <p className="picker-tagline">Conduct a team of agents.</p>
+        </div>
         <button
-          className="btn primary"
+          className="btn primary picker-open"
           onClick={async () => {
             const g = await window.api.pickProjectFolder()
             if (g) onOpen(g)
@@ -346,12 +374,11 @@ function ProjectPicker({ onOpen }: { onOpen: (g: ProjectGraph) => void }) {
         >
           <FolderOpen size={14} /> Open project folder…
         </button>
-
         {recents.length > 0 && (
           <div className="recent-list">
             <div className="label">Recent</div>
             {recents.map((r) => (
-              <div
+              <button
                 className="recent-item"
                 key={r.path}
                 onClick={async () => {
@@ -359,9 +386,12 @@ function ProjectPicker({ onOpen }: { onOpen: (g: ProjectGraph) => void }) {
                   if (g) onOpen(g)
                 }}
               >
-                <span>{r.name}</span>
-                <span className="path">{r.path}</span>
-              </div>
+                <Folder size={16} className="recent-icon" />
+                <span className="recent-meta">
+                  <span className="recent-name">{r.name}</span>
+                  <span className="path">{r.path}</span>
+                </span>
+              </button>
             ))}
           </div>
         )}

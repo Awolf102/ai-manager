@@ -111,6 +111,9 @@ interface AppState {
   discardResumable: (runId: string) => Promise<void>
   dismissResumableBanner: () => void
 
+  goalFocusTick: number
+  focusGoal: () => void
+
   toasts: Toast[]
   notify: (input: { kind: Toast['kind']; message: string }) => string
   dismissToast: (id: string) => void
@@ -354,6 +357,9 @@ export const useStore = create<AppState>((set, get) => ({
     set({ resumable: await window.api.listResumable() })
   },
   dismissResumableBanner: () => set({ resumableDismissed: true }),
+
+  goalFocusTick: 0,
+  focusGoal: () => set((s) => ({ goalFocusTick: s.goalFocusTick + 1 })),
 
   toasts: [],
   notify: ({ kind, message }) => {

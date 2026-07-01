@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Network, PanelRight, Play, Rocket, Sparkles, Square, Target } from 'lucide-react'
 import { isGoalSubmitKey } from './goalbar-keys'
 import { useStore } from '../store'
@@ -26,6 +26,11 @@ export default function GoalBar() {
   const notify = useStore((s) => s.notify)
   const inspectorCollapsed = useStore((s) => s.layout.inspector.collapsed)
   const toggleZoneCollapsed = useStore((s) => s.toggleZoneCollapsed)
+  const goalFocusTick = useStore((s) => s.goalFocusTick)
+  const taRef = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => {
+    if (goalFocusTick > 0) taRef.current?.focus()
+  }, [goalFocusTick])
   const [goal, setGoal] = useState('')
   const [focused, setFocused] = useState(false)
   const [drafting, setDrafting] = useState(false)
@@ -106,6 +111,7 @@ export default function GoalBar() {
   return (
     <div className={`goalbar ${focused ? 'goalbar-focus' : ''}`}>
       <textarea
+        ref={taRef}
         className="goal-input"
         rows={1}
         placeholder="Describe a goal for the chain to build…  (Enter to run, Shift+Enter for a new line)"
