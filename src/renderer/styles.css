@@ -211,6 +211,9 @@ button {
   box-shadow: var(--glass-highlight), 0 0 0 3px var(--accent-tint), 0 4px 14px rgba(15, 107, 69, 0.45);
 }
 .btn.primary:active { background-color: var(--brand-press); }
+/* Higher specificity than .btn.primary so the keyboard focus ring isn't lost to
+   the primary's own box-shadow (specificity tie, source order). */
+.btn.primary:focus-visible { box-shadow: var(--glass-highlight), 0 0 0 3px var(--focus-ring); }
 .btn.danger { background: transparent; border-color: var(--hairline-strong); color: var(--state-danger); }
 .btn.danger:hover { border-color: var(--state-danger); background: var(--surface-hover); }
 .btn.tiny { padding: 3px 8px; font-size: var(--text-xs); border-radius: var(--radius-sm); }
