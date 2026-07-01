@@ -1904,8 +1904,16 @@ describe('headless follow-through (engine)', () => {
     h.settings.followThrough = 'headless'
     const { e, emitted } = await runOnce()
     expect(e.followUps.length).toBeGreaterThan(0)
-    expect(e.followUps[0]).toMatchObject({ summary: 'chat icon unspecified', decision: 'built a chat panel' })
-    expect(emitted.some((ev) => (ev as { type?: string }).type === 'follow-up')).toBe(true)
+    expect(e.followUps).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ workerId: 'w1', summary: 'chat icon unspecified', decision: 'built a chat panel' })
+      ])
+    )
+    expect(emitted).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'follow-up', workerId: 'w1', summary: 'chat icon unspecified', decision: 'built a chat panel' })
+      ])
+    )
   })
 
   it('off: records nothing even when a worker emits a followup block', async () => {
