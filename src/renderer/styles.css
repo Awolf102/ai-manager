@@ -253,6 +253,10 @@ button {
 .recent-item:active {
   transform: scale(0.99);
 }
+.recent-item:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
 .recent-icon {
   flex: 0 0 auto;
   color: var(--muted);
