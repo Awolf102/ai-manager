@@ -22,7 +22,7 @@ export default function TerminalPane({ tab }: { tab: TerminalTab }) {
       fontSize: 12,
       cursorBlink: tab.mode === 'interactive',
       convertEol: false,
-      theme: { background: '#141019', foreground: '#EAD7D1', cursor: '#DD99BB' }
+      theme: { background: '#0B0C0E', foreground: '#F4F6F5', cursor: '#3FBE86' }
     })
     const fit = new FitAddon()
     term.loadAddon(fit)
