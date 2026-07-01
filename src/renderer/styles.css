@@ -544,7 +544,7 @@ button {
 .terminal-dock {
   height: 100%;
   border-top: 1px solid var(--border);
-  background: #0b0c10;
+  background: #141019;
   display: grid;
   grid-template-rows: 34px 1fr;
   overflow: hidden;
@@ -571,7 +571,7 @@ button {
 }
 
 .term-tab.active {
-  background: #0b0c10;
+  background: #141019;
   color: var(--text);
 }
 
@@ -924,7 +924,7 @@ button {
   padding: 10px 12px;
 }
 
-.run-output { position: absolute; inset: 0; padding: 6px 8px; background: #0b0c10; }
+.run-output { position: absolute; inset: 0; padding: 6px 8px; background: #141019; }
 
 .run-row-name {
   flex: 1;
@@ -1568,6 +1568,53 @@ button {
   font-weight: 600;
   flex: none;
 }
+/* role-tinted agent names — tree + narration feed (rose stays as the unknown fallback) */
+.run-row-name.kind-orchestrator,
+.activity-agent.kind-orchestrator { color: var(--orchestrator); }
+.run-row-name.kind-manager,
+.activity-agent.kind-manager { color: var(--manager); }
+.run-row-name.kind-worker,
+.activity-agent.kind-worker { color: var(--worker); }
+
+/* ---- run view: motion (the run coming alive) ---- */
+.activity-row {
+  transition: opacity var(--motion) var(--ease-out), transform var(--motion) var(--ease-out);
+}
+@starting-style {
+  .activity-row { opacity: 0; transform: translateY(4px); }
+}
+
+.run-pill {
+  transition: background-color var(--motion) var(--ease-out), color var(--motion) var(--ease-out), border-color var(--motion) var(--ease-out);
+}
+.run-pill.st-working { animation: pill-breathe 1.6s var(--ease-in-out) infinite; }
+@keyframes pill-breathe { 50% { opacity: 0.72; } }
+
+.run-banner {
+  transition: opacity 220ms var(--ease-out), transform 220ms var(--ease-out);
+}
+@starting-style {
+  .run-banner { opacity: 0; transform: translateY(-6px); }
+}
+.run-banner-mark {
+  display: inline-block;
+  transition: transform 220ms var(--ease-out);
+}
+@starting-style {
+  .run-banner-mark { transform: scale(0.9); }
+}
+
+.run-result.reveal { animation: result-in 180ms var(--ease-out); }
+@keyframes result-in { from { opacity: 0; } to { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .activity-row,
+  .run-banner { transition-property: opacity; transform: none; }
+  .run-banner-mark { transition: none; transform: none; }
+  .run-pill.st-working { animation: none; }
+  .run-result.reveal { animation: none; }
+}
+
 .activity-text {
   color: var(--text);
   overflow: hidden;

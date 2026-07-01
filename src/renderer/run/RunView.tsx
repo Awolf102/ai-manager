@@ -37,10 +37,14 @@ export default function RunView() {
   const selectStep = useStore((s) => s.selectStep)
 
   const [rightTab, setRightTab] = useState<'narration' | 'terminal' | 'result'>('narration')
+  const [revealResult, setRevealResult] = useState(false)
   const prevRunning = useRef(run.running)
   // Land on the Result tab when a run finishes successfully with a report.
   useEffect(() => {
-    if (prevRunning.current && !run.running && run.final && !run.error) setRightTab('result')
+    if (prevRunning.current && !run.running && run.final && !run.error) {
+      setRightTab('result')
+      setRevealResult(true)
+    }
     prevRunning.current = run.running
   }, [run.running, run.final, run.error])
 
@@ -56,7 +60,7 @@ export default function RunView() {
       fontSize: 12,
       convertEol: false,
       cursorBlink: false,
-      theme: { background: '#0b0c10', foreground: '#e6e8ee' }
+      theme: { background: '#141019', foreground: '#EAD7D1', cursor: '#DD99BB' }
     })
     const fit = new FitAddon()
     term.loadAddon(fit)
@@ -92,6 +96,7 @@ export default function RunView() {
   useEffect(() => {
     buffers.current.clear()
     termRef.current?.clear()
+    setRevealResult(false)
   }, [run.runId])
 
   // selection change → repaint from buffer
@@ -105,6 +110,7 @@ export default function RunView() {
 
   const chain = graph ? buildChain(graph, run.orchestratorId) : []
   const nameOf = (id: string): string => graph?.nodes.find((n) => n.id === id)?.name ?? id
+  const kindOf = (id: string): string => graph?.nodes.find((n) => n.id === id)?.kind ?? 'unknown'
   // Effort is assigned per task and the worker runs at the highest of its batch.
   const allAssignments = Object.values(run.assignments).flat()
 
@@ -115,7 +121,7 @@ export default function RunView() {
     <div className="runview">
       {banner && (
         <div className={`run-banner ${banner.kind}`}>
-          {banner.kind === 'success' ? '✓' : '✗'} {banner.text}
+          <span className="run-banner-mark">{banner.kind === 'success' ? '✓' : '✗'}</span> {banner.text}
         </div>
       )}
       <div className="run-main">
@@ -165,7 +171,7 @@ export default function RunView() {
                 title={tasks?.join(', ')}
                 onClick={() => selectStep(id)}
               >
-                <span className="run-row-name">{nameOf(id)}</span>
+                <span className={`run-row-name kind-${kindOf(id)}`}>{nameOf(id)}</span>
                 <span className={`run-pill st-${status}`}>{STATUS_LABEL[status] ?? status}</span>
                 {eff && (
                   <span className={`run-eff eff-${eff}`} title={capped ? `effort ${eff} (capped from ${capped} — model limit)` : `assigned effort: ${eff}`}>
@@ -203,7 +209,7 @@ export default function RunView() {
             </div>
             {hasResult && (
               <div className={`run-slot ${rightTab === 'result' ? 'active' : ''}`}>
-                <pre className="run-result">{run.final}</pre>
+                <pre className={`run-result ${revealResult ? 'reveal' : ''}`}>{run.final}</pre>
               </div>
             )}
           </div>

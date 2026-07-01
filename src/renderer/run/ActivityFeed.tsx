@@ -54,6 +54,7 @@ export default function ActivityFeed({ runId }: { runId: string | null }) {
   }, [rows])
 
   const nameOf = (id: string): string => graph?.nodes.find((n) => n.id === id)?.name ?? id
+  const kindOf = (id: string): string => graph?.nodes.find((n) => n.id === id)?.kind ?? 'unknown'
 
   return (
     <div className="activity-feed" ref={listRef}>
@@ -68,7 +69,7 @@ export default function ActivityFeed({ runId }: { runId: string | null }) {
             onClick={() => selectStep(r.agentId)}
           >
             <span className="activity-time">{r.time}</span>
-            <span className="activity-agent">{nameOf(r.agentId)}</span>
+            <span className={`activity-agent kind-${kindOf(r.agentId)}`}>{nameOf(r.agentId)}</span>
             <span className="activity-text">{r.text}</span>
           </div>
         ))
