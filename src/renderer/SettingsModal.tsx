@@ -5,6 +5,7 @@ import { Switch } from './Switch'
 import { Modal } from './Modal'
 import type { Autonomy, ProjectSettings, ReviewMode } from '../shared/types'
 import { clampParallel, clampBulk } from '../shared/team-scale'
+import { clampMaxOutputTokens } from '../shared/max-output-tokens'
 
 type CategoryId = 'safety' | 'cost' | 'efficiency' | 'review' | 'run' | 'team'
 
@@ -230,6 +231,19 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                     checked={s.adaptiveEffort}
                     label="Adaptive effort"
                     onChange={(v) => void update({ adaptiveEffort: v })}
+                  />
+                }
+              />
+              <SettingRow
+                label="Max output tokens"
+                desc="The most tokens an agent may emit in a single response. 0 = Claude Code's default (32,000). Raise this if agents fail with “exceeded the 32000 output token maximum.” The model's own ceiling still caps it (top models 128,000; Haiku 64,000)."
+                control={
+                  <input
+                    type="number"
+                    min={0}
+                    max={128000}
+                    value={s.maxOutputTokens}
+                    onChange={(e) => void update({ maxOutputTokens: clampMaxOutputTokens(Number(e.target.value)) })}
                   />
                 }
               />
