@@ -24,6 +24,30 @@ export function parseFollowUps(text: string): FollowUp[] {
   return out
 }
 
+export interface FollowUpAsk {
+  summary: string
+  question: string
+  options: string[]
+}
+
+/** Parse the LAST own-line ```followup block carrying a non-empty summary + question.
+ *  options optional → array of non-empty strings capped to 4. null when absent/malformed. */
+export function parseFollowUpAsk(text: string): FollowUpAsk | null {
+  const blocks = [...text.matchAll(/```followup[^\n]*\r?\n([\s\S]*?)\r?\n```/g)].map((m) => m[1])
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    const o = tryParseObject(blocks[i]) as { summary?: unknown; question?: unknown; options?: unknown } | null
+    if (!o) continue
+    const summary = String(o.summary ?? '').trim()
+    const question = String(o.question ?? '').trim()
+    if (!summary || !question) continue
+    const options = Array.isArray(o.options)
+      ? o.options.map((x) => String(x ?? '').trim()).filter(Boolean).slice(0, 4)
+      : []
+    return { summary, question, options }
+  }
+  return null
+}
+
 function tryParseObject(s: string): { summary?: unknown; decision?: unknown } | null {
   const start = s.indexOf('{')
   const end = s.lastIndexOf('}')
