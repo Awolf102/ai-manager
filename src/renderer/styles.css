@@ -2163,3 +2163,5 @@ input[type='checkbox'] {
 @media (prefers-reduced-motion: reduce) {
   .canvas-empty-card { animation: none; }
 }
+.linklike { background: none; border: none; color: var(--accent, var(--fg-muted)); font-size: var(--text-xs); padding: 4px 0 0; cursor: pointer; text-align: left; }
+.linklike:hover { text-decoration: underline; }
