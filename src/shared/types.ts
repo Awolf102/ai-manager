@@ -13,7 +13,7 @@ export type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | '
 export interface SpawnedMember {
   id: string
   name: string
-  kind: 'manager' | 'worker'
+  kind: 'manager' | 'worker' // widened to include 'director' when director spawning lands (Task 6)
   role: string
   reportsTo: string
   model?: string
@@ -166,7 +166,7 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
 
 /** Which agents a context item applies to. Absent OR (kinds empty AND nodeIds empty) ⇒ all agents. */
 export interface ContextScope {
-  kinds?: AgentKind[] // 'orchestrator' | 'manager' | 'worker'
+  kinds?: AgentKind[] // any subset of AgentKind
   nodeIds?: string[] // specific AgentNodeData ids
 }
 
