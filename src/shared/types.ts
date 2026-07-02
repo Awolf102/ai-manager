@@ -51,6 +51,8 @@ export interface AgentNodeData {
   permissionMode: PermissionMode
   /** plugin-qualified skill ids this agent may use (see shared/skill-trust) */
   skills?: string[]
+  /** references a ProjectGraph.backends entry; absent = default Claude login (byte-for-byte) */
+  backendId?: string
   /** last Claude Code session id captured from a headless run (for --resume) */
   sessionId?: string
   /** stable team-member identity that survives export/import (used by the portable-team feature) */
@@ -198,6 +200,28 @@ export interface PairedDir {
   addedAt: string // ISO timestamp
 }
 
+/** A model within a backend (the id sent as options.model / --model; label for display). */
+export interface BackendModel {
+  id: string
+  label: string
+}
+
+/** An Anthropic-API-compatible model backend for this project (e.g. GLM via z.ai). The token is
+ *  NOT stored here — it lives safeStorage-encrypted in the main process. */
+export interface Backend {
+  id: string // randomUUID — React key + AgentNodeData.backendId reference + token key
+  label: string
+  baseUrl: string // the Anthropic-compatible endpoint
+  models: BackendModel[]
+  presetId?: string // provenance: 'zai-glm' | 'chatgpt-gateway' | 'custom'
+  addedAt: string // ISO timestamp
+}
+
+/** Backend + whether a token is configured (renderer-facing; NEVER carries the token itself). */
+export interface BackendView extends Backend {
+  hasToken: boolean
+}
+
 export interface ProjectGraph {
   project: ProjectMeta
   nodes: AgentNodeData[]
@@ -211,6 +235,8 @@ export interface ProjectGraph {
   contextFolders?: ContextFolder[]
   /** second working directories paired with the project (writable = additionalDirectories / --add-dir) */
   pairedDirs?: PairedDir[]
+  /** Anthropic-compatible model backends for this project (tokens stored separately, encrypted) */
+  backends?: Backend[]
 }
 
 // ---- IPC payloads ----
@@ -588,6 +614,12 @@ export const IPC = {
   addPairedDir: 'pairedDir:add',
   setPairedDirWritable: 'pairedDir:setWritable',
   removePairedDir: 'pairedDir:remove',
+  backendAdd: 'backend:add',
+  backendUpdate: 'backend:update',
+  backendRemove: 'backend:remove',
+  backendList: 'backend:list',
+  backendSetToken: 'backend:setToken',
+  backendEncryptionAvailable: 'backend:encAvailable',
   listSkills: 'skills:list',
   listResumable: 'run:list-resumable',
   discardRun: 'run:discard',
@@ -671,6 +703,12 @@ export interface RendererApi {
   addPairedDir: (paths?: string[]) => Promise<{ graph: ProjectGraph; skipped: string[] }>
   setPairedDirWritable: (id: string, writable: boolean) => Promise<ProjectGraph>
   removePairedDir: (id: string) => Promise<ProjectGraph>
+  addBackend: (input: { label: string; baseUrl: string; models: BackendModel[]; presetId?: string }) => Promise<ProjectGraph>
+  updateBackend: (id: string, patch: { label?: string; baseUrl?: string; models?: BackendModel[] }) => Promise<ProjectGraph>
+  removeBackend: (id: string) => Promise<ProjectGraph>
+  listBackends: () => Promise<BackendView[]>
+  setBackendToken: (id: string, token: string) => Promise<{ ok: boolean; error?: string }>
+  backendEncryptionAvailable: () => Promise<boolean>
   getPathForFile: (file: File) => string
   listSkills: () => Promise<DiscoveredPlugin[]>
   onServerLog: (cb: (e: ServerLogEvent) => void) => () => void
