@@ -575,7 +575,9 @@ export const IPC = {
   removeContextFolder: 'folders:remove',
   listSkills: 'skills:list',
   listResumable: 'run:list-resumable',
-  discardRun: 'run:discard'
+  discardRun: 'run:discard',
+  gitInfo: 'git:info',
+  gitCheckout: 'git:checkout'
 } as const
 
 /** The typed API the preload bridge exposes on window.api. */
@@ -656,4 +658,6 @@ export interface RendererApi {
   onServerLog: (cb: (e: ServerLogEvent) => void) => () => void
   onServerStatus: (cb: (e: ServerStatusEvent) => void) => () => void
   onServerReady: (cb: (e: ServerReadyEvent) => void) => () => void
+  gitInfo: () => Promise<{ isRepo: boolean; branch: string; dirty: boolean; branches: string[] }>
+  gitCheckout: (branch: string) => Promise<{ ok: boolean; error?: string }>
 }

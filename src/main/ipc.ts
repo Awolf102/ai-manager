@@ -27,6 +27,7 @@ import { detectManifest } from './engine/manifest-detector'
 import * as serverMgr from './engine/server-manager'
 import { discoverSkills } from './engine/skill-discovery'
 import * as envStore from './engine/env-store'
+import * as gitEngine from './engine/git'
 
 export function registerIpc(): void {
   // ---- project ----
@@ -300,6 +301,10 @@ export function registerIpc(): void {
     store.updateContextFolder(id, { note })
   )
   ipcMain.handle(IPC.removeContextFolder, (_e, id: string) => store.removeContextFolder(id))
+
+  // ---- git ----
+  ipcMain.handle(IPC.gitInfo, () => gitEngine.gitInfo())
+  ipcMain.handle(IPC.gitCheckout, (_e, branch: string) => gitEngine.gitCheckout(branch))
 
   // ---- skills ----
   ipcMain.handle(IPC.listSkills, () => {
