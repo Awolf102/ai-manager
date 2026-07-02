@@ -96,6 +96,7 @@ From a message's parsed brief:
 ## Security / safety
 
 - **Read-only:** write/exec tools disallowed — the Advisor cannot modify files or run commands.
+- **Project settings trust boundary:** like the main run engine (`agent-runner.ts` also uses `settingSources: ['project']`), the Advisor loads the project's `.claude/settings.json`, which can register hooks that run on tool use. This is an **inherited, not newly-introduced** risk — it rides on the same "you opened and trust this project" assumption as every agent run; the Advisor does not widen it.
 - **No token leakage:** the system prompt injects backend **labels + model ids only**; tokens/base URLs are never included. The Advisor never reads the encrypted secret store.
 - **Confirm-then-apply:** every state change (settings, team hand-off, backend setup) requires an explicit user confirm.
 - **Settings whitelist:** only cost/efficiency knobs are applyable; autonomy/permission settings can be discussed but never applied by the Advisor.
