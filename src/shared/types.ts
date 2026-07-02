@@ -188,6 +188,16 @@ export interface ContextFolder {
   scope?: ContextScope // absent = all agents
 }
 
+/** A second working directory paired with the project. Read-only by default (referenced in the
+ *  prompt, read on demand — no access grant); when `writable`, the SDK (additionalDirectories) and
+ *  the interactive terminal (--add-dir) are granted create/edit access. Absent/empty = byte-for-byte. */
+export interface PairedDir {
+  id: string // randomUUID — React key + update/remove handle
+  path: string // absolute, resolved path on disk
+  writable: boolean // false = read-only reference; true = SDK/terminal access grant
+  addedAt: string // ISO timestamp
+}
+
 export interface ProjectGraph {
   project: ProjectMeta
   nodes: AgentNodeData[]
@@ -199,6 +209,8 @@ export interface ProjectGraph {
   context?: ContextFile[]
   /** folders the agents read on demand with their file tools (nothing copied) */
   contextFolders?: ContextFolder[]
+  /** second working directories paired with the project (writable = additionalDirectories / --add-dir) */
+  pairedDirs?: PairedDir[]
 }
 
 // ---- IPC payloads ----
