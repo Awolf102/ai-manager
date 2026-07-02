@@ -43,6 +43,7 @@ import { parseAskUser, redactUserAnswer } from '../../shared/ask-user'
 import { parseFollowUps, parseFollowUpAsk } from '../../shared/follow-through'
 import { clampEffort } from '../../shared/model-caps'
 import { capEffort } from '../../shared/token-efficiency'
+import { parallelCap } from '../../shared/team-scale'
 
 export const MAX_PARALLEL = 3
 
@@ -466,7 +467,7 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
       list.push(t)
       byOwner.set(t.ownerId!, list)
     }
-    await mapCapped([...byOwner.entries()], MAX_PARALLEL, ([ownerId, group]) => runGroup(ownerId, group))
+    await mapCapped([...byOwner.entries()], parallelCap(getSettings()), ([ownerId, group]) => runGroup(ownerId, group))
 
     // ── Workers asked during this wave → queue them; present up to the per-source budget. ──
     if (asks.length > 0 && !eng.abort.signal.aborted) {
@@ -541,7 +542,7 @@ async function domainReviewNode(state: RunState, _io: NodeIO, eng: Eng): Promise
   }
 
   const recorded: TaskVerdict[] = []
-  await mapCapped([...groups.entries()], MAX_PARALLEL, async ([reviewerId, group]) => {
+  await mapCapped([...groups.entries()], parallelCap(getSettings()), async ([reviewerId, group]) => {
     if (eng.abort.signal.aborted) return
     setStatus(eng, steps, reviewerId, 'reviewing', group.map((t) => t.task.title))
     const items = group.map((t) => ({
@@ -642,7 +643,7 @@ async function repairNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeRe
   const steps = { ...state.steps }
   const failed = Object.values(tasks).filter((t) => t.ownerId && t.status === 'failed')
 
-  await mapCapped(failed, MAX_PARALLEL, async (t) => {
+  await mapCapped(failed, parallelCap(getSettings()), async (t) => {
     if (eng.abort.signal.aborted) return
     const ownerId = t.ownerId!
     setStatus(eng, steps, ownerId, 'working', [t.task.title])
@@ -758,7 +759,7 @@ async function reflectNode(state: RunState, _io: NodeIO, eng: Eng): Promise<Node
   }
   const steps = { ...state.steps }
   const reflections = [...state.reflections]
-  await mapCapped(workerIdsOf(state.tasks), MAX_PARALLEL, async (wid) => {
+  await mapCapped(workerIdsOf(state.tasks), parallelCap(getSettings()), async (wid) => {
     if (eng.abort.signal.aborted) return
     const wTasks = owned.filter((t) => t.ownerId === wid)
     setStatus(eng, steps, wid, 'reflecting', wTasks.map((t) => t.task.title))
@@ -778,7 +779,7 @@ async function reflectNode(state: RunState, _io: NodeIO, eng: Eng): Promise<Node
   })
 
   // reviewers (managers + the orchestrator's integration pass) reflect on their QA work
-  await mapCapped(reviewerIdsOf(state), MAX_PARALLEL, async (rid) => {
+  await mapCapped(reviewerIdsOf(state), parallelCap(getSettings()), async (rid) => {
     if (eng.abort.signal.aborted) return
     const reviewed =
       rid === state.orchestratorId

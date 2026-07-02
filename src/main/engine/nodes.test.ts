@@ -57,7 +57,10 @@ const h = vi.hoisted(() => {
       maxReplans: 0,
       maxHandoffs: 0,
       maxUserRequests: 0,
-      followThrough: 'off'
+      followThrough: 'off',
+      largeTeamMode: false,
+      largeTeamParallel: 6,
+      bulkCreateMax: 25
     },
     memory: {} as Record<string, string>,
     reflections: [] as { id: string }[]
