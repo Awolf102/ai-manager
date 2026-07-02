@@ -536,6 +536,7 @@ export const IPC = {
   cancelHeadless: 'run:cancel',
   agentStream: 'run:stream',
   spawnPty: 'pty:spawn',
+  spawnShell: 'pty:spawnShell',
   writePty: 'pty:write',
   resizePty: 'pty:resize',
   killPty: 'pty:kill',
@@ -574,7 +575,9 @@ export const IPC = {
   removeContextFolder: 'folders:remove',
   listSkills: 'skills:list',
   listResumable: 'run:list-resumable',
-  discardRun: 'run:discard'
+  discardRun: 'run:discard',
+  gitInfo: 'git:info',
+  gitCheckout: 'git:checkout'
 } as const
 
 /** The typed API the preload bridge exposes on window.api. */
@@ -598,6 +601,7 @@ export interface RendererApi {
   cancelHeadless: (runId: string) => Promise<void>
   onAgentStream: (cb: (e: AgentStreamEvent) => void) => () => void
   spawnPty: (input: SpawnPtyInput) => Promise<{ ptyId: string }>
+  spawnShell: (input: { cols: number; rows: number }) => Promise<{ ptyId: string }>
   writePty: (ptyId: string, data: string) => void
   resizePty: (ptyId: string, cols: number, rows: number) => void
   killPty: (ptyId: string) => void
@@ -654,4 +658,6 @@ export interface RendererApi {
   onServerLog: (cb: (e: ServerLogEvent) => void) => () => void
   onServerStatus: (cb: (e: ServerStatusEvent) => void) => () => void
   onServerReady: (cb: (e: ServerReadyEvent) => void) => () => void
+  gitInfo: () => Promise<{ isRepo: boolean; branch: string; dirty: boolean; branches: string[] }>
+  gitCheckout: (branch: string) => Promise<{ ok: boolean; error?: string }>
 }
