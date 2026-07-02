@@ -3,28 +3,40 @@ import type { WebContents } from 'electron'
 // Type-only import: erased at compile time, so it does NOT trigger a runtime
 // require of this ESM-only package (we load it via dynamic import below).
 import type { Options, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
-import type { AgentStreamEvent, ContextFile, ContextFolder, Effort, PermissionMode, RunHeadlessInput } from '../../shared/types'
+import type { AgentStreamEvent, ContextFile, ContextFolder, Effort, PairedDir, PermissionMode, RunHeadlessInput } from '../../shared/types'
 import { IPC } from '../../shared/types'
 import { skillOptionsFor } from '../../shared/skill-trust'
 import { assembleAgentSkills, headlessNote } from '../../shared/skills-pack'
 import { narrateTool } from '../../shared/narrate'
 import { discoverSkills } from './skill-discovery'
 import { resolvePackPath, discoverPackSkills } from './skills-pack'
-import { buildContextBlock } from '../../shared/context-files'
+import { buildContextBlock, buildWritableDirsBlock } from '../../shared/context-files'
+import { splitPairedDirs } from '../../shared/paired-dirs'
 import { buildAgentContext, getSettings, updateAgent } from './project-store'
 import { buildPermissionOptions } from './permission-options'
 import { actingModeFor } from './acting-mode'
 import { outputModeInstruction } from '../../shared/token-efficiency'
 
-/** Role + persistent memory + the user's project context (files + folders), appended onto the preset prompt. */
-function composeAppend(role: string, memory: string, context: ContextFile[], folders: ContextFolder[]): string {
-  const block = buildContextBlock(context, folders)
+/** Role + persistent memory + the user's project context (files + folders + paired dirs), appended onto the preset prompt. */
+export function composeAppend(
+  role: string,
+  memory: string,
+  context: ContextFile[],
+  folders: ContextFolder[],
+  pairedDirs: PairedDir[] = []
+): string {
+  const { writablePaths, readOnlyPaths } = splitPairedDirs(pairedDirs)
+  // read-only paired dirs render in the same "Referenced folders" section as contextFolders
+  const readOnlyFolders: ContextFolder[] = readOnlyPaths.map((p) => ({ id: p, path: p, note: '', addedAt: '' }))
+  const block = buildContextBlock(context, [...folders, ...readOnlyFolders])
+  const writableBlock = buildWritableDirsBlock(writablePaths)
   return [
     role.trim(),
     '',
     '## Your memory (persistent brain — read and apply these lessons)',
     memory.trim() || '(empty)',
-    ...(block ? ['', block] : [])
+    ...(block ? ['', block] : []),
+    ...(writableBlock ? ['', writableBlock] : [])
   ].join('\n')
 }
 
@@ -94,7 +106,7 @@ export async function streamAgent(
   opts: StreamAgentOptions
 ): Promise<{ text: string; sessionId?: string }> {
   const { wc, agentId, prompt, runId, stepId } = opts
-  const { agent, projectPath, role, memory, context, folders } = await buildAgentContext(agentId)
+  const { agent, projectPath, role, memory, context, folders, pairedDirs } = await buildAgentContext(agentId)
   const abort = opts.abort ?? new AbortController()
   const send = (
     kind: AgentStreamEvent['kind'],
@@ -117,11 +129,13 @@ export async function streamAgent(
     const options: Options = {
       cwd: projectPath,
       model: opts.modelOverride ?? agent.model,
-      systemPrompt: { type: 'preset', preset: 'claude_code', append: composeAppend(role, memory, context, folders) + headlessNote(pack.names) + outputModeInstruction(getSettings().outputMode) },
+      systemPrompt: { type: 'preset', preset: 'claude_code', append: composeAppend(role, memory, context, folders, pairedDirs) + headlessNote(pack.names) + outputModeInstruction(getSettings().outputMode) },
       ...buildPermissionOptions(mode, { lockBypass: getSettings().lockBypassPermissions }),
       settingSources: ['project'],
       abortController: abort
     }
+    const { writablePaths } = splitPairedDirs(pairedDirs)
+    if (writablePaths.length > 0) options.additionalDirectories = writablePaths
     if (opts.disallowedTools && opts.disallowedTools.length > 0) {
       options.disallowedTools = opts.disallowedTools
     }
