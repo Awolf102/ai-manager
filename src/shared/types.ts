@@ -3,6 +3,8 @@
 
 import type { EnvEntry } from './env-file'
 export type { EnvEntry } from './env-file'
+import type { OutputImage } from './output-images'
+export type { OutputImage } from './output-images'
 
 export type AgentKind = 'orchestrator' | 'director' | 'manager' | 'worker'
 
@@ -141,6 +143,8 @@ export interface ProjectSettings {
   largeTeamParallel: number
   /** per-action ceiling for bulk create/duplicate (clamped 1–100) */
   bulkCreateMax: number
+  /** treat the project as a creative/design project: biases team-building + reframes worker/QA prompts toward creative fidelity (off = byte-for-byte) */
+  visionMode: boolean
 }
 
 export const DEFAULT_SETTINGS: ProjectSettings = {
@@ -170,7 +174,8 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   maxFollowThrough: 0,
   largeTeamMode: false,
   largeTeamParallel: 6,
-  bulkCreateMax: 25
+  bulkCreateMax: 25,
+  visionMode: false
 }
 
 /** Which agents a context item applies to. Absent OR (kinds empty AND nodeIds empty) ⇒ all agents. */
@@ -649,6 +654,7 @@ export const IPC = {
   listSkills: 'skills:list',
   listResumable: 'run:list-resumable',
   discardRun: 'run:discard',
+  outputImages: 'run:output-images',
   gitInfo: 'git:info',
   gitCheckout: 'git:checkout',
   advisorSend: 'advisor:send',
@@ -690,6 +696,7 @@ export interface RendererApi {
   resumeRun: (runId: string, answer?: string) => Promise<void>
   listResumable: () => Promise<ResumableRun[]>
   discardRun: (runId: string) => Promise<void>
+  listOutputImages: () => Promise<OutputImage[]>
   onOrchestration: (cb: (e: OrchestrationEvent) => void) => () => void
   checkAuth: () => Promise<AuthStatus>
   listRuns: () => Promise<RunSummary[]>

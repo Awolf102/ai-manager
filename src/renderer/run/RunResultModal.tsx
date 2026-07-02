@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { RunManifest, ServerStatus } from '../../shared/types'
+import type { RunManifest, ServerStatus, OutputImage } from '../../shared/types'
 import { parseStartCommand } from '../../shared/run-manifest'
 import { Modal } from '../Modal'
 
@@ -18,6 +18,7 @@ export default function RunResultModal({
   const [status, setStatus] = useState<ServerStatus | 'idle'>('idle')
   const [url, setUrl] = useState<string | null>(null)
   const [log, setLog] = useState('')
+  const [images, setImages] = useState<OutputImage[]>([])
   const logRef = useRef<HTMLPreElement>(null)
   const serverIdRef = useRef<string | null>(null)
   const launchable = manifest.type === 'web' || manifest.type === 'static'
@@ -44,6 +45,12 @@ export default function RunResultModal({
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight
   }, [log])
+
+  useEffect(() => {
+    let alive = true
+    void window.api.listOutputImages().then((imgs) => { if (alive) setImages(imgs) })
+    return () => { alive = false }
+  }, [])
 
   const launch = async (): Promise<void> => {
     if (launching) return
@@ -101,12 +108,34 @@ export default function RunResultModal({
               <pre className="server-log" ref={logRef}>
                 {log || '(no output yet)'}
               </pre>
+              {url && (
+                <iframe
+                  className="rr-preview"
+                  src={url}
+                  title="Deliverable preview"
+                  sandbox="allow-scripts allow-same-origin"
+                />
+              )}
             </>
           ) : (
             <p className="rr-notes">
               This project doesn't look like a runnable web app (detected: {manifest.type}).{' '}
               {manifest.notes ?? 'Open the project folder to run it yourself.'}
             </p>
+          )}
+          {images.length > 0 && (
+            <div className="field">
+              <label>Produced images ({images.length})</label>
+              <div className="output-gallery">
+                {images.map((img) =>
+                  img.dataUrl ? (
+                    <img key={img.path} className="output-thumb" src={img.dataUrl} alt={img.path} title={img.path} />
+                  ) : (
+                    <span key={img.path} className="output-thumb output-thumb-icon" title={img.path}>{img.path.split('/').pop()}</span>
+                  )
+                )}
+              </div>
+            </div>
           )}
         </div>
         <div className="modal-actions">

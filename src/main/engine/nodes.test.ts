@@ -1876,6 +1876,21 @@ describe('lighter internal prompts', () => {
   })
 })
 
+describe('workerPrompt vision reframe', () => {
+  it('non-light is byte-for-byte off, creative on', () => {
+    expect(workerPrompt('g', [])).toBe(workerPrompt('g', [], false, false))
+    expect(workerPrompt('g', [])).toContain('404s assets') // current software-QA wording preserved
+    const v = workerPrompt('g', [], false, true)
+    expect(v).not.toContain('404s assets')
+    expect(v).toContain('visual hierarchy')
+  })
+  it('light is byte-for-byte off, creative on', () => {
+    expect(workerPrompt('g', [], true)).toBe(workerPrompt('g', [], true, false))
+    expect(workerPrompt('g', [], true)).toContain('return 200')
+    expect(workerPrompt('g', [], true, true)).toContain('visual hierarchy')
+  })
+})
+
 describe('followThroughSection', () => {
   it('is a non-empty instruction that references the followup block', () => {
     const s = followThroughSection()
@@ -2128,5 +2143,10 @@ describe('planPrompt broad planning', () => {
   })
   it('asks for a broad program-level plan when on', () => {
     expect(planPrompt('build X', true)).toMatch(/program/i)
+  })
+  it('planPrompt is byte-for-byte when vision off, and frames deliverables when on', () => {
+    expect(planPrompt('build X')).toBe(planPrompt('build X', false, false))
+    expect(planPrompt('build X')).not.toMatch(/CREATIVE \/ DESIGN/)
+    expect(planPrompt('build X', false, true)).toMatch(/design deliverables/i)
   })
 })

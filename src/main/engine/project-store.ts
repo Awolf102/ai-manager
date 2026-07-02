@@ -26,6 +26,7 @@ import { DEFAULT_MODEL_BY_KIND, DEFAULT_SETTINGS } from '../../shared/types'
 import { iconForName } from '../../shared/icons'
 import { slugify, uniqueSlug } from '../../shared/slug'
 import { isImageName, uniqueContextName, scopeAppliesTo } from '../../shared/context-files'
+import { includeOutputImage, OUTPUT_IMAGE_MAX, OUTPUT_IMAGE_MAX_BYTES, type OutputImage } from '../../shared/output-images'
 import { parseLessonBullet } from '../../shared/lessons'
 import { buildTeamBundle, planTeamImport, validateTeamBundle, type TeamBundle } from '../../shared/team-bundle'
 import { duplicateNames } from '../../shared/team-scale'
@@ -72,7 +73,7 @@ export function getAgent(agentId: string): AgentNodeData {
 
 // ---------- templates ----------
 
-export function roleTemplate(name: string, kind: AgentKind): string {
+export function roleTemplate(name: string, kind: AgentKind, vision = false): string {
   if (kind === 'orchestrator') {
     return `# Role: ${name} (Orchestrator)
 
@@ -105,12 +106,14 @@ You are a **manager** — between the orchestrator and the workers.
 - Read the **role** and **track record** (the lessons each worker has recorded from past work) of every worker that reports to you.
 - Assign each task to the worker whose role best matches it. When more than one role fits, prefer the worker whose track record shows the most relevant, reliable experience. If no worker's role matches a task, leave it unassigned and report that upward.
 - **Assess each task's difficulty and assign a reasoning effort level** (low / medium / high / xhigh / max) to the worker who will do it — harder tasks get more effort; reserve xhigh/max for genuinely hard tasks (they cost more).
-- **Review and test your team's output in your domain against the goal.** Don't trust a worker's report — run the app/tests and verify it actually works. You own testing, so your workers can focus on building.
+- ${vision
+  ? '**Review your team’s output for craft and vision fidelity** — visual hierarchy, brand consistency, typographic quality, and tone. You own creative review, so your workers can focus on creating.'
+  : '**Review and test your team\'s output in your domain against the goal.** Don\'t trust a worker\'s report — run the app/tests and verify it actually works. You own testing, so your workers can focus on building.'}
 - For anything that fails, give specific, actionable feedback and have the worker fix it. Hand well-tested, less-buggy work up to the orchestrator.
 - After a run, reflect on what your review caught so your future reviews get sharper.
 
 ## How you work
-- Match tasks to roles literally — don't hand a database task to a UI specialist.
+- ${vision ? 'Match tasks to roles literally — don’t hand a copywriting task to a visual designer.' : 'Match tasks to roles literally — don\'t hand a database task to a UI specialist.'}
 - Keep the orchestrator informed about what was assigned, to whom, and what is blocked.
 - When reviewing, verify behavior in your domain first (run it), then completeness against what was asked.
 
@@ -143,7 +146,7 @@ You are a **director** — a program lead between the orchestrator and the manag
   }
   return `# Role: ${name} (Worker)
 
-You are a **specialist worker** — you do the actual implementation.
+You are a **specialist worker** — ${vision ? 'you produce the actual creative work (design, brand, and copy deliverables).' : 'you do the actual implementation.'}
 
 ## Specialty
 <!-- Describe what this agent is great at, e.g. databases & data pipelines,
@@ -158,7 +161,9 @@ General-purpose specialist. Edit this section to define your focus.
 ## How you work
 - Before starting, read your memory file for lessons from past tasks and apply them.
 - Do the simplest thing that fully solves the task; verify your own work where you can.
-- If you build anything that serves a web page, **verify it actually renders** — run it and confirm the entry page and every asset it references (CSS/JS/images) return 200, not just that unit tests pass. A static-path mismatch that 404s assets renders the page unstyled even when the code is correct.
+- ${vision
+  ? 'Evaluate your work against the creative intent — visual hierarchy, brand and tonal consistency, and typographic craft — not just whether it technically works.'
+  : 'If you build anything that serves a web page, **verify it actually renders** — run it and confirm the entry page and every asset it references (CSS/JS/images) return 200, not just that unit tests pass. A static-path mismatch that 404s assets renders the page unstyled even when the code is correct.'}
 
 ## Constraints
 - Only take on tasks that match your specialty. If a task doesn't fit your role, say so rather than attempting it.
@@ -281,7 +286,7 @@ export async function createAgent(input: CreateAgentInput): Promise<ProjectGraph
   await fs.mkdir(dir, { recursive: true })
   const rolePath = join(dir, 'role.md')
   const memPath = join(dir, 'memory.md')
-  if (!existsSync(rolePath)) await fs.writeFile(rolePath, roleTemplate(input.name, input.kind), 'utf8')
+  if (!existsSync(rolePath)) await fs.writeFile(rolePath, roleTemplate(input.name, input.kind, getSettings().visionMode), 'utf8')
   if (!existsSync(memPath)) await fs.writeFile(memPath, memoryTemplate(input.name), 'utf8')
 
   graph.nodes.push(agent)
@@ -504,6 +509,48 @@ export async function contextThumbnail(id: string): Promise<string | null> {
   } catch {
     return null
   }
+}
+
+/** Bounded scan of the project for produced images, for the run-output gallery. Skips build/vcs/app
+ *  dirs and svg; inlines each ≤ OUTPUT_IMAGE_MAX_BYTES as a data URL (mirrors contextThumbnail). */
+export async function listOutputImages(): Promise<OutputImage[]> {
+  const { path } = requireCurrent()
+  const out: OutputImage[] = []
+  const walk = async (dir: string, rel: string, depth: number): Promise<void> => {
+    if (out.length >= OUTPUT_IMAGE_MAX) return
+    let entries: import('fs').Dirent[]
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const e of entries) {
+      if (out.length >= OUTPUT_IMAGE_MAX) return
+      const relPath = rel ? `${rel}/${e.name}` : e.name
+      if (e.isDirectory()) {
+        // prune excluded dirs cheaply via the predicate on a sentinel child
+        if (includeOutputImage(`${relPath}/_.png`, depth + 1)) await walk(join(dir, e.name), relPath, depth + 1)
+        continue
+      }
+      if (!e.isFile()) continue
+      if (!includeOutputImage(relPath, depth)) continue
+      let dataUrl: string | null = null
+      try {
+        const stat = await fs.stat(join(dir, e.name))
+        if (stat.size <= OUTPUT_IMAGE_MAX_BYTES) {
+          const buf = await fs.readFile(join(dir, e.name))
+          const ext = e.name.slice(e.name.lastIndexOf('.') + 1).toLowerCase()
+          const mime = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`
+          dataUrl = `data:${mime};base64,${buf.toString('base64')}`
+        }
+      } catch {
+        dataUrl = null
+      }
+      out.push({ path: relPath, dataUrl })
+    }
+  }
+  await walk(path, '', 0)
+  return out
 }
 
 /** The user's referenced folders for this project. */

@@ -30,7 +30,7 @@ export async function draftRoles(
   })
   const offered = offeredSkills(discovered, 40)
   const validIds = discovered.flatMap((p) => p.skills.map((sk) => sk.id))
-  const base = draftRolesPrompt(opts.goal, agents, edges, offered, s.largeTeamMode)
+  const base = draftRolesPrompt(opts.goal, agents, edges, offered, s.largeTeamMode, s.visionMode)
   let last = ''
   for (let attempt = 0; attempt < 2; attempt++) {
     const { text } = await runAgent({

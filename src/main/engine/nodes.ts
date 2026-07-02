@@ -381,7 +381,7 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
       const base: StreamAgentOptions = {
         wc: eng.wc,
         agentId: ownerId,
-        prompt: workerPrompt(state.goal, group.map((t) => t.task), es.lightPrompts) + (asksAvailable() ? askUserSection() : '') + (es.followThrough === 'headless' ? followThroughSection() : '') + (es.followThrough === 'ask' ? followThroughAskSection() : ''),
+        prompt: workerPrompt(state.goal, group.map((t) => t.task), es.lightPrompts, es.visionMode) + (asksAvailable() ? askUserSection() : '') + (es.followThrough === 'headless' ? followThroughSection() : '') + (es.followThrough === 'ask' ? followThroughAskSection() : ''),
         runId: eng.runId,
         stepId: ownerId,
         permissionMode: state.actingMode,
@@ -851,7 +851,7 @@ async function planStep(
   const parsed = await runStructured(
     eng,
     orchestratorId,
-    planPrompt(goal, getSettings().largeTeamMode),
+    planPrompt(goal, getSettings().largeTeamMode, getSettings().visionMode),
     (v): v is { tasks: unknown[] } => Array.isArray((v as { tasks?: unknown })?.tasks),
     { permissionMode: 'default', disallowedTools: THINK_DISALLOW }
   )
@@ -1469,14 +1469,17 @@ export function formatFollowUps(state: RunState): string {
 const STRICT_REMINDER =
   '\n\nIMPORTANT: Your previous reply could not be parsed. Reply with ONLY the JSON code block described above — no prose before or after.'
 
-export function planPrompt(goal: string, largeTeam = false): string {
+export function planPrompt(goal: string, largeTeam = false, vision = false): string {
   const scale = largeTeam
     ? `\n\nThis is a LARGE team. Plan at a BROAD, PROGRAM level: produce a small number (~3–8) of high-level workstreams, each of which a director or manager can own and break down further with their own team. Prefer few broad tasks over many fine-grained ones.`
+    : ''
+  const visionScale = vision
+    ? `\n\nThis is a CREATIVE / DESIGN project — plan design deliverables (brand direction, UX flows, wireframes, visual comps, copy, and content structure), not code modules.`
     : ''
   return `You are planning work to achieve the user's goal for this project. You may READ files to inform the plan, but do NOT make any changes.
 
 GOAL:
-${goal}${scale}
+${goal}${scale}${visionScale}
 
 Produce a concise, ordered list of concrete tasks that together fully achieve the goal. Each task should be self-contained and suitable to hand to a single specialist. Prefer the smallest set of tasks that covers the goal.
 
@@ -1535,17 +1538,23 @@ Reply with ONLY this JSON code block (no other text):
 \`\`\``
 }
 
-export function workerPrompt(goal: string, tasks: RunTask[], light = false): string {
+export function workerPrompt(goal: string, tasks: RunTask[], light = false, vision = false): string {
   const list = tasks.map((t, i) => `${i + 1}. ${t.title}\n   ${t.description}`).join('\n\n')
   if (light) {
+    const qa = vision
+      ? 'If your work is a design, brand, or copy deliverable, evaluate it against the creative intent — check visual hierarchy, brand and tonal consistency, and typographic craft — before reporting success.'
+      : 'If your work serves web pages, actually run it and confirm the entry page AND every asset it references return 200 before reporting success.'
     return `Team goal: ${goal}
 
 Complete the following task(s) in this project folder, making the necessary changes. Apply any relevant lessons from your memory.
 
 ${list}
 
-If your work serves web pages, actually run it and confirm the entry page AND every asset it references return 200 before reporting success. When finished, briefly report what you changed and flag anything you could not complete.`
+${qa} When finished, briefly report what you changed and flag anything you could not complete.`
   }
+  const qa = vision
+    ? 'If your work is a design, brand, or copy deliverable, do not rely on "it looks right" — evaluate it against the creative intent: check visual hierarchy, brand and tonal consistency, typographic craft, and that it reads as intended for its audience. Don\'t report success until the deliverable holds together.'
+    : 'If your work is a web app or anything that serves pages, do not rely on unit tests or "the code looks right" — actually run it and load the entry page: confirm it returns 200 AND every asset it references (CSS, JS, images) also returns 200. A static-path or route mismatch that 404s assets makes the page render as unstyled, broken HTML even when your code is correct. Don\'t report success until the page renders fully.'
   return `You are working as part of a team to achieve this overall goal:
 ${goal}
 
@@ -1553,7 +1562,7 @@ You have been assigned the following task(s). Complete them in this project fold
 
 ${list}
 
-If your work is a web app or anything that serves pages, do not rely on unit tests or "the code looks right" — actually run it and load the entry page: confirm it returns 200 AND every asset it references (CSS, JS, images) also returns 200. A static-path or route mismatch that 404s assets makes the page render as unstyled, broken HTML even when your code is correct. Don't report success until the page renders fully.
+${qa}
 
 When finished, briefly report what you changed and flag anything you could not complete.`
 }

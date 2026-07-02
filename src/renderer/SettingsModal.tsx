@@ -362,6 +362,20 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                   }
                 />
               </SettingSection>
+
+              <SettingSection title="Creative Vision">
+                <SettingRow
+                  label="Vision mode"
+                  desc="Treat this as a creative/design project: Build-team and Draft-roles propose design roles, planning frames work as design deliverables, and workers evaluate craft and brand fidelity instead of HTTP-200s. Off = unchanged."
+                  control={
+                    <Switch
+                      checked={s.visionMode}
+                      label="Vision mode"
+                      onChange={(v) => void update({ visionMode: v })}
+                    />
+                  }
+                />
+              </SettingSection>
             </>
           )}
 

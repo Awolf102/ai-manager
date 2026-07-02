@@ -112,6 +112,7 @@ export function registerIpc(): void {
   )
   ipcMain.handle(IPC.listResumable, () => orchestrator.listResumable())
   ipcMain.handle(IPC.discardRun, (_e, runId: string) => orchestrator.discardRun(runId))
+  ipcMain.handle(IPC.outputImages, () => store.listOutputImages())
 
   // ---- auth ----
   ipcMain.handle(IPC.checkAuth, () => checkAuth())

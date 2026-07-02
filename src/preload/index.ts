@@ -87,6 +87,7 @@ const api: RendererApi = {
   listSkills: () => ipcRenderer.invoke(IPC.listSkills),
   listResumable: () => ipcRenderer.invoke(IPC.listResumable),
   discardRun: (runId) => ipcRenderer.invoke(IPC.discardRun, runId),
+  listOutputImages: () => ipcRenderer.invoke(IPC.outputImages),
   gitInfo: () => ipcRenderer.invoke(IPC.gitInfo),
   gitCheckout: (branch: string) => ipcRenderer.invoke(IPC.gitCheckout, branch),
   sendAdvisor: (input) => ipcRenderer.invoke(IPC.advisorSend, input),

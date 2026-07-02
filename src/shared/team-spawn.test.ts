@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { spawnTeamPrompt, parseSpawnedTeam, pickSpawnModel } from './team-spawn'
+import { visionBias } from './team-vision'
 
 describe('spawnTeamPrompt', () => {
   it('includes the goal, orchestrator name, existing members, and the JSON shape', () => {
@@ -129,6 +130,17 @@ describe('director-aware spawn', () => {
     const text = '```json\n{ "members": [ { "id": "d1", "name": "Lead", "kind": "director", "role": "r", "reportsTo": "orchestrator" } ] }\n```'
     const members = parseSpawnedTeam(text)
     expect(members?.[0].kind).toBe('director')
+  })
+})
+
+describe('vision-aware spawn', () => {
+  it('is byte-for-byte when vision off', () => {
+    expect(spawnTeamPrompt('g', 'O', [])).toBe(spawnTeamPrompt('g', 'O', [], [], false, false, false))
+    expect(spawnTeamPrompt('g', 'O', [])).not.toMatch(/CREATIVE \/ DESIGN/)
+  })
+  it('injects the vision bias when on', () => {
+    const p = spawnTeamPrompt('g', 'O', [], [], false, false, true)
+    expect(p).toContain(visionBias().trim())
   })
 })
 
