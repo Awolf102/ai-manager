@@ -26,6 +26,7 @@ import PanelDivider from './PanelDivider'
 import { computeBodyGrid, INSPECTOR_MIN, INSPECTOR_MAX, DOCK_HEIGHT_MIN, DOCK_WIDTH_MIN, DOCK_WIDTH_MAX } from './layout'
 import { AGENT_KINDS } from '../shared/types'
 import type { AgentKind, AuthStatus, ProjectGraph, ProjectMeta } from '../shared/types'
+import { clampBulk } from '../shared/team-scale'
 import { Modal } from './Modal'
 import { rovingIndex } from './roving'
 
@@ -507,14 +508,22 @@ function AddAgentModal({
   onClose: () => void
   onCreated: (g: ProjectGraph) => void
 }) {
+  const settings = useStore((s) => s.graph?.settings)
   const [name, setName] = useState('')
   const [kind, setKind] = useState<AgentKind>('worker')
+  const [count, setCount] = useState(1)
   const kindRefs = useRef<(HTMLButtonElement | null)[]>([])
 
   const create = async (): Promise<void> => {
     if (!name.trim()) return
-    const g = await window.api.createAgent({ name: name.trim(), kind })
-    onCreated(g)
+    const n = clampBulk(count)
+    const model = settings?.largeTeamMode ? settings.cheapModelTier : undefined
+    let g: ProjectGraph | null = null
+    for (let i = 0; i < n; i++) {
+      const nm = i === 0 ? name.trim() : `${name.trim()} ${i + 1}`
+      g = await window.api.createAgent({ name: nm, kind, model })
+    }
+    if (g) onCreated(g)
     onClose()
   }
 
@@ -560,6 +569,16 @@ function AddAgentModal({
                 </button>
               ))}
             </div>
+          </div>
+          <div className="field">
+            <label>How many</label>
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={count}
+              onChange={(e) => setCount(clampBulk(Number(e.target.value)))}
+            />
           </div>
         </div>
         <div className="modal-actions">
