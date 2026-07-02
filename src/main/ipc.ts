@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto'
 import { IPC } from '../shared/types'
 import type {
   AgentNodeData,
+  BackendModel,
   ContextScope,
   CreateAgentInput,
   EnvEntry,
@@ -28,6 +29,7 @@ import * as serverMgr from './engine/server-manager'
 import { discoverSkills } from './engine/skill-discovery'
 import * as envStore from './engine/env-store'
 import * as gitEngine from './engine/git'
+import { setBackendToken, encryptionAvailable } from './engine/backend-secrets'
 
 export function registerIpc(): void {
   // ---- project ----
@@ -318,6 +320,25 @@ export function registerIpc(): void {
     store.setPairedDirWritable(id, writable)
   )
   ipcMain.handle(IPC.removePairedDir, (_e, id: string) => store.removePairedDir(id))
+
+  // ---- model backends ----
+  ipcMain.handle(IPC.backendAdd, (_e, input: { label: string; baseUrl: string; models: BackendModel[]; presetId?: string }) =>
+    store.addBackend(input)
+  )
+  ipcMain.handle(IPC.backendUpdate, (_e, id: string, patch: { label?: string; baseUrl?: string; models?: BackendModel[] }) =>
+    store.updateBackend(id, patch)
+  )
+  ipcMain.handle(IPC.backendRemove, (_e, id: string) => store.removeBackend(id))
+  ipcMain.handle(IPC.backendList, () => store.backendsView())
+  ipcMain.handle(IPC.backendSetToken, async (_e, id: string, token: string) => {
+    try {
+      await setBackendToken(store.getCurrentProjectPath(), id, token)
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+  ipcMain.handle(IPC.backendEncryptionAvailable, () => encryptionAvailable())
 
   // ---- git ----
   ipcMain.handle(IPC.gitInfo, () => gitEngine.gitInfo())
