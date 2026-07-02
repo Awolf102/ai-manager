@@ -135,6 +135,12 @@ export interface ProjectSettings {
   followThrough: 'off' | 'headless' | 'ask'
   /** pause budget for followThrough === 'ask' (0 = no pauses) */
   maxFollowThrough: number
+  /** master toggle for large-team behaviors: broad planning + director spawn/draft + raised concurrency (off = byte-for-byte) */
+  largeTeamMode: boolean
+  /** concurrency cap used only when largeTeamMode is on (clamped 1–24) */
+  largeTeamParallel: number
+  /** per-action ceiling for bulk create/duplicate (clamped 1–100) */
+  bulkCreateMax: number
 }
 
 export const DEFAULT_SETTINGS: ProjectSettings = {
@@ -161,7 +167,10 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   cheapModelTier: 'claude-haiku-4-5',
   lightPrompts: false,
   followThrough: 'off',
-  maxFollowThrough: 0
+  maxFollowThrough: 0,
+  largeTeamMode: false,
+  largeTeamParallel: 6,
+  bulkCreateMax: 25
 }
 
 /** Which agents a context item applies to. Absent OR (kinds empty AND nodeIds empty) ⇒ all agents. */

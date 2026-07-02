@@ -4,6 +4,7 @@ import { useStore } from './store'
 import { Switch } from './Switch'
 import { Modal } from './Modal'
 import type { Autonomy, ProjectSettings, ReviewMode } from '../shared/types'
+import { clampParallel, clampBulk } from '../shared/team-scale'
 
 type CategoryId = 'safety' | 'cost' | 'efficiency' | 'review' | 'run' | 'team'
 
@@ -236,6 +237,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           )}
 
           {active === 'efficiency' && (
+            <>
             <SettingSection>
               <SettingRow
                 label="Concise output"
@@ -322,6 +324,45 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                 }
               />
             </SettingSection>
+              <SettingSection title="Large Team">
+                <SettingRow
+                  label="Large team mode"
+                  desc="For big goals: the orchestrator plans at a broad program level, Build-team and Draft-roles may propose a director tier, and runs use a higher concurrency cap. Off = unchanged."
+                  control={
+                    <div className="gated-control">
+                      {s.largeTeamMode && (
+                        <input
+                          type="number"
+                          min={1}
+                          max={24}
+                          value={s.largeTeamParallel}
+                          title="Concurrency cap (agents running at once)"
+                          onChange={(e) => void update({ largeTeamParallel: clampParallel(Number(e.target.value)) })}
+                        />
+                      )}
+                      <Switch
+                        checked={s.largeTeamMode}
+                        label="Large team mode"
+                        onChange={(v) => void update({ largeTeamMode: v })}
+                      />
+                    </div>
+                  }
+                />
+                <SettingRow
+                  label="Bulk create limit"
+                  desc="The most agents a single Add or Duplicate action may create at once."
+                  control={
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={s.bulkCreateMax}
+                      onChange={(e) => void update({ bulkCreateMax: clampBulk(Number(e.target.value)) })}
+                    />
+                  }
+                />
+              </SettingSection>
+            </>
           )}
 
           {active === 'review' && (
