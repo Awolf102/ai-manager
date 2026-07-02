@@ -143,6 +143,8 @@ export interface ProjectSettings {
   largeTeamParallel: number
   /** per-action ceiling for bulk create/duplicate (clamped 1–100) */
   bulkCreateMax: number
+  /** cap every acting task's output tokens (0 = off — Claude Code default 32000) */
+  maxOutputTokens: number
   /** treat the project as a creative/design project: biases team-building + reframes worker/QA prompts toward creative fidelity (off = byte-for-byte) */
   visionMode: boolean
 }
@@ -175,6 +177,7 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   largeTeamMode: false,
   largeTeamParallel: 6,
   bulkCreateMax: 25,
+  maxOutputTokens: 0,
   visionMode: false
 }
 
