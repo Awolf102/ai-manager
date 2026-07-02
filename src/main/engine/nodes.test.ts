@@ -14,6 +14,8 @@ import {
   reviewerIdsOf,
   formatUserRequests,
   followThroughSection,
+  followThroughAskSection,
+  interruptFor,
   formatFollowUps,
   assignPrompt,
   workerPrompt,
@@ -1921,5 +1923,27 @@ describe('headless follow-through (engine)', () => {
     const { e, emitted } = await runOnce()
     expect(e.followUps).toEqual([])
     expect(emitted.some((ev) => (ev as { type?: string }).type === 'follow-up')).toBe(false)
+  })
+})
+
+describe('followThroughAskSection', () => {
+  it('references followup, options, and question', () => {
+    const s = followThroughAskSection()
+    expect(s).toContain('followup')
+    expect(s).toContain('options')
+    expect(s).toContain('question')
+  })
+})
+
+describe('interruptFor', () => {
+  it('builds an ask-user interrupt (default source)', () => {
+    const iv = interruptFor({ ownerId: 'w1', question: 'Which color?' })
+    expect(iv.kind).toBe('ask-user')
+    expect(iv.payload).toMatchObject({ askerId: 'w1', askerName: 'W1', question: 'Which color?' })
+  })
+  it('builds a follow-through interrupt carrying summary + options', () => {
+    const iv = interruptFor({ ownerId: 'w1', question: 'What should it do?', source: 'follow-through', summary: 'chat icon', options: ['a', 'b'] })
+    expect(iv.kind).toBe('follow-through')
+    expect(iv.payload).toMatchObject({ askerId: 'w1', askerName: 'W1', summary: 'chat icon', question: 'What should it do?', options: ['a', 'b'] })
   })
 })

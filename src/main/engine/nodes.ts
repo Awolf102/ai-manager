@@ -11,6 +11,7 @@ import type { StreamAgentOptions } from './agent-runner'
 import type {
   Assignment,
   Effort,
+  Interrupt,
   OrchestrationEvent,
   PermissionMode,
   RunPhase,
@@ -1336,6 +1337,37 @@ export function followThroughSection(): string {
 { "summary": "<what was under-specified>", "decision": "<what you built and why>" }
 \`\`\`
 You may include more than one followup block if you made several such decisions.`
+}
+
+export function followThroughAskSection(): string {
+  return `\n\nFOLLOW-THROUGH (ask): If you encounter a feature whose intended behavior was not clearly specified (for example a button or control with no described action), do NOT assume — pause and ask the user. Reply with ONLY this block and nothing else:
+\`\`\`followup
+{ "summary": "<what is under-specified>", "question": "<what you need decided>", "options": ["<option 1>", "<option 2>"] }
+\`\`\`
+Propose 2–4 concrete options you'd recommend. Ask only for genuinely under-specified features; otherwise finish normally.`
+}
+
+/** Build the pause interrupt for a collected ask item, by source. */
+export function interruptFor(item: {
+  ownerId: string
+  question: string
+  source?: 'ask-user' | 'follow-through'
+  summary?: string
+  options?: string[]
+}): Interrupt {
+  const askerName = getAgent(item.ownerId).name
+  if (item.source === 'follow-through') {
+    return {
+      kind: 'follow-through',
+      prompt: item.question,
+      payload: { askerId: item.ownerId, askerName, summary: item.summary ?? '', question: item.question, options: item.options ?? [] }
+    }
+  }
+  return {
+    kind: 'ask-user',
+    prompt: item.question,
+    payload: { askerId: item.ownerId, askerName, question: item.question }
+  }
 }
 
 /** Synthesis section listing headless follow-through decisions, so the final report
