@@ -585,6 +585,9 @@ export const IPC = {
   addContextFolder: 'folders:add',
   updateContextFolder: 'folders:update',
   removeContextFolder: 'folders:remove',
+  addPairedDir: 'pairedDir:add',
+  setPairedDirWritable: 'pairedDir:setWritable',
+  removePairedDir: 'pairedDir:remove',
   listSkills: 'skills:list',
   listResumable: 'run:list-resumable',
   discardRun: 'run:discard',
@@ -665,6 +668,9 @@ export interface RendererApi {
   addContextFolder: (paths?: string[]) => Promise<{ graph: ProjectGraph; skipped: string[] }>
   updateContextFolder: (id: string, note: string) => Promise<ProjectGraph>
   removeContextFolder: (id: string) => Promise<ProjectGraph>
+  addPairedDir: (paths?: string[]) => Promise<{ graph: ProjectGraph; skipped: string[] }>
+  setPairedDirWritable: (id: string, writable: boolean) => Promise<ProjectGraph>
+  removePairedDir: (id: string) => Promise<ProjectGraph>
   getPathForFile: (file: File) => string
   listSkills: () => Promise<DiscoveredPlugin[]>
   onServerLog: (cb: (e: ServerLogEvent) => void) => () => void

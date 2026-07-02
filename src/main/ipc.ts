@@ -302,6 +302,23 @@ export function registerIpc(): void {
   )
   ipcMain.handle(IPC.removeContextFolder, (_e, id: string) => store.removeContextFolder(id))
 
+  ipcMain.handle(IPC.addPairedDir, async (_e, paths?: string[]) => {
+    let sources = paths
+    if (!sources || sources.length === 0) {
+      const r = await dialog.showOpenDialog({
+        title: 'Add a working directory',
+        properties: ['openDirectory', 'multiSelections']
+      })
+      if (r.canceled || r.filePaths.length === 0) return { graph: store.getGraph(), skipped: [] }
+      sources = r.filePaths
+    }
+    return store.addPairedDirs(sources)
+  })
+  ipcMain.handle(IPC.setPairedDirWritable, (_e, id: string, writable: boolean) =>
+    store.setPairedDirWritable(id, writable)
+  )
+  ipcMain.handle(IPC.removePairedDir, (_e, id: string) => store.removePairedDir(id))
+
   // ---- git ----
   ipcMain.handle(IPC.gitInfo, () => gitEngine.gitInfo())
   ipcMain.handle(IPC.gitCheckout, (_e, branch: string) => gitEngine.gitCheckout(branch))
