@@ -16,6 +16,7 @@ import { buildAgentContext, getSettings, updateAgent } from './project-store'
 import { buildPermissionOptions } from './permission-options'
 import { actingModeFor } from './acting-mode'
 import { outputModeInstruction } from '../../shared/token-efficiency'
+import { resolveBackendEnv, type BackendResolution } from './backend-resolve'
 
 /** Role + persistent memory + the user's project context (files + folders + paired dirs), appended onto the preset prompt. */
 export function composeAppend(
@@ -38,6 +39,21 @@ export function composeAppend(
     ...(block ? ['', block] : []),
     ...(writableBlock ? ['', writableBlock] : [])
   ].join('\n')
+}
+
+/** Compute the run's model + optional env from a resolved backend. The 'error' kind is handled by
+ *  the caller (streamAgent) BEFORE this is called. For an 'env' backend, agent.model wins (a
+ *  transient modelOverride would send a Claude id to a non-Claude endpoint) and process.env is
+ *  spread so PATH/HOME survive; 'none' keeps today's override precedence. */
+export function applyBackendToRun(
+  result: BackendResolution,
+  agentModel: string,
+  modelOverride: string | undefined
+): { model: string; env?: Record<string, string | undefined>; label?: string } {
+  if (result.kind === 'env') {
+    return { model: agentModel, env: { ...process.env, ...result.env }, label: result.label }
+  }
+  return { model: modelOverride ?? agentModel }
 }
 
 function emit(wc: WebContents, e: AgentStreamEvent): void {
@@ -119,8 +135,14 @@ export async function streamAgent(
 
   try {
     const { query } = await import('@anthropic-ai/claude-agent-sdk')
+    const backend = await resolveBackendEnv(agent)
+    if (backend.kind === 'error') {
+      send('error', `\r\n\x1b[31m✗ ${backend.message}\x1b[0m\r\n`, { isFinal: true })
+      throw new Error(backend.message)
+    }
+    const run = applyBackendToRun(backend, agent.model, opts.modelOverride)
     if (opts.header !== false) {
-      send('system', `\x1b[2m▶ ${agent.name} · ${opts.modelOverride ?? agent.model}\x1b[0m\r\n`)
+      send('system', `\x1b[2m▶ ${agent.name} · ${run.model}${run.label ? ` (${run.label})` : ''}\x1b[0m\r\n`)
     }
 
     const pack = await packSkills()
@@ -128,7 +150,7 @@ export async function streamAgent(
     const mode = opts.permissionMode ?? actingModeFor(getSettings().autonomy)
     const options: Options = {
       cwd: projectPath,
-      model: opts.modelOverride ?? agent.model,
+      model: run.model,
       systemPrompt: { type: 'preset', preset: 'claude_code', append: composeAppend(role, memory, context, folders, pairedDirs) + headlessNote(pack.names) + outputModeInstruction(getSettings().outputMode) },
       ...buildPermissionOptions(mode, { lockBypass: getSettings().lockBypassPermissions }),
       settingSources: ['project'],
@@ -136,6 +158,7 @@ export async function streamAgent(
     }
     const { writablePaths } = splitPairedDirs(pairedDirs)
     if (writablePaths.length > 0) options.additionalDirectories = writablePaths
+    if (run.env) options.env = run.env
     if (opts.disallowedTools && opts.disallowedTools.length > 0) {
       options.disallowedTools = opts.disallowedTools
     }
