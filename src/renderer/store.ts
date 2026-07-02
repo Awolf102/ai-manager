@@ -116,6 +116,11 @@ interface AppState {
 
   goalFocusTick: number
   focusGoal: () => void
+  advisorOpen: boolean
+  setAdvisorOpen: (v: boolean) => void
+  pendingGoal: string | null
+  seedGoal: (text: string) => void
+  clearPendingGoal: () => void
 
   toasts: Toast[]
   notify: (input: { kind: Toast['kind']; message: string }) => string
@@ -386,6 +391,11 @@ export const useStore = create<AppState>((set, get) => ({
 
   goalFocusTick: 0,
   focusGoal: () => set((s) => ({ goalFocusTick: s.goalFocusTick + 1 })),
+  advisorOpen: false,
+  setAdvisorOpen: (v) => set({ advisorOpen: v }),
+  pendingGoal: null,
+  seedGoal: (text) => set((s) => ({ pendingGoal: text, goalFocusTick: s.goalFocusTick + 1 })),
+  clearPendingGoal: () => set({ pendingGoal: null }),
 
   toasts: [],
   notify: ({ kind, message }) => {
