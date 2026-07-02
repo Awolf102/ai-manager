@@ -1968,3 +1968,44 @@ describe('resumeFollowUpAsk', () => {
     expect(e.followUps[0].decision).toContain('skipped')
   })
 })
+
+describe('follow-through ask (engine)', () => {
+  afterEach(() => { h.settings.followThrough = 'off'; h.settings.maxFollowThrough = 0 })
+
+  const askBlk = '\n```followup\n{ "summary": "chat icon unspecified", "question": "what should it do?", "options": ["chat panel", "help page"] }\n```'
+  function agentWithAsk(): AgentRunner {
+    const base = cannedAgent()
+    return async (opts) => {
+      const r = await base.runAgent(opts)
+      return opts.prompt.includes('You have been assigned') ? { ...r, text: r.text + askBlk } : r
+    }
+  }
+
+  it('pauses with a follow-through interrupt carrying options', async () => {
+    h.settings.followThrough = 'ask'; h.settings.maxFollowThrough = 2
+    const e = eng(agentWithAsk())
+    const store = fakeStore()
+    const paused = await runGraph(
+      buildOrchestratorGraph(e),
+      seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 't' }),
+      store,
+      makeIO(e.abort.signal, store)
+    )
+    expect(paused.status).toBe('interrupted')
+    expect(paused.pendingInterrupt?.kind).toBe('follow-through')
+    expect(paused.pendingAsk?.source).toBe('follow-through')
+    expect(paused.pendingInterrupt?.payload).toMatchObject({ summary: 'chat icon unspecified', options: ['chat panel', 'help page'] })
+  })
+
+  it('resuming with a choice records a followUp', async () => {
+    h.settings.followThrough = 'ask'; h.settings.maxFollowThrough = 2
+    const e = eng(agentWithAsk())
+    const store = fakeStore()
+    const graph = buildOrchestratorGraph(e)
+    await runGraph(graph, seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 't' }), store, makeIO(e.abort.signal, store))
+    // resume the paused run with a decision — resumeFollowUpAsk records onto e2.followUps
+    const e2 = eng(cannedAgent().runAgent)
+    await resumeGraph(buildOrchestratorGraph(e2), 'run1', store, makeIO(e2.abort.signal, store), 'chat panel')
+    expect(e2.followUps.some((f) => f.decision === 'chat panel' && f.summary === 'chat icon unspecified')).toBe(true)
+  })
+})

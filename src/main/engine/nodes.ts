@@ -40,7 +40,7 @@ import {
 } from './project-store'
 import { parseHandoff } from '../../shared/handoff'
 import { parseAskUser, redactUserAnswer } from '../../shared/ask-user'
-import { parseFollowUps } from '../../shared/follow-through'
+import { parseFollowUps, parseFollowUpAsk } from '../../shared/follow-through'
 import { clampEffort } from '../../shared/model-caps'
 import { capEffort } from '../../shared/token-efficiency'
 
@@ -380,7 +380,7 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
       const base: StreamAgentOptions = {
         wc: eng.wc,
         agentId: ownerId,
-        prompt: workerPrompt(state.goal, group.map((t) => t.task), es.lightPrompts) + (asksAvailable() ? askUserSection() : '') + (es.followThrough === 'headless' ? followThroughSection() : ''),
+        prompt: workerPrompt(state.goal, group.map((t) => t.task), es.lightPrompts) + (asksAvailable() ? askUserSection() : '') + (es.followThrough === 'headless' ? followThroughSection() : '') + (es.followThrough === 'ask' ? followThroughAskSection() : ''),
         runId: eng.runId,
         stepId: ownerId,
         permissionMode: state.actingMode,
@@ -399,6 +399,15 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
         for (const fu of parseFollowUps(text)) {
           eng.followUps.push({ workerId: ownerId, summary: fu.summary, decision: fu.decision })
           eng.emit({ runId: eng.runId, type: 'follow-up', workerId: ownerId, summary: fu.summary, decision: fu.decision })
+        }
+      }
+      // ── FOLLOW-THROUGH ASK: a worker wants the user to decide an under-specified feature → pause. ──
+      if (followThroughAskAvailable()) {
+        const fa = parseFollowUpAsk(text)
+        if (fa) {
+          for (const t of group) tasks[t.task.id].status = 'pending'
+          asks.push({ ownerId, taskIds: group.map((t) => t.task.id), sessionId, question: fa.question, source: 'follow-through', summary: fa.summary, options: fa.options })
+          return
         }
       }
       // ── ASK DETECTION: a worker asked → leave its group pending, record the ask. ──
