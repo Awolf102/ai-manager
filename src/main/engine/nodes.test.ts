@@ -20,6 +20,7 @@ import {
   formatFollowUps,
   assignPrompt,
   workerPrompt,
+  planPrompt,
   type Eng,
   type AgentRunner
 } from './nodes'
@@ -2117,5 +2118,15 @@ describe('follow-through ask (engine)', () => {
     const e2 = eng(cannedAgent().runAgent)
     await resumeGraph(buildOrchestratorGraph(e2), 'run1', store, makeIO(e2.abort.signal, store), 'chat panel')
     expect(e2.followUps.some((f) => f.decision === 'chat panel' && f.summary === 'chat icon unspecified')).toBe(true)
+  })
+})
+
+describe('planPrompt broad planning', () => {
+  it('is byte-for-byte when largeTeam is off', () => {
+    expect(planPrompt('build X')).toBe(planPrompt('build X', false))
+    expect(planPrompt('build X')).not.toMatch(/program/i)
+  })
+  it('asks for a broad program-level plan when on', () => {
+    expect(planPrompt('build X', true)).toMatch(/program/i)
   })
 })
