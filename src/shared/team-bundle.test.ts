@@ -125,7 +125,7 @@ describe('validateTeamBundle (normalize)', () => {
 
   it('rejects a member missing memberId/name and a too-large team', () => {
     expect(validateTeamBundle(rawBundle([{ name: 'A', kind: 'worker' }])).ok).toBe(false)
-    const many = Array.from({ length: 201 }, (_, i) => ({ memberId: `m${i}`, name: 'A', kind: 'worker', icon: 'x', model: 'claude-sonnet-4-6', permissionMode: 'acceptEdits', position: { x: 0, y: 0 }, role: '', lessons: [] }))
+    const many = Array.from({ length: 1001 }, (_, i) => ({ memberId: `m${i}`, name: 'A', kind: 'worker', icon: 'x', model: 'claude-sonnet-4-6', permissionMode: 'acceptEdits', position: { x: 0, y: 0 }, role: '', lessons: [] }))
     expect(validateTeamBundle(rawBundle(many)).ok).toBe(false)
   })
 
