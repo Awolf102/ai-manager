@@ -609,7 +609,8 @@ export async function removeBackend(id: string): Promise<ProjectGraph> {
   const { path, graph } = requireCurrent()
   graph.backends = (graph.backends ?? []).filter((x) => x.id !== id)
   for (const n of graph.nodes) if (n.backendId === id) n.backendId = undefined
-  await deleteBackendToken(path, id)
+  // best-effort: a failed token delete leaves only a harmless orphaned entry — never block/desync the removal
+  await deleteBackendToken(path, id).catch(() => {})
   return saveGraph()
 }
 

@@ -13,6 +13,19 @@ vi.mock('electron', () => ({
   }
 }))
 
+// Spy target for deleteBackendToken — lets one test simulate a token-delete failure.
+const deleteTokenSpy = vi.hoisted(() => ({ shouldFail: false }))
+vi.mock('./backend-secrets', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./backend-secrets')>()
+  return {
+    ...actual,
+    deleteBackendToken: vi.fn(async (...args: Parameters<typeof actual.deleteBackendToken>) => {
+      if (deleteTokenSpy.shouldFail) throw new Error('disk error')
+      return actual.deleteBackendToken(...args)
+    })
+  }
+})
+
 import {
   openProject,
   getBackends,
@@ -79,5 +92,17 @@ describe('backend store', () => {
     const view = await backendsView()
     expect(view[0].hasToken).toBe(true)
     expect('token' in view[0]).toBe(false)
+  })
+
+  it('removeBackend still resolves and drops the backend when deleteBackendToken rejects', async () => {
+    await addBackend(input)
+    const id = getBackends()[0].id
+    deleteTokenSpy.shouldFail = true
+    try {
+      await removeBackend(id)
+    } finally {
+      deleteTokenSpy.shouldFail = false
+    }
+    expect(getBackends()).toEqual([])
   })
 })
