@@ -18,6 +18,7 @@ import CanvasEmptyState from './CanvasEmptyState'
 import HitlModal from './HitlModal'
 import FollowThroughModal from './FollowThroughModal'
 import BranchChip from './BranchChip'
+import AddDirButton from './AddDirButton'
 import ConfirmDialog from './ConfirmDialog'
 import ToastViewport from './ToastViewport'
 import PanelDivider from './PanelDivider'
@@ -211,6 +212,7 @@ export default function App() {
           <button className={`btn ctx-btn ${showContext ? 'active' : ''}`} title="Project context — files & folders for the team" onClick={() => setShowContext(true)}><Paperclip size={14} /> Context{((graph.context?.length ?? 0) + (graph.contextFolders?.length ?? 0)) > 0 && <span className="ctx-badge">{(graph.context?.length ?? 0) + (graph.contextFolders?.length ?? 0)}</span>}</button>
           <button className={`btn ${showEnv ? 'active' : ''}`} title="Environment variables (.env) — no AI" onClick={() => setShowEnv(true)}><KeyRound size={14} /> Env</button>
           <button className="btn" title="Open a shell at the project root" onClick={() => openShellTerminal()}><SquareTerminal size={14} /> Shell</button>
+          <AddDirButton />
           <button
             className={`btn ${showDock ? 'active' : ''}`}
             title={showDock ? 'Hide the bottom panel' : 'Show the bottom panel'}
