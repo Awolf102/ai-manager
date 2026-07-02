@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_PARALLEL, clampParallel, clampBulk, parallelCap, duplicateNames } from './team-scale'
+import { DEFAULT_PARALLEL, clampParallel, clampBulk, parallelCap, duplicateNames, teamSizeCaption } from './team-scale'
 
 describe('team-scale concurrency', () => {
   it('parallelCap is the default when largeTeamMode is off', () => {
@@ -17,6 +17,19 @@ describe('team-scale concurrency', () => {
     expect(clampBulk(500)).toBe(100)
     expect(clampBulk(-1)).toBe(1)
     expect(clampBulk(Number.NaN)).toBe(1)
+  })
+})
+
+describe('teamSizeCaption', () => {
+  it('summarizes counts and concurrency', () => {
+    const cap = teamSizeCaption(
+      [{ kind: 'orchestrator' }, { kind: 'director' }, { kind: 'manager' }, { kind: 'worker' }, { kind: 'worker' }],
+      6
+    )
+    expect(cap).toContain('5 agents')
+    expect(cap).toContain('1 director')
+    expect(cap).toContain('2 workers')
+    expect(cap).toContain('concurrency 6')
   })
 })
 
