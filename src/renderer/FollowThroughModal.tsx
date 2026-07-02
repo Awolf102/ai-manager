@@ -36,7 +36,7 @@ export default function FollowThroughModal() {
           {(pending.options ?? []).length > 0 && (
             <div className="field" style={{ marginTop: 8 }}>
               {pending.options!.map((opt, i) => (
-                <button key={i} className="btn" style={{ display: 'block', width: '100%', textAlign: 'left', marginBottom: 6 }} onClick={() => close(() => submit(opt))}>
+                <button key={opt} className="btn" style={{ display: 'block', width: '100%', textAlign: 'left', marginBottom: 6 }} onClick={() => close(() => submit(opt))}>
                   {opt}
                 </button>
               ))}

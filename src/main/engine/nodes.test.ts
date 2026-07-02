@@ -1969,6 +1969,96 @@ describe('resumeFollowUpAsk', () => {
   })
 })
 
+describe('follow-through ask (engine) — mixed-source same-wave', () => {
+  afterEach(() => {
+    h.settings.maxUserRequests = 0
+    h.settings.followThrough = 'off'
+    h.settings.maxFollowThrough = 0
+  })
+
+  it('same wave: w1 raises HITL ask, w2 raises follow-through followup — both queued, drains in two resumes, counters and records correct', async () => {
+    h.settings.maxUserRequests = 2
+    h.settings.followThrough = 'ask'
+    h.settings.maxFollowThrough = 2
+
+    const calls: { agentId: string; kind: string; sessionId?: string; prompt: string }[] = []
+    const asked = new Set<string>()
+    const base = cannedAgent()
+
+    const runAgent: AgentRunner = async (opts) => {
+      const p = opts.prompt
+      const id = opts.agentId
+      // Resume branch — fires for both HITL and follow-through resumes
+      if (p.includes('The user answered') || p.includes('did not provide an answer')) {
+        calls.push({ agentId: id, kind: 'resume', sessionId: opts.resumeSessionId, prompt: p })
+        return { text: `resumed ${id}`, sessionId: `s2-${id}` }
+      }
+      // Worker branch — w1 emits a HITL ask block, w2 emits a follow-through followup block
+      if (p.includes('You have been assigned')) {
+        if (!asked.has(id)) {
+          asked.add(id)
+          calls.push({ agentId: id, kind: 'ask', prompt: p })
+          if (id === 'w1') {
+            return { text: '```ask\n{"question":"Which DB to use?"}\n```', sessionId: `sess-${id}` }
+          }
+          if (id === 'w2') {
+            return { text: '```followup\n{"summary":"icon style unclear","question":"Which icon?","options":["outline","filled"]}\n```', sessionId: `sess-${id}` }
+          }
+        }
+        calls.push({ agentId: id, kind: 'work', prompt: p })
+        return { text: `worked ${id}`, sessionId: `s-${id}` }
+      }
+      // Delegate everything else to the canned agent (plan/route/review/reflect/synth)
+      return base.runAgent(opts)
+    }
+
+    const e = eng(runAgent)
+    const store = fakeStore()
+    const io = makeIO(e.abort.signal, store)
+
+    // ── First run: both workers fire their asks in the same wave → pause ──
+    const paused = await runGraph(
+      buildOrchestratorGraph(e),
+      seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' }),
+      store, io
+    )
+    expect(paused.status).toBe('interrupted')
+    // One pending interrupt presented to the user, one queued
+    expect(paused.pendingInterrupt).toBeTruthy()
+    expect(paused.askQueue?.length).toBeGreaterThanOrEqual(1)
+    // Mixed sources: the pending and queued items span both 'ask-user' and 'follow-through'
+    const allAsks = [paused.pendingAsk, ...(paused.askQueue ?? [])].filter(Boolean)
+    expect(allAsks.some((a) => a!.source === 'ask-user')).toBe(true)
+    expect(allAsks.some((a) => a!.source === 'follow-through')).toBe(true)
+
+    // ── First resume: answer the pending interrupt ──
+    const e2 = eng(runAgent)
+    const mid = await resumeGraph(buildOrchestratorGraph(e2), 'run1', store, makeIO(e2.abort.signal, store), 'sqlite')
+    expect(mid.status).toBe('interrupted') // second ask still queued
+
+    // ── Second resume: drain the remaining ask ──
+    const e3 = eng(runAgent)
+    const final = await resumeGraph(buildOrchestratorGraph(e3), 'run1', store, makeIO(e3.abort.signal, store), 'outline')
+    expect(final.status).toBe('completed')
+
+    // followUps should record w2's follow-through decision (summary + the answered choice)
+    const allFollowUps = [...e2.followUps, ...e3.followUps]
+    const w2Fu = allFollowUps.find((f) => f.workerId === 'w2')
+    expect(w2Fu).toBeTruthy()
+    expect(w2Fu!.summary).toBe('icon style unclear')
+    expect(w2Fu!.decision).toBeTruthy() // the chosen answer (non-empty)
+
+    // userRequests should record w1 (HITL) but NOT w2 (follow-through)
+    const userReqs = final.userRequests ?? []
+    expect(userReqs.some((r) => r.askerId === 'w1')).toBe(true)
+    expect(userReqs.some((r) => r.askerId === 'w2')).toBe(false)
+
+    // Both counters must have advanced
+    expect(final.userRequestCount).toBeGreaterThanOrEqual(1)
+    expect(final.followThroughCount).toBeGreaterThanOrEqual(1)
+  })
+})
+
 describe('follow-through ask (engine)', () => {
   afterEach(() => { h.settings.followThrough = 'off'; h.settings.maxFollowThrough = 0 })
 
