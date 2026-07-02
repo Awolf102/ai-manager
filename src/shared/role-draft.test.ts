@@ -43,6 +43,18 @@ describe('draftRolesPrompt (with offered skills)', () => {
   })
 })
 
+describe('director-aware draft', () => {
+  it('is byte-for-byte when largeTeam is off', () => {
+    const roster = [{ id: 'a', name: 'A', kind: 'worker' as const, role: 'r' }]
+    expect(draftRolesPrompt('g', roster, [])).toBe(draftRolesPrompt('g', roster, [], [], false))
+    expect(draftRolesPrompt('g', roster, [])).toContain('(<Worker|Manager>)')
+  })
+  it('offers Director when largeTeam is on', () => {
+    const roster = [{ id: 'a', name: 'A', kind: 'worker' as const, role: 'r' }]
+    expect(draftRolesPrompt('g', roster, [], [], true)).toContain('(<Worker|Manager|Director>)')
+  })
+})
+
 describe('parseDraftedRoles (with skill validation)', () => {
   it('reads optional per-role skills, validates + caps', () => {
     const text = '```json\n' + JSON.stringify({

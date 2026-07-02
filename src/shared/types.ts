@@ -13,7 +13,7 @@ export type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | '
 export interface SpawnedMember {
   id: string
   name: string
-  kind: 'manager' | 'worker' // widened to include 'director' when director spawning lands (Task 6)
+  kind: 'director' | 'manager' | 'worker'
   role: string
   reportsTo: string
   model?: string
