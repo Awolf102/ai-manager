@@ -39,7 +39,7 @@ export default function TerminalPane({ tab }: { tab: TerminalTab }) {
 
     const ro = new ResizeObserver(() => {
       doFit()
-      if (tab.mode === 'interactive' && ptyIdRef.current) {
+      if ((tab.mode === 'interactive' || tab.mode === 'shell') && ptyIdRef.current) {
         window.api.resizePty(ptyIdRef.current, term.cols, term.rows)
       }
     })
@@ -52,20 +52,24 @@ export default function TerminalPane({ tab }: { tab: TerminalTab }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Interactive: spawn the claude PTY and wire I/O.
+  // Interactive claude OR plain shell: spawn a live PTY and wire I/O.
   useEffect(() => {
-    if (tab.mode !== 'interactive') return
+    if (tab.mode !== 'interactive' && tab.mode !== 'shell') return
     const term = termRef.current!
     let unsubData: (() => void) | undefined
     let unsubExit: (() => void) | undefined
+    const label = tab.mode === 'shell' ? 'shell' : 'claude'
 
     const input = term.onData((d) => {
       if (ptyIdRef.current) window.api.writePty(ptyIdRef.current, d)
     })
 
     setBusy(true)
-    void window.api
-      .spawnPty({ agentId: tab.agentId, cols: term.cols, rows: term.rows, resume })
+    const spawn =
+      tab.mode === 'shell'
+        ? window.api.spawnShell({ cols: term.cols, rows: term.rows })
+        : window.api.spawnPty({ agentId: tab.agentId, cols: term.cols, rows: term.rows, resume })
+    void spawn
       .then(({ ptyId }) => {
         ptyIdRef.current = ptyId
         unsubData = window.api.onPtyData((e) => {
@@ -73,16 +77,14 @@ export default function TerminalPane({ tab }: { tab: TerminalTab }) {
         })
         unsubExit = window.api.onPtyExit((e) => {
           if (e.ptyId === ptyId) {
-            term.write(`\r\n\x1b[2m[claude exited (${e.exitCode})]\x1b[0m\r\n`)
+            term.write(`\r\n\x1b[2m[${label} exited (${e.exitCode})]\x1b[0m\r\n`)
             setBusy(false)
           }
         })
       })
       .catch((err) => {
-        // Surface spawn failures instead of swallowing them (e.g. claude not on
-        // PATH) — otherwise the pane just hangs "busy" with a blank terminal.
         const msg = err instanceof Error ? err.message : String(err)
-        term.write(`\r\n\x1b[31m[failed to start claude: ${msg}]\x1b[0m\r\n`)
+        term.write(`\r\n\x1b[31m[failed to start ${label}: ${msg}]\x1b[0m\r\n`)
         setBusy(false)
       })
 

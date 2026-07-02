@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CircleHelp, Clock, Folder, FolderOpen, KeyRound, PanelRight, Paperclip, Plus, Settings as SettingsIcon, Terminal, Users } from 'lucide-react'
+import { CircleHelp, Clock, Folder, FolderOpen, KeyRound, PanelRight, Paperclip, Plus, Settings as SettingsIcon, SquareTerminal, Terminal, Users } from 'lucide-react'
 import { useStore } from './store'
 import TeamMenu from './TeamMenu'
 import FaqModal from './FaqModal'
@@ -53,6 +53,7 @@ export default function App() {
   const toggleZoneCollapsed = useStore((s) => s.toggleZoneCollapsed)
   const setZonePlacement = useStore((s) => s.setZonePlacement)
   const focusGoal = useStore((s) => s.focusGoal)
+  const openShellTerminal = useStore((s) => s.openShellTerminal)
   const [showAdd, setShowAdd] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showContext, setShowContext] = useState(false)
@@ -207,6 +208,7 @@ export default function App() {
           <button className="btn" title="Run history" onClick={() => openHistory()}><Clock size={14} /> History{resumable.length > 0 && <span className="resume-badge">{resumable.length}</span>}</button>
           <button className={`btn ctx-btn ${showContext ? 'active' : ''}`} title="Project context — files & folders for the team" onClick={() => setShowContext(true)}><Paperclip size={14} /> Context{((graph.context?.length ?? 0) + (graph.contextFolders?.length ?? 0)) > 0 && <span className="ctx-badge">{(graph.context?.length ?? 0) + (graph.contextFolders?.length ?? 0)}</span>}</button>
           <button className={`btn ${showEnv ? 'active' : ''}`} title="Environment variables (.env) — no AI" onClick={() => setShowEnv(true)}><KeyRound size={14} /> Env</button>
+          <button className="btn" title="Open a shell at the project root" onClick={() => openShellTerminal()}><SquareTerminal size={14} /> Shell</button>
           <button
             className={`btn ${showDock ? 'active' : ''}`}
             title={showDock ? 'Hide the bottom panel' : 'Show the bottom panel'}
@@ -336,7 +338,7 @@ export default function App() {
                       onClick={() => setActiveDock(t.id)}
                       onKeyDown={(e) => onDockTabKeyDown(e, t.id)}
                     >
-                      <span className="dot" /> {t.agentName} · {t.mode === 'headless' ? 'run' : 'shell'}
+                      <span className="dot" /> {t.mode === 'shell' ? 'Shell' : `${t.agentName} · ${t.mode === 'headless' ? 'run' : 'shell'}`}
                     </button>
                     <button
                       className="term-tab-close"
