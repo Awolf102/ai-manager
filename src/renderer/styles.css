@@ -781,6 +781,16 @@ button {
   border-top: 1px solid var(--hairline);
 }
 
+/* ===== Backends modal ===== */
+.muted { color: var(--fg-muted); }
+.backends { display: flex; flex-direction: column; gap: var(--space-3); }
+.backend-row { border: 1px solid var(--hairline); border-radius: var(--radius-sm); padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; }
+.backend-head { display: flex; align-items: center; gap: var(--space-3); }
+.backend-head .spacer { flex: 1; }
+.backend-remove { display: flex; align-items: center; padding: 3px; background: none; border: none; color: var(--fg-muted); border-radius: var(--radius-sm); }
+.backend-remove:hover { color: var(--fg); background: var(--surface-hover); }
+.token-field { display: flex; align-items: center; gap: 6px; }
+
 .confirm-body {
   margin: 8px 0;
   font-size: 13px;
@@ -2153,3 +2163,5 @@ input[type='checkbox'] {
 @media (prefers-reduced-motion: reduce) {
   .canvas-empty-card { animation: none; }
 }
+.linklike { background: none; border: none; color: var(--accent, var(--fg-muted)); font-size: var(--text-xs); padding: 4px 0 0; cursor: pointer; text-align: left; }
+.linklike:hover { text-decoration: underline; }

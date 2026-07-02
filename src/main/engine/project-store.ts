@@ -6,6 +6,9 @@ import { randomUUID } from 'node:crypto'
 import type {
   AgentKind,
   AgentNodeData,
+  Backend,
+  BackendModel,
+  BackendView,
   ContextFile,
   ContextFolder,
   ContextScope,
@@ -25,6 +28,7 @@ import { slugify, uniqueSlug } from '../../shared/slug'
 import { isImageName, uniqueContextName, scopeAppliesTo } from '../../shared/context-files'
 import { parseLessonBullet } from '../../shared/lessons'
 import { buildTeamBundle, planTeamImport, validateTeamBundle, type TeamBundle } from '../../shared/team-bundle'
+import { hasBackendToken, deleteBackendToken } from './backend-secrets'
 import { atomicWriteWithBackup, atomicWrite } from './atomic-write'
 import { createMutex, createKeyedMutex } from './mutex'
 import { mergeBrainPush, planBrainPull, mergeLessons } from '../../shared/team-brain'
@@ -218,6 +222,7 @@ export async function openProject(projectPath: string): Promise<ProjectGraph> {
   graph.context = graph.context ?? []
   graph.contextFolders = graph.contextFolders ?? []
   graph.pairedDirs = graph.pairedDirs ?? []
+  graph.backends = graph.backends ?? []
   current = { path: projectPath, graph }
   // Re-persist (applies settings/context defaults). After a .bak recovery the corrupt
   // graph.json was already renamed to *.corrupt-<ts>, so atomicWriteWithBackup sees no
@@ -557,6 +562,63 @@ export async function removePairedDir(id: string): Promise<ProjectGraph> {
   const { graph } = requireCurrent()
   graph.pairedDirs = (graph.pairedDirs ?? []).filter((d) => d.id !== id)
   return saveGraph()
+}
+
+// ---------- model backends ----------
+
+/** The Anthropic-compatible backends configured for this project. */
+export function getBackends(): Backend[] {
+  return [...(requireCurrent().graph.backends ?? [])]
+}
+
+export async function addBackend(input: {
+  label: string
+  baseUrl: string
+  models: BackendModel[]
+  presetId?: string
+}): Promise<ProjectGraph> {
+  const { graph } = requireCurrent()
+  graph.backends = graph.backends ?? []
+  graph.backends.push({
+    id: randomUUID(),
+    label: input.label,
+    baseUrl: input.baseUrl,
+    models: input.models,
+    presetId: input.presetId,
+    addedAt: new Date().toISOString()
+  })
+  return saveGraph()
+}
+
+export async function updateBackend(
+  id: string,
+  patch: { label?: string; baseUrl?: string; models?: BackendModel[] }
+): Promise<ProjectGraph> {
+  const { graph } = requireCurrent()
+  const b = (graph.backends ?? []).find((x) => x.id === id)
+  if (b) {
+    if (patch.label !== undefined) b.label = patch.label
+    if (patch.baseUrl !== undefined) b.baseUrl = patch.baseUrl
+    if (patch.models !== undefined) b.models = patch.models
+  }
+  return saveGraph()
+}
+
+/** Remove a backend: drop it, unassign any agent using it, and delete its encrypted token. */
+export async function removeBackend(id: string): Promise<ProjectGraph> {
+  const { path, graph } = requireCurrent()
+  graph.backends = (graph.backends ?? []).filter((x) => x.id !== id)
+  for (const n of graph.nodes) if (n.backendId === id) n.backendId = undefined
+  // best-effort: a failed token delete leaves only a harmless orphaned entry — never block/desync the removal
+  await deleteBackendToken(path, id).catch(() => {})
+  return saveGraph()
+}
+
+/** Backends augmented with whether a token is configured (never the token itself). */
+export async function backendsView(): Promise<BackendView[]> {
+  const { path, graph } = requireCurrent()
+  const list = graph.backends ?? []
+  return Promise.all(list.map(async (b) => ({ ...b, hasToken: await hasBackendToken(path, b.id) })))
 }
 
 /** Drag-drop router: stat each path and copy files / reference directories. */

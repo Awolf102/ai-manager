@@ -7,9 +7,15 @@ import { pairedDirCliArgs } from '../../shared/paired-dirs'
 import { buildAgentContext, getCurrentProjectPath, getSettings } from './project-store'
 import { resolveClaudeBin } from './env'
 import { launchMode } from './acting-mode'
+import { resolveBackendEnv, type BackendResolution } from './backend-resolve'
 
 type Session = { proc: pty.IPty }
 const sessions = new Map<string, Session>()
+
+/** Merge a resolved backend's env over a base env (for the interactive claude PTY). none/error ⇒ base. */
+export function mergeBackendEnv(base: Record<string, string>, result: BackendResolution): Record<string, string> {
+  return result.kind === 'env' ? { ...base, ...result.env } : base
+}
 
 /** Assemble the interactive `claude` CLI args. Pure + exported for tests. Writable paired dirs
  *  become `--add-dir` grants; empty ⇒ the baseline args (byte-for-byte). */
@@ -60,7 +66,7 @@ export async function spawnPty(
     cols: Math.max(2, input.cols || 80),
     rows: Math.max(2, input.rows || 24),
     cwd: projectPath,
-    env: cleanEnv()
+    env: mergeBackendEnv(cleanEnv(), await resolveBackendEnv(agent))
   })
 
   sessions.set(ptyId, { proc })

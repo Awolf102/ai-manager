@@ -3,6 +3,7 @@ import { Trash2 } from 'lucide-react'
 import { useStore } from '../store'
 import { AGENT_KINDS, MODELS } from '../../shared/types'
 import type { AgentKind, AgentNodeData, DiscoveredPlugin } from '../../shared/types'
+import BackendsModal from '../BackendsModal'
 
 export default function AgentConfigPanel() {
   const graph = useStore((s) => s.graph)
@@ -12,12 +13,19 @@ export default function AgentConfigPanel() {
   const requestConfirm = useStore((s) => s.requestConfirm)
 
   const [catalog, setCatalog] = useState<DiscoveredPlugin[] | null>(null)
+  const [showBackends, setShowBackends] = useState(false)
   useEffect(() => {
     void window.api.listSkills().then(setCatalog)
   }, [])
 
   const agent = graph?.nodes.find((n) => n.id === selectedId)
   if (!agent) return null
+
+  const backends = graph?.backends ?? []
+  const selectedBackend = backends.find((b) => b.id === agent.backendId)
+  const modelOptions = selectedBackend ? selectedBackend.models : MODELS
+  const validModel = (opts: readonly { id: string }[], cur: string): string =>
+    opts.some((o) => o.id === cur) ? cur : (opts[0]?.id ?? cur)
 
   const update = async (patch: Partial<AgentNodeData>): Promise<void> => {
     setGraph(await window.api.updateAgent({ id: agent.id, ...patch }))
@@ -32,6 +40,12 @@ export default function AgentConfigPanel() {
     if (!ok) return
     setGraph(await window.api.deleteAgent(agent.id))
     select(null)
+  }
+
+  const onBackendChange = (id: string): void => {
+    const b = backends.find((x) => x.id === id)
+    const opts = b ? b.models : MODELS
+    void update({ backendId: id || undefined, model: validModel(opts, agent.model) })
   }
 
   const assigned = new Set(agent.skills ?? [])
@@ -60,13 +74,17 @@ export default function AgentConfigPanel() {
         </select>
       </div>
       <div className="field">
+        <label>Backend</label>
+        <select value={agent.backendId ?? ''} onChange={(e) => onBackendChange(e.target.value)}>
+          <option value="">Claude (default)</option>
+          {backends.map((b) => (<option key={b.id} value={b.id}>{b.label}</option>))}
+        </select>
+        <button className="linklike" onClick={() => setShowBackends(true)}>Manage backends…</button>
+      </div>
+      <div className="field">
         <label>Model</label>
         <select value={agent.model} onChange={(e) => update({ model: e.target.value })}>
-          {MODELS.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.label}
-            </option>
-          ))}
+          {modelOptions.map((m) => (<option key={m.id} value={m.id}>{m.label}</option>))}
         </select>
       </div>
       <div className="field">
@@ -109,6 +127,7 @@ export default function AgentConfigPanel() {
       <button className="btn danger" onClick={remove}>
         <Trash2 size={13} /> Delete agent
       </button>
+      {showBackends && <BackendsModal onClose={() => setShowBackends(false)} />}
     </div>
   )
 }
