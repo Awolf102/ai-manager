@@ -41,6 +41,7 @@ const h = vi.hoisted(() => {
   return {
     agents: {
       o: mk('o', 'orchestrator'),
+      d: mk('d', 'director'),
       m: mk('m', 'manager'),
       w1: mk('w1', 'worker'),
       w2: mk('w2', 'worker')
@@ -622,6 +623,22 @@ describe('hasManagers / reviewerIdsOf', () => {
 
   it('two-tier: the manager parent + the orchestrator are reviewers', () => {
     h.children = { o: ['m'], m: ['w1', 'w2'], w1: [], w2: [] }
+    const s = stateWith({ t1: { ownerId: 'w1' }, t2: { ownerId: 'w2' } })
+    expect(hasManagers(s)).toBe(true)
+    expect(reviewerIdsOf(s).sort()).toEqual(['m', 'o'])
+    h.children = { o: ['w1', 'w2'], w1: [], w2: [] }
+  })
+
+  it('director tier: a worker under a director → director + orchestrator review', () => {
+    h.children = { o: ['d'], d: ['w1', 'w2'], w1: [], w2: [] }
+    const s = stateWith({ t1: { ownerId: 'w1' }, t2: { ownerId: 'w2' } })
+    expect(hasManagers(s)).toBe(true)
+    expect(reviewerIdsOf(s).sort()).toEqual(['d', 'o'])
+    h.children = { o: ['w1', 'w2'], w1: [], w2: [] }
+  })
+
+  it('three tiers: workers under a manager under a director → manager + orchestrator', () => {
+    h.children = { o: ['d'], d: ['m'], m: ['w1', 'w2'], w1: [], w2: [] }
     const s = stateWith({ t1: { ownerId: 'w1' }, t2: { ownerId: 'w2' } })
     expect(hasManagers(s)).toBe(true)
     expect(reviewerIdsOf(s).sort()).toEqual(['m', 'o'])
