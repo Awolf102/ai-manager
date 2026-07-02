@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { writePty, buildClaudeArgs } from './pty-manager'
+import { writePty, buildClaudeArgs, mergeBackendEnv } from './pty-manager'
 import type { PairedDir } from '../../shared/types'
 
 describe('writePty', () => {
@@ -9,6 +9,18 @@ describe('writePty', () => {
 })
 
 const pd = (path: string, writable: boolean): PairedDir => ({ id: path, path, writable, addedAt: '' })
+
+describe('mergeBackendEnv', () => {
+  it('merges backend env over the base for an env result', () => {
+    const out = mergeBackendEnv({ PATH: '/bin', ANTHROPIC_BASE_URL: 'old' }, { kind: 'env', label: 'z', env: { ANTHROPIC_BASE_URL: 'new', ANTHROPIC_AUTH_TOKEN: 't' } })
+    expect(out).toEqual({ PATH: '/bin', ANTHROPIC_BASE_URL: 'new', ANTHROPIC_AUTH_TOKEN: 't' })
+  })
+  it('leaves the base unchanged for none/error', () => {
+    const base = { PATH: '/bin' }
+    expect(mergeBackendEnv(base, { kind: 'none' })).toEqual(base)
+    expect(mergeBackendEnv(base, { kind: 'error', message: 'x' })).toEqual(base)
+  })
+})
 
 describe('buildClaudeArgs', () => {
   const base = { append: 'APP', model: 'claude-sonnet-4-6', mode: 'acceptEdits' }
