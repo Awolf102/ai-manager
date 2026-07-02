@@ -7,6 +7,7 @@ import type { BackendView } from '../shared/types'
 
 export default function BackendsModal({ onClose }: { onClose: () => void }) {
   const setGraph = useStore((s) => s.setGraph)
+  const notify = useStore((s) => s.notify)
   const [list, setList] = useState<BackendView[]>([])
   const [encOk, setEncOk] = useState(true)
 
@@ -39,13 +40,17 @@ export default function BackendsModal({ onClose }: { onClose: () => void }) {
 
   const save = async (): Promise<void> => {
     const models = parseModelIds(modelsText)
-    if (editingId) {
-      setGraph(await window.api.updateBackend(editingId, { label, baseUrl, models }))
-    } else {
-      setGraph(await window.api.addBackend({ label, baseUrl, models, presetId }))
+    try {
+      if (editingId) {
+        setGraph(await window.api.updateBackend(editingId, { label, baseUrl, models }))
+      } else {
+        setGraph(await window.api.addBackend({ label, baseUrl, models, presetId }))
+      }
+      resetForm()
+      await refresh()
+    } catch (err) {
+      notify({ kind: 'error', message: err instanceof Error ? err.message : 'Could not save the backend.' })
     }
-    resetForm()
-    await refresh()
   }
 
   const startEdit = (b: BackendView): void => {
@@ -54,9 +59,13 @@ export default function BackendsModal({ onClose }: { onClose: () => void }) {
   }
 
   const remove = async (id: string): Promise<void> => {
-    setGraph(await window.api.removeBackend(id))
-    if (editingId === id) resetForm()
-    await refresh()
+    try {
+      setGraph(await window.api.removeBackend(id))
+      if (editingId === id) resetForm()
+      await refresh()
+    } catch (err) {
+      notify({ kind: 'error', message: err instanceof Error ? err.message : 'Could not remove the backend.' })
+    }
   }
 
   return (
