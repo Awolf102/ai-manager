@@ -39,6 +39,8 @@
   --orchestrator-tint: rgba(230, 178, 60, 0.14);
   --manager-tint: rgba(143, 166, 230, 0.14);
   --worker-tint: rgba(184, 194, 206, 0.14);
+  --director: #CB98DB;       /* orchid — program-lead tier, ≥7:1 on --surface-2, ≠ emerald */
+  --director-tint: rgba(203, 152, 219, 0.14);
 
   /* ===== Semantic states ===== */
   --state-danger: #F06A6A;
