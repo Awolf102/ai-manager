@@ -1,14 +1,34 @@
 import { randomUUID } from 'node:crypto'
 import type { WebContents } from 'electron'
 import * as pty from 'node-pty'
-import type { SpawnPtyInput } from '../../shared/types'
+import type { SpawnPtyInput, PairedDir } from '../../shared/types'
 import { IPC } from '../../shared/types'
+import { pairedDirCliArgs } from '../../shared/paired-dirs'
 import { buildAgentContext, getCurrentProjectPath, getSettings } from './project-store'
 import { resolveClaudeBin } from './env'
 import { launchMode } from './acting-mode'
 
 type Session = { proc: pty.IPty }
 const sessions = new Map<string, Session>()
+
+/** Assemble the interactive `claude` CLI args. Pure + exported for tests. Writable paired dirs
+ *  become `--add-dir` grants; empty ⇒ the baseline args (byte-for-byte). */
+export function buildClaudeArgs(input: {
+  append: string
+  model: string
+  mode: string
+  resumeSessionId?: string
+  pairedDirs?: PairedDir[]
+}): string[] {
+  const args = [
+    '--append-system-prompt', input.append,
+    '--model', input.model,
+    '--permission-mode', input.mode,
+    ...pairedDirCliArgs(input.pairedDirs)
+  ]
+  if (input.resumeSessionId) args.push('--resume', input.resumeSessionId)
+  return args
+}
 
 function cleanEnv(): Record<string, string> {
   const env = Object.fromEntries(
@@ -22,20 +42,18 @@ export async function spawnPty(
   wc: WebContents,
   input: SpawnPtyInput
 ): Promise<{ ptyId: string }> {
-  const { agent, projectPath, role, memory } = await buildAgentContext(input.agentId)
+  const { agent, projectPath, role, memory, pairedDirs } = await buildAgentContext(input.agentId)
   const ptyId = randomUUID()
 
   const settings = getSettings()
   const append = [role.trim(), '', '## Your memory', memory.trim() || '(empty)'].join('\n')
-  const args = [
-    '--append-system-prompt',
+  const args = buildClaudeArgs({
     append,
-    '--model',
-    agent.model,
-    '--permission-mode',
-    launchMode(settings.autonomy, settings.lockBypassPermissions)
-  ]
-  if (input.resume && agent.sessionId) args.push('--resume', agent.sessionId)
+    model: agent.model,
+    mode: launchMode(settings.autonomy, settings.lockBypassPermissions),
+    resumeSessionId: input.resume && agent.sessionId ? agent.sessionId : undefined,
+    pairedDirs
+  })
 
   const proc = pty.spawn(resolveClaudeBin(), args, {
     name: 'xterm-256color',

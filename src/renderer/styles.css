@@ -1729,6 +1729,16 @@ button {
 .topmenu-list { position: absolute; top: 100%; right: 0; margin-top: 4px; background: var(--glass-bg); backdrop-filter: blur(var(--glass-blur)); -webkit-backdrop-filter: blur(var(--glass-blur)); border: 1px solid var(--hairline-strong); border-radius: var(--radius); box-shadow: var(--glass-highlight), var(--elev-3); padding: 4px; display: flex; flex-direction: column; min-width: 200px; z-index: 60; }
 .topmenu-list button { display: flex; align-items: center; gap: var(--space-3); padding: 7px 10px; background: none; border: none; color: var(--fg); font-size: var(--text-sm); border-radius: var(--radius-sm); text-align: left; }
 .topmenu-list button:hover { background: var(--surface-hover); }
+.paired-dirs { min-width: 340px; max-width: 520px; gap: 2px; }
+.paired-empty { padding: 8px 10px; color: var(--fg-muted); font-size: var(--text-sm); }
+.paired-row { display: flex; align-items: center; gap: var(--space-3); padding: 5px 8px; border-radius: var(--radius-sm); }
+.paired-row:hover { background: var(--surface-hover); }
+.paired-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; font-size: var(--text-sm); color: var(--fg); }
+.paired-writable { display: flex; align-items: center; gap: 4px; font-size: var(--text-xs); color: var(--fg-muted); white-space: nowrap; }
+.paired-remove { display: flex; align-items: center; padding: 3px; background: none; border: none; color: var(--fg-muted); border-radius: var(--radius-sm); }
+.paired-remove:hover { color: var(--fg); background: var(--surface-hover); }
+.paired-warn { padding: 6px 10px; font-size: var(--text-xs); color: var(--warn, var(--fg-muted)); }
+.paired-add { margin-top: 2px; }
 /* ---- Team ▾ dropdown: origin-aware enter (the one earned animation) ---- */
 .topmenu-list {
   transform-origin: top right;

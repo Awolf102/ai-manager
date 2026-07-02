@@ -188,6 +188,16 @@ export interface ContextFolder {
   scope?: ContextScope // absent = all agents
 }
 
+/** A second working directory paired with the project. Read-only by default (referenced in the
+ *  prompt, read on demand — no access grant); when `writable`, the SDK (additionalDirectories) and
+ *  the interactive terminal (--add-dir) are granted create/edit access. Absent/empty = byte-for-byte. */
+export interface PairedDir {
+  id: string // randomUUID — React key + update/remove handle
+  path: string // absolute, resolved path on disk
+  writable: boolean // false = read-only reference; true = SDK/terminal access grant
+  addedAt: string // ISO timestamp
+}
+
 export interface ProjectGraph {
   project: ProjectMeta
   nodes: AgentNodeData[]
@@ -199,6 +209,8 @@ export interface ProjectGraph {
   context?: ContextFile[]
   /** folders the agents read on demand with their file tools (nothing copied) */
   contextFolders?: ContextFolder[]
+  /** second working directories paired with the project (writable = additionalDirectories / --add-dir) */
+  pairedDirs?: PairedDir[]
 }
 
 // ---- IPC payloads ----
@@ -573,6 +585,9 @@ export const IPC = {
   addContextFolder: 'folders:add',
   updateContextFolder: 'folders:update',
   removeContextFolder: 'folders:remove',
+  addPairedDir: 'pairedDir:add',
+  setPairedDirWritable: 'pairedDir:setWritable',
+  removePairedDir: 'pairedDir:remove',
   listSkills: 'skills:list',
   listResumable: 'run:list-resumable',
   discardRun: 'run:discard',
@@ -653,6 +668,9 @@ export interface RendererApi {
   addContextFolder: (paths?: string[]) => Promise<{ graph: ProjectGraph; skipped: string[] }>
   updateContextFolder: (id: string, note: string) => Promise<ProjectGraph>
   removeContextFolder: (id: string) => Promise<ProjectGraph>
+  addPairedDir: (paths?: string[]) => Promise<{ graph: ProjectGraph; skipped: string[] }>
+  setPairedDirWritable: (id: string, writable: boolean) => Promise<ProjectGraph>
+  removePairedDir: (id: string) => Promise<ProjectGraph>
   getPathForFile: (file: File) => string
   listSkills: () => Promise<DiscoveredPlugin[]>
   onServerLog: (cb: (e: ServerLogEvent) => void) => () => void

@@ -11,6 +11,7 @@ import type {
   ContextScope,
   CreateAgentInput,
   GraphEdge,
+  PairedDir,
   ProjectGraph,
   ProjectMeta,
   ProjectSettings,
@@ -216,6 +217,7 @@ export async function openProject(projectPath: string): Promise<ProjectGraph> {
   graph.settings = { ...DEFAULT_SETTINGS, ...(graph.settings ?? {}) }
   graph.context = graph.context ?? []
   graph.contextFolders = graph.contextFolders ?? []
+  graph.pairedDirs = graph.pairedDirs ?? []
   current = { path: projectPath, graph }
   // Re-persist (applies settings/context defaults). After a .bak recovery the corrupt
   // graph.json was already renamed to *.corrupt-<ts>, so atomicWriteWithBackup sees no
@@ -355,12 +357,13 @@ export async function buildAgentContext(agentId: string): Promise<{
   memory: string
   context: ContextFile[]
   folders: ContextFolder[]
+  pairedDirs: PairedDir[]
 }> {
   const agent = getAgent(agentId)
   const [role, memory] = await Promise.all([readRole(agentId), readMemory(agentId)])
   const context = getContextFiles().filter((f) => scopeAppliesTo(f.scope, agent))
   const folders = getContextFolders().filter((f) => scopeAppliesTo(f.scope, agent))
-  return { agent, projectPath: getCurrentProjectPath(), role, memory, context, folders }
+  return { agent, projectPath: getCurrentProjectPath(), role, memory, context, folders, pairedDirs: getPairedDirs() }
 }
 
 // ---------- context files ----------
@@ -509,6 +512,51 @@ export async function setContextScope(id: string, scope: ContextScope): Promise<
     return saveGraph()
   }
   return graph // id not found: nothing changed, don't write
+}
+
+// ---------- paired directories (second working dirs) ----------
+
+/** The second working directories paired with this project. */
+export function getPairedDirs(): PairedDir[] {
+  return [...(requireCurrent().graph.pairedDirs ?? [])]
+}
+
+/** Record each source directory as an absolute, read-only paired dir. Non-dirs / symlinks / dupes / the project root are skipped. */
+export async function addPairedDirs(
+  sourcePaths: string[]
+): Promise<{ graph: ProjectGraph; skipped: string[] }> {
+  const { path, graph } = requireCurrent()
+  graph.pairedDirs = graph.pairedDirs ?? []
+  const skipped: string[] = []
+  for (const src of sourcePaths) {
+    try {
+      const abs = resolve(src)
+      const stat = await fs.lstat(abs)
+      if (stat.isSymbolicLink()) { skipped.push(`${basename(abs)} (symlink)`); continue }
+      if (!stat.isDirectory()) { skipped.push(`${basename(abs)} (not a folder)`); continue }
+      if (abs === resolve(path)) { skipped.push(`${basename(abs)} (project root)`); continue }
+      if (graph.pairedDirs.some((d) => d.path === abs)) { skipped.push(`${basename(abs)} (already added)`); continue }
+      graph.pairedDirs.push({ id: randomUUID(), path: abs, writable: false, addedAt: new Date().toISOString() })
+    } catch {
+      skipped.push(`${basename(src)} (unreadable)`)
+    }
+  }
+  return { graph: await saveGraph(), skipped }
+}
+
+/** Toggle a paired dir's writable flag. */
+export async function setPairedDirWritable(id: string, writable: boolean): Promise<ProjectGraph> {
+  const { graph } = requireCurrent()
+  const entry = (graph.pairedDirs ?? []).find((d) => d.id === id)
+  if (entry) entry.writable = writable
+  return saveGraph()
+}
+
+/** Remove a paired dir (nothing on disk to delete). */
+export async function removePairedDir(id: string): Promise<ProjectGraph> {
+  const { graph } = requireCurrent()
+  graph.pairedDirs = (graph.pairedDirs ?? []).filter((d) => d.id !== id)
+  return saveGraph()
 }
 
 /** Drag-drop router: stat each path and copy files / reference directories. */
