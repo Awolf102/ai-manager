@@ -4,6 +4,7 @@ import { promises as fs } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { IPC } from '../shared/types'
 import type {
+  AdvisorSendInput,
   AgentNodeData,
   BackendModel,
   ContextScope,
@@ -16,6 +17,7 @@ import type {
   StartRunInput,
   SpawnedMember
 } from '../shared/types'
+import { streamAdvisor, cancelAdvisor } from './engine/advisor'
 import * as store from './engine/project-store'
 import { validateTeamBundle, previewOf } from '../shared/team-bundle'
 import * as runner from './engine/agent-runner'
@@ -351,5 +353,13 @@ export function registerIpc(): void {
       mode: s.trustAnthropicOnly ? 'anthropic-only' : 'anthropic-marketplaces',
       blockHooks: s.blockPluginHooks
     })
+  })
+
+  // ---- advisor ----
+  ipcMain.handle(IPC.advisorSend, (e, input: AdvisorSendInput) => streamAdvisor(e.sender, input))
+  ipcMain.on(IPC.advisorCancel, (_e, turnId: string) => cancelAdvisor(turnId))
+  ipcMain.handle(IPC.advisorPickFolder, async () => {
+    const r = await dialog.showOpenDialog({ title: 'Focus a folder for the Advisor', properties: ['openDirectory'] })
+    return r.canceled || r.filePaths.length === 0 ? null : r.filePaths[0]
   })
 }

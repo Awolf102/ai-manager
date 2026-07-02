@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { IPC } from '../shared/types'
 import type {
+  AdvisorStreamEvent,
   AgentStreamEvent,
   EnvEntry,
   OrchestrationEvent,
@@ -87,6 +88,10 @@ const api: RendererApi = {
   discardRun: (runId) => ipcRenderer.invoke(IPC.discardRun, runId),
   gitInfo: () => ipcRenderer.invoke(IPC.gitInfo),
   gitCheckout: (branch: string) => ipcRenderer.invoke(IPC.gitCheckout, branch),
+  sendAdvisor: (input) => ipcRenderer.invoke(IPC.advisorSend, input),
+  onAdvisorStream: (cb) => sub<AdvisorStreamEvent>(IPC.advisorStream, cb),
+  cancelAdvisor: (turnId) => ipcRenderer.send(IPC.advisorCancel, turnId),
+  pickAdvisorFolder: () => ipcRenderer.invoke(IPC.advisorPickFolder),
   onServerLog: (cb) => sub<ServerLogEvent>(IPC.serverLog, cb),
   onServerStatus: (cb) => sub<ServerStatusEvent>(IPC.serverStatus, cb),
   onServerReady: (cb) => sub<ServerReadyEvent>(IPC.serverReady, cb)

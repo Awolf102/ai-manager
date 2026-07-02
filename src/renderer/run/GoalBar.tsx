@@ -27,11 +27,19 @@ export default function GoalBar() {
   const inspectorCollapsed = useStore((s) => s.layout.inspector.collapsed)
   const toggleZoneCollapsed = useStore((s) => s.toggleZoneCollapsed)
   const goalFocusTick = useStore((s) => s.goalFocusTick)
+  const pendingGoal = useStore((s) => s.pendingGoal)
+  const clearPendingGoal = useStore((s) => s.clearPendingGoal)
   const taRef = useRef<HTMLTextAreaElement>(null)
   useEffect(() => {
     if (goalFocusTick > 0) taRef.current?.focus()
   }, [goalFocusTick])
   const [goal, setGoal] = useState('')
+  useEffect(() => {
+    if (pendingGoal != null) {
+      setGoal(pendingGoal)
+      clearPendingGoal()
+    }
+  }, [pendingGoal, clearPendingGoal])
   const [focused, setFocused] = useState(false)
   const [drafting, setDrafting] = useState(false)
   const [drafts, setDrafts] = useState<{ agentId: string; name: string; role: string; skills?: string[] }[] | null>(null)

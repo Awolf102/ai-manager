@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CircleHelp, Clock, Folder, FolderOpen, KeyRound, PanelRight, Paperclip, Plus, Settings as SettingsIcon, SquareTerminal, Terminal, Users } from 'lucide-react'
+import { Bot, CircleHelp, Clock, Folder, FolderOpen, KeyRound, PanelRight, Paperclip, Plus, Settings as SettingsIcon, SquareTerminal, Terminal, Users } from 'lucide-react'
 import { useStore } from './store'
 import TeamMenu from './TeamMenu'
 import FaqModal from './FaqModal'
@@ -19,6 +19,7 @@ import HitlModal from './HitlModal'
 import FollowThroughModal from './FollowThroughModal'
 import BranchChip from './BranchChip'
 import AddDirButton from './AddDirButton'
+import AdvisorModal from './AdvisorModal'
 import ConfirmDialog from './ConfirmDialog'
 import ToastViewport from './ToastViewport'
 import PanelDivider from './PanelDivider'
@@ -56,6 +57,7 @@ export default function App() {
   const setZonePlacement = useStore((s) => s.setZonePlacement)
   const focusGoal = useStore((s) => s.focusGoal)
   const openShellTerminal = useStore((s) => s.openShellTerminal)
+  const setAdvisorOpen = useStore((s) => s.setAdvisorOpen)
   const [showAdd, setShowAdd] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showContext, setShowContext] = useState(false)
@@ -212,6 +214,7 @@ export default function App() {
           <button className={`btn ctx-btn ${showContext ? 'active' : ''}`} title="Project context — files & folders for the team" onClick={() => setShowContext(true)}><Paperclip size={14} /> Context{((graph.context?.length ?? 0) + (graph.contextFolders?.length ?? 0)) > 0 && <span className="ctx-badge">{(graph.context?.length ?? 0) + (graph.contextFolders?.length ?? 0)}</span>}</button>
           <button className={`btn ${showEnv ? 'active' : ''}`} title="Environment variables (.env) — no AI" onClick={() => setShowEnv(true)}><KeyRound size={14} /> Env</button>
           <button className="btn" title="Open a shell at the project root" onClick={() => openShellTerminal()}><SquareTerminal size={14} /> Shell</button>
+          <button className="btn" title="Advisor — plan, pick a model/service, write prompts" onClick={() => setAdvisorOpen(true)}><Bot size={14} /> Advisor</button>
           <AddDirButton />
           <button
             className={`btn ${showDock ? 'active' : ''}`}
@@ -393,6 +396,7 @@ export default function App() {
       <HitlModal />
       <FollowThroughModal />
       <ConfirmDialog />
+      <AdvisorModal />
       <ToastViewport />
       {authBanner}
     </div>

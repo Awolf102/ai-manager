@@ -264,6 +264,21 @@ export interface SpawnPtyInput {
   resume?: boolean
 }
 
+/** A streamed chunk of an Advisor turn (chat-shaped plain text, NOT ANSI like AgentStreamEvent). */
+export interface AdvisorStreamEvent {
+  turnId: string
+  kind: 'delta' | 'done' | 'error'
+  text?: string
+  sessionId?: string
+}
+
+export interface AdvisorSendInput {
+  message: string
+  sessionId?: string
+  focusPath?: string
+  model?: string
+}
+
 /** A normalized stream chunk emitted from a headless agent run. */
 export interface AgentStreamEvent {
   agentId: string
@@ -624,7 +639,11 @@ export const IPC = {
   listResumable: 'run:list-resumable',
   discardRun: 'run:discard',
   gitInfo: 'git:info',
-  gitCheckout: 'git:checkout'
+  gitCheckout: 'git:checkout',
+  advisorSend: 'advisor:send',
+  advisorCancel: 'advisor:cancel',
+  advisorStream: 'advisor:stream',
+  advisorPickFolder: 'advisor:pickFolder',
 } as const
 
 /** The typed API the preload bridge exposes on window.api. */
@@ -716,4 +735,8 @@ export interface RendererApi {
   onServerReady: (cb: (e: ServerReadyEvent) => void) => () => void
   gitInfo: () => Promise<{ isRepo: boolean; branch: string; dirty: boolean; branches: string[] }>
   gitCheckout: (branch: string) => Promise<{ ok: boolean; error?: string }>
+  sendAdvisor: (input: AdvisorSendInput) => Promise<{ turnId: string }>
+  onAdvisorStream: (cb: (e: AdvisorStreamEvent) => void) => () => void
+  cancelAdvisor: (turnId: string) => void
+  pickAdvisorFolder: () => Promise<string | null>
 }
