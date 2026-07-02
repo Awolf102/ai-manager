@@ -23,7 +23,7 @@ interface PairedDir {
   id: string
   path: string        // absolute, resolved
   writable: boolean   // default false (read-only)
-  addedAt: number
+  addedAt: string   // ISO timestamp (matches ContextFolder.addedAt)
 }
 // on ProjectGraph:
 pairedDirs?: PairedDir[]
