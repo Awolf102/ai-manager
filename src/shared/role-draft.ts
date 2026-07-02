@@ -1,6 +1,7 @@
 // Pure prompt-building + output-parsing for orchestrator-drafted agent roles.
 // No node/DOM imports — unit-tested in plain Node, used by the engine.
 import type { AgentKind } from './types'
+import { visionBias } from './team-vision'
 
 export interface DraftRosterAgent {
   id: string
@@ -14,7 +15,8 @@ export function draftRolesPrompt(
   roster: DraftRosterAgent[],
   edges: { source: string; target: string }[],
   offered: { id: string; description: string }[] = [],
-  largeTeam = false
+  largeTeam = false,
+  vision = false
 ): string {
   const nameById = new Map(roster.map((a) => [a.id, a.name]))
   const agents = roster
@@ -32,6 +34,7 @@ export function draftRolesPrompt(
         .join('\n')}`
     : ''
   const roleKinds = largeTeam ? 'Worker|Manager|Director' : 'Worker|Manager'
+  const visionNote = vision ? visionBias() : ''
   return `You are the lead orchestrator. Draft a tailored role for each specialist on your team so they are well-suited to this goal. Each role becomes that agent's role.md and is reused across future goals, so write a DURABLE specialty (informed by the goal, not narrowly tied to it).
 
 GOAL:
@@ -41,7 +44,7 @@ YOUR TEAM (write one role per agent; make their specialties DISTINCT and COMPLEM
 ${agents}
 
 REPORTING STRUCTURE (source delegates work down to target):
-${topology}${skillsBlock}
+${topology}${skillsBlock}${visionNote}
 
 For each agent, write a COMPLETE role.md in this shape:
 # Role: <name> (<${roleKinds}>)

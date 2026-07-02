@@ -851,7 +851,7 @@ async function planStep(
   const parsed = await runStructured(
     eng,
     orchestratorId,
-    planPrompt(goal, getSettings().largeTeamMode),
+    planPrompt(goal, getSettings().largeTeamMode, getSettings().visionMode),
     (v): v is { tasks: unknown[] } => Array.isArray((v as { tasks?: unknown })?.tasks),
     { permissionMode: 'default', disallowedTools: THINK_DISALLOW }
   )
@@ -1469,14 +1469,17 @@ export function formatFollowUps(state: RunState): string {
 const STRICT_REMINDER =
   '\n\nIMPORTANT: Your previous reply could not be parsed. Reply with ONLY the JSON code block described above — no prose before or after.'
 
-export function planPrompt(goal: string, largeTeam = false): string {
+export function planPrompt(goal: string, largeTeam = false, vision = false): string {
   const scale = largeTeam
     ? `\n\nThis is a LARGE team. Plan at a BROAD, PROGRAM level: produce a small number (~3–8) of high-level workstreams, each of which a director or manager can own and break down further with their own team. Prefer few broad tasks over many fine-grained ones.`
+    : ''
+  const visionScale = vision
+    ? `\n\nThis is a CREATIVE / DESIGN project — plan design deliverables (brand direction, UX flows, wireframes, visual comps, copy, and content structure), not code modules.`
     : ''
   return `You are planning work to achieve the user's goal for this project. You may READ files to inform the plan, but do NOT make any changes.
 
 GOAL:
-${goal}${scale}
+${goal}${scale}${visionScale}
 
 Produce a concise, ordered list of concrete tasks that together fully achieve the goal. Each task should be self-contained and suitable to hand to a single specialist. Prefer the smallest set of tasks that covers the goal.
 

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { draftRolesPrompt, parseDraftedRoles, type DraftRosterAgent } from './role-draft'
+import { visionBias } from './team-vision'
 
 const roster: DraftRosterAgent[] = [
   { id: 'w1', name: 'Dana', kind: 'worker', role: 'general' },
@@ -52,6 +53,18 @@ describe('director-aware draft', () => {
   it('offers Director when largeTeam is on', () => {
     const roster = [{ id: 'a', name: 'A', kind: 'worker' as const, role: 'r' }]
     expect(draftRolesPrompt('g', roster, [], [], true)).toContain('(<Worker|Manager|Director>)')
+  })
+})
+
+describe('vision-aware draft', () => {
+  it('is byte-for-byte when vision off', () => {
+    const roster = [{ id: 'a', name: 'A', kind: 'worker' as const, role: 'r' }]
+    expect(draftRolesPrompt('g', roster, [])).toBe(draftRolesPrompt('g', roster, [], [], false, false))
+    expect(draftRolesPrompt('g', roster, [])).not.toMatch(/CREATIVE \/ DESIGN/)
+  })
+  it('injects the vision bias when on', () => {
+    const roster = [{ id: 'a', name: 'A', kind: 'worker' as const, role: 'r' }]
+    expect(draftRolesPrompt('g', roster, [], [], false, true)).toContain(visionBias().trim())
   })
 })
 

@@ -2129,4 +2129,9 @@ describe('planPrompt broad planning', () => {
   it('asks for a broad program-level plan when on', () => {
     expect(planPrompt('build X', true)).toMatch(/program/i)
   })
+  it('planPrompt is byte-for-byte when vision off, and frames deliverables when on', () => {
+    expect(planPrompt('build X')).toBe(planPrompt('build X', false, false))
+    expect(planPrompt('build X')).not.toMatch(/CREATIVE \/ DESIGN/)
+    expect(planPrompt('build X', false, true)).toMatch(/design deliverables/i)
+  })
 })

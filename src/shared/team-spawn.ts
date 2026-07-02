@@ -2,6 +2,7 @@
 // No node/DOM imports — unit-tested in plain Node, used by the engine.
 import type { AgentKind, SpawnedMember } from './types'
 import { MODELS, DEFAULT_MODEL_BY_KIND } from './types'
+import { visionBias } from './team-vision'
 
 export function spawnTeamPrompt(
   goal: string,
@@ -9,7 +10,8 @@ export function spawnTeamPrompt(
   existing: { name: string; kind: AgentKind; role: string }[],
   offered: { id: string; description: string }[] = [],
   assignModels = false,
-  largeTeam = false
+  largeTeam = false,
+  vision = false
 ): string {
   const existingList = existing.length
     ? existing.map((a) => `- ${a.name} (${a.kind}): ${a.role.replace(/\s+/g, ' ').slice(0, 200)}`).join('\n')
@@ -29,6 +31,7 @@ export function spawnTeamPrompt(
   const directorRule = largeTeam
     ? `\n- For a broad goal spanning several distinct PROGRAM AREAS, add a "director" between yourself and the managers: a director owns one broad area, routes to its managers/workers, and reviews/aggregates their results up to you. Use directors ONLY when the scope is genuinely large — otherwise keep the team flat or two-tier.`
     : ''
+  const visionRule = vision ? visionBias() : ''
   return `You are ${orchestratorName}, the lead orchestrator. Design the team of specialists you need to achieve this goal. Propose each teammate as a worker or a manager, give each a complete role.md, and define who reports to whom.
 
 GOAL:
@@ -39,7 +42,7 @@ ${existingList}${skillsBlock}
 
 Rules:
 - Make every specialty DISTINCT and COMPLEMENTARY.
-- Create a domain manager when a distinct area of work (a cluster of several related roles or subsystems) would benefit from dedicated review, testing, and accumulated QA expertise — not only when there are many workers. A manager owns reviewing and testing its area, so group several related roles under one QA-capable manager. A manager with a single worker is pure overhead — keep that flat (the worker reports directly to you).${directorRule}
+- Create a domain manager when a distinct area of work (a cluster of several related roles or subsystems) would benefit from dedicated review, testing, and accumulated QA expertise — not only when there are many workers. A manager owns reviewing and testing its area, so group several related roles under one QA-capable manager. A manager with a single worker is pure overhead — keep that flat (the worker reports directly to you).${directorRule}${visionRule}
 - Each member's "reportsTo" is the "id" of another member you propose, or the literal "orchestrator" (you). A manager may have workers (or managers) reporting to it.
 - Each "role" is a complete role.md: a "# Role" title, "## Specialty", "## Responsibilities", "## How you work", "## Constraints".${modelBlock}
 
