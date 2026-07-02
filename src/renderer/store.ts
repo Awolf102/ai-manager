@@ -43,7 +43,7 @@ export interface RunState {
   handoffs: { askerId: string; peerId: string; ask: string }[]
   followUps: { workerId: string; summary: string; decision: string }[]
   userRequests: { askerId: string; question: string }[]
-  pendingInterrupt: { question: string; askerName: string; askerId: string } | null
+  pendingInterrupt: { kind: 'ask-user' | 'follow-through'; question: string; askerName: string; askerId: string; summary?: string; options?: string[] } | null
   interruptMinimized: boolean
   memoryUpdated: Record<string, number>
   final: string
@@ -286,12 +286,20 @@ export const useStore = create<AppState>((set, get) => ({
           run.followUps = [...run.followUps, { workerId: e.workerId, summary: e.summary, decision: e.decision }]
           return { run }
         case 'interrupt': {
-          const pl = e.interrupt.payload as { askerId: string; askerName: string; question: string } | undefined
-          run.pendingInterrupt = pl
-            ? { question: pl.question, askerName: pl.askerName, askerId: pl.askerId }
-            : { question: e.interrupt.prompt, askerName: 'Agent', askerId: '' }
+          const kind = e.interrupt.kind === 'follow-through' ? 'follow-through' : 'ask-user'
+          const pl = e.interrupt.payload as { askerId?: string; askerName?: string; question?: string; summary?: string; options?: string[] } | undefined
+          run.pendingInterrupt = {
+            kind,
+            question: pl?.question ?? e.interrupt.prompt,
+            askerName: pl?.askerName ?? 'Agent',
+            askerId: pl?.askerId ?? '',
+            summary: pl?.summary,
+            options: pl?.options
+          }
           run.interruptMinimized = false
-          run.userRequests = [...run.userRequests, { askerId: run.pendingInterrupt.askerId, question: run.pendingInterrupt.question }]
+          if (kind === 'ask-user') {
+            run.userRequests = [...run.userRequests, { askerId: run.pendingInterrupt.askerId, question: run.pendingInterrupt.question }]
+          }
           return { run }
         }
         case 'reflection':
