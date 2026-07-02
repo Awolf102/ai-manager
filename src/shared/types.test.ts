@@ -33,6 +33,6 @@ describe('director AgentKind', () => {
     expect(DEFAULT_MODEL_BY_KIND.director).toBe('claude-opus-4-8')
   })
   it('falls back a director icon to compass', () => {
-    expect(iconForName('Program Lead', 'director')).toBe('compass')
+    expect(iconForName('Delivery Lead', 'director')).toBe('compass')
   })
 })

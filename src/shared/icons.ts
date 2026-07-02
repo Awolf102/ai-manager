@@ -36,7 +36,7 @@ const RULES: { pattern: RegExp; icon: IconKey }[] = [
   { pattern: /search|scout|\bfind\b|explor/i, icon: 'search' },
   { pattern: /chart|report|metric|dashboard/i, icon: 'chart' },
   { pattern: /book|knowledge|librar/i, icon: 'book' },
-  { pattern: /software|engineer|develop|programm|coder?/i, icon: 'code' }
+  { pattern: /software|engineer|develop|program|coder?/i, icon: 'code' }
 ]
 
 const KIND_FALLBACK: Record<string, IconKey> = {
