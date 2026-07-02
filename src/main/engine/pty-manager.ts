@@ -8,6 +8,7 @@ import { buildAgentContext, getCurrentProjectPath, getSettings } from './project
 import { resolveClaudeBin } from './env'
 import { launchMode } from './acting-mode'
 import { resolveBackendEnv, type BackendResolution } from './backend-resolve'
+import { maxOutputTokensEnv } from '../../shared/max-output-tokens'
 
 type Session = { proc: pty.IPty }
 const sessions = new Map<string, Session>()
@@ -61,12 +62,15 @@ export async function spawnPty(
     pairedDirs
   })
 
+  const env = mergeBackendEnv(cleanEnv(), await resolveBackendEnv(agent))
+  Object.assign(env, maxOutputTokensEnv(settings.maxOutputTokens))
+
   const proc = pty.spawn(resolveClaudeBin(), args, {
     name: 'xterm-256color',
     cols: Math.max(2, input.cols || 80),
     rows: Math.max(2, input.rows || 24),
     cwd: projectPath,
-    env: mergeBackendEnv(cleanEnv(), await resolveBackendEnv(agent))
+    env
   })
 
   sessions.set(ptyId, { proc })
