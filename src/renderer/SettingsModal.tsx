@@ -236,7 +236,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
               />
               <SettingRow
                 label="Max output tokens"
-                desc={`The most tokens an agent may emit in a single response. 0 = Claude Code's default (32,000). Raise this if agents fail with "exceeded the 32000 output token maximum." The model's own ceiling still caps it (top models 128,000; Haiku 64,000).`}
+                desc="The most tokens an agent may emit in a single response. 0 = Claude Code's default (32,000). Raise this if agents fail with “exceeded the 32000 output token maximum.” The model's own ceiling still caps it (top models 128,000; Haiku 64,000)."
                 control={
                   <input
                     type="number"
