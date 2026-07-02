@@ -85,6 +85,9 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.spawnPty, (e: IpcMainInvokeEvent, input: SpawnPtyInput) =>
     ptyMgr.spawnPty(e.sender, input)
   )
+  ipcMain.handle(IPC.spawnShell, (e: IpcMainInvokeEvent, input: { cols: number; rows: number }) =>
+    ptyMgr.spawnShellPty(e.sender, input)
+  )
   ipcMain.on(IPC.writePty, (_e, ptyId: string, data: string) => ptyMgr.writePty(ptyId, data))
   ipcMain.on(IPC.resizePty, (_e, ptyId: string, cols: number, rows: number) =>
     ptyMgr.resizePty(ptyId, cols, rows)

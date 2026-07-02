@@ -17,7 +17,7 @@ import type {
   TaskVerdict
 } from '../shared/types'
 
-export type TerminalMode = 'interactive' | 'headless'
+export type TerminalMode = 'interactive' | 'headless' | 'shell'
 
 export type ConfirmOpts = { title: string; body: string; confirmLabel?: string; danger?: boolean }
 
@@ -88,6 +88,7 @@ interface AppState {
   patchPositions: (list: { id: string; position: { x: number; y: number } }[]) => void
   select: (id: string | null) => void
   openTerminal: (agent: AgentNodeData, mode: TerminalMode) => void
+  openShellTerminal: () => void
   closeTerminal: (id: string) => void
   setActiveDock: (id: string) => void
   toggleDock: () => void
@@ -201,6 +202,18 @@ export const useStore = create<AppState>((set, get) => ({
     set((s) => {
       const id = `term-${++counter}`
       const tab: TerminalTab = { id, agentId: agent.id, agentName: agent.name, mode }
+      const activeDockId = activeDockAfterOpenTerminal({
+        running: s.run.running,
+        currentActive: s.activeDockId,
+        newTermId: id
+      })
+      return { terminals: [...s.terminals, tab], activeDockId, dockOpen: true }
+    }),
+
+  openShellTerminal: () =>
+    set((s) => {
+      const id = `term-${++counter}`
+      const tab: TerminalTab = { id, agentId: '', agentName: 'Shell', mode: 'shell' }
       const activeDockId = activeDockAfterOpenTerminal({
         running: s.run.running,
         currentActive: s.activeDockId,

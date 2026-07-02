@@ -3,7 +3,7 @@ import type { WebContents } from 'electron'
 import * as pty from 'node-pty'
 import type { SpawnPtyInput } from '../../shared/types'
 import { IPC } from '../../shared/types'
-import { buildAgentContext, getSettings } from './project-store'
+import { buildAgentContext, getCurrentProjectPath, getSettings } from './project-store'
 import { resolveClaudeBin } from './env'
 import { launchMode } from './acting-mode'
 
@@ -55,6 +55,33 @@ export async function spawnPty(
     if (!wc.isDestroyed()) wc.send(IPC.ptyExit, { ptyId, exitCode })
   })
 
+  return { ptyId }
+}
+
+/** Spawn a plain interactive login shell at the project root (no agent). Reuses the
+ *  same sessions map + writePty/resizePty/killPty/ptyData/ptyExit plumbing. */
+export async function spawnShellPty(
+  wc: WebContents,
+  input: { cols: number; rows: number }
+): Promise<{ ptyId: string }> {
+  const ptyId = randomUUID()
+  const shell = process.env.SHELL || (process.platform === 'win32' ? 'powershell.exe' : '/bin/zsh')
+  const args = process.platform === 'win32' ? [] : ['-il']
+  const proc = pty.spawn(shell, args, {
+    name: 'xterm-256color',
+    cols: Math.max(2, input.cols || 80),
+    rows: Math.max(2, input.rows || 24),
+    cwd: getCurrentProjectPath(),
+    env: cleanEnv()
+  })
+  sessions.set(ptyId, { proc })
+  proc.onData((data) => {
+    if (!wc.isDestroyed()) wc.send(IPC.ptyData, { ptyId, data })
+  })
+  proc.onExit(({ exitCode }) => {
+    sessions.delete(ptyId)
+    if (!wc.isDestroyed()) wc.send(IPC.ptyExit, { ptyId, exitCode })
+  })
   return { ptyId }
 }
 

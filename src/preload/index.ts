@@ -38,6 +38,7 @@ const api: RendererApi = {
   cancelHeadless: (runId) => ipcRenderer.invoke(IPC.cancelHeadless, runId),
   onAgentStream: (cb) => sub<AgentStreamEvent>(IPC.agentStream, cb),
   spawnPty: (input) => ipcRenderer.invoke(IPC.spawnPty, input),
+  spawnShell: (input) => ipcRenderer.invoke(IPC.spawnShell, input),
   writePty: (ptyId, data) => ipcRenderer.send(IPC.writePty, ptyId, data),
   resizePty: (ptyId, cols, rows) => ipcRenderer.send(IPC.resizePty, ptyId, cols, rows),
   killPty: (ptyId) => ipcRenderer.send(IPC.killPty, ptyId),

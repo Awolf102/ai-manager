@@ -536,6 +536,7 @@ export const IPC = {
   cancelHeadless: 'run:cancel',
   agentStream: 'run:stream',
   spawnPty: 'pty:spawn',
+  spawnShell: 'pty:spawnShell',
   writePty: 'pty:write',
   resizePty: 'pty:resize',
   killPty: 'pty:kill',
@@ -598,6 +599,7 @@ export interface RendererApi {
   cancelHeadless: (runId: string) => Promise<void>
   onAgentStream: (cb: (e: AgentStreamEvent) => void) => () => void
   spawnPty: (input: SpawnPtyInput) => Promise<{ ptyId: string }>
+  spawnShell: (input: { cols: number; rows: number }) => Promise<{ ptyId: string }>
   writePty: (ptyId: string, data: string) => void
   resizePty: (ptyId: string, cols: number, rows: number) => void
   killPty: (ptyId: string) => void
