@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { IPC } from '../shared/types'
 import type {
   AgentStreamEvent,
+  EnvEntry,
   OrchestrationEvent,
   PtyDataEvent,
   PtyExitEvent,
@@ -29,6 +30,8 @@ const api: RendererApi = {
   updateSettings: (patch) => ipcRenderer.invoke(IPC.updateSettings, patch),
   readRole: (agentId) => ipcRenderer.invoke(IPC.readRole, agentId),
   writeRole: (agentId, content) => ipcRenderer.invoke(IPC.writeRole, agentId, content),
+  readEnv: () => ipcRenderer.invoke(IPC.readEnv),
+  writeEnv: (entries: EnvEntry[]) => ipcRenderer.invoke(IPC.writeEnv, entries),
   readMemory: (agentId) => ipcRenderer.invoke(IPC.readMemory, agentId),
   writeMemory: (agentId, content) => ipcRenderer.invoke(IPC.writeMemory, agentId, content),
   runHeadless: (input) => ipcRenderer.invoke(IPC.runHeadless, input),

@@ -1,6 +1,9 @@
 // Shared types + IPC contract. MUST stay free of node/DOM-only imports so both
 // the main and renderer processes can import it.
 
+import type { EnvEntry } from './env-file'
+export type { EnvEntry } from './env-file'
+
 export type AgentKind = 'orchestrator' | 'manager' | 'worker'
 
 export type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | 'auto'
@@ -525,6 +528,8 @@ export const IPC = {
   updateSettings: 'settings:update',
   readRole: 'role:read',
   writeRole: 'role:write',
+  readEnv: 'env:read',
+  writeEnv: 'env:write',
   readMemory: 'memory:read',
   writeMemory: 'memory:write',
   runHeadless: 'run:headless',
@@ -585,6 +590,8 @@ export interface RendererApi {
   updateSettings: (patch: Partial<ProjectSettings>) => Promise<ProjectGraph>
   readRole: (agentId: string) => Promise<string>
   writeRole: (agentId: string, content: string) => Promise<void>
+  readEnv: () => Promise<EnvEntry[]>
+  writeEnv: (entries: EnvEntry[]) => Promise<void>
   readMemory: (agentId: string) => Promise<string>
   writeMemory: (agentId: string, content: string) => Promise<void>
   runHeadless: (input: RunHeadlessInput) => Promise<{ runId: string }>
