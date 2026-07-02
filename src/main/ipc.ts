@@ -7,6 +7,7 @@ import type {
   AgentNodeData,
   ContextScope,
   CreateAgentInput,
+  EnvEntry,
   GraphEdge,
   ProjectSettings,
   RunHeadlessInput,
@@ -25,6 +26,7 @@ import { spawnTeam } from './engine/team-spawner'
 import { detectManifest } from './engine/manifest-detector'
 import * as serverMgr from './engine/server-manager'
 import { discoverSkills } from './engine/skill-discovery'
+import * as envStore from './engine/env-store'
 
 export function registerIpc(): void {
   // ---- project ----
@@ -66,6 +68,8 @@ export function registerIpc(): void {
   // ---- role / memory ----
   ipcMain.handle(IPC.readRole, (_e, id: string) => store.readRole(id))
   ipcMain.handle(IPC.writeRole, (_e, id: string, content: string) => store.writeRole(id, content))
+  ipcMain.handle(IPC.readEnv, () => envStore.readEnvFile())
+  ipcMain.handle(IPC.writeEnv, (_e, entries: EnvEntry[]) => envStore.writeEnvFile(entries))
   ipcMain.handle(IPC.readMemory, (_e, id: string) => store.readMemory(id))
   ipcMain.handle(IPC.writeMemory, (_e, id: string, content: string) =>
     store.writeMemory(id, content)
