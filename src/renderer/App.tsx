@@ -17,6 +17,7 @@ import { BrandMark } from './BrandMark'
 import CanvasEmptyState from './CanvasEmptyState'
 import HitlModal from './HitlModal'
 import FollowThroughModal from './FollowThroughModal'
+import BranchChip from './BranchChip'
 import ConfirmDialog from './ConfirmDialog'
 import ToastViewport from './ToastViewport'
 import PanelDivider from './PanelDivider'
@@ -196,6 +197,7 @@ export default function App() {
         </div>
         <span className="topbar-sep" aria-hidden="true" />
         <span className="project">{graph.project.name}</span>
+        <BranchChip />
         <button className="btn" title="Switch to another project" onClick={async () => { const g = await window.api.pickProjectFolder(); if (g) { setGraph(g); void refreshResumable(true) } }}><FolderOpen size={14} /> Switch project</button>
 
         <span className="spacer" />
