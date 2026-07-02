@@ -41,7 +41,7 @@ export default function EnvModal({ onClose }: { onClose: () => void }) {
         <div className="modal-header">
           <h2 id="env-title" className="modal-title">Environment variables</h2>
           <div className="modal-desc">
-            Edited directly in this project's <code>.env</code> — no AI is involved. (Agents can still read
+            Edited directly in this project's <code>.env</code> — no AI is involved. (Agents can still read{' '}
             <code>.env</code> like any file in the project.)
           </div>
         </div>
