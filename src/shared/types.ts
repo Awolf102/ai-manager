@@ -3,6 +3,8 @@
 
 import type { EnvEntry } from './env-file'
 export type { EnvEntry } from './env-file'
+import type { OutputImage } from './output-images'
+export type { OutputImage } from './output-images'
 
 export type AgentKind = 'orchestrator' | 'director' | 'manager' | 'worker'
 
@@ -652,6 +654,7 @@ export const IPC = {
   listSkills: 'skills:list',
   listResumable: 'run:list-resumable',
   discardRun: 'run:discard',
+  outputImages: 'run:output-images',
   gitInfo: 'git:info',
   gitCheckout: 'git:checkout',
   advisorSend: 'advisor:send',
@@ -693,6 +696,7 @@ export interface RendererApi {
   resumeRun: (runId: string, answer?: string) => Promise<void>
   listResumable: () => Promise<ResumableRun[]>
   discardRun: (runId: string) => Promise<void>
+  listOutputImages: () => Promise<OutputImage[]>
   onOrchestration: (cb: (e: OrchestrationEvent) => void) => () => void
   checkAuth: () => Promise<AuthStatus>
   listRuns: () => Promise<RunSummary[]>

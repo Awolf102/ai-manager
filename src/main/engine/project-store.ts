@@ -26,6 +26,7 @@ import { DEFAULT_MODEL_BY_KIND, DEFAULT_SETTINGS } from '../../shared/types'
 import { iconForName } from '../../shared/icons'
 import { slugify, uniqueSlug } from '../../shared/slug'
 import { isImageName, uniqueContextName, scopeAppliesTo } from '../../shared/context-files'
+import { includeOutputImage, OUTPUT_IMAGE_MAX, OUTPUT_IMAGE_MAX_BYTES, type OutputImage } from '../../shared/output-images'
 import { parseLessonBullet } from '../../shared/lessons'
 import { buildTeamBundle, planTeamImport, validateTeamBundle, type TeamBundle } from '../../shared/team-bundle'
 import { duplicateNames } from '../../shared/team-scale'
@@ -508,6 +509,47 @@ export async function contextThumbnail(id: string): Promise<string | null> {
   } catch {
     return null
   }
+}
+
+/** Bounded scan of the project for produced images, for the run-output gallery. Skips build/vcs/app
+ *  dirs and svg; inlines each ≤ OUTPUT_IMAGE_MAX_BYTES as a data URL (mirrors contextThumbnail). */
+export async function listOutputImages(): Promise<OutputImage[]> {
+  const { path } = requireCurrent()
+  const out: OutputImage[] = []
+  const walk = async (dir: string, rel: string, depth: number): Promise<void> => {
+    if (out.length >= OUTPUT_IMAGE_MAX) return
+    let entries: import('fs').Dirent[]
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const e of entries) {
+      if (out.length >= OUTPUT_IMAGE_MAX) return
+      const relPath = rel ? `${rel}/${e.name}` : e.name
+      if (e.isDirectory()) {
+        // prune excluded dirs cheaply via the predicate on a sentinel child
+        if (includeOutputImage(`${relPath}/_.png`, depth + 1)) await walk(join(dir, e.name), relPath, depth + 1)
+        continue
+      }
+      if (!includeOutputImage(relPath, depth)) continue
+      let dataUrl: string | null = null
+      try {
+        const stat = await fs.stat(join(dir, e.name))
+        if (stat.size <= OUTPUT_IMAGE_MAX_BYTES) {
+          const buf = await fs.readFile(join(dir, e.name))
+          const ext = e.name.slice(e.name.lastIndexOf('.') + 1).toLowerCase()
+          const mime = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`
+          dataUrl = `data:${mime};base64,${buf.toString('base64')}`
+        }
+      } catch {
+        dataUrl = null
+      }
+      out.push({ path: relPath, dataUrl })
+    }
+  }
+  await walk(path, '', 0)
+  return out
 }
 
 /** The user's referenced folders for this project. */
