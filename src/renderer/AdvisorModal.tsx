@@ -4,7 +4,9 @@ import { Modal } from './Modal'
 import { useStore } from './store'
 import { MODELS } from '../shared/types'
 import BackendsModal from './BackendsModal'
-import { parseBrief, applyableSettings, type AdvisorBrief } from '../shared/advisor'
+import { parseBrief, applyableSettings, briefTeamToSpawnedMembers, type AdvisorBrief } from '../shared/advisor'
+import TeamSpawnModal from './TeamSpawnModal'
+import type { SpawnedMember } from '../shared/types'
 
 interface Msg { id: string; role: 'user' | 'assistant'; text: string; turnId?: string; brief?: AdvisorBrief | null }
 
@@ -22,7 +24,9 @@ export default function AdvisorModal() {
   const requestConfirm = useStore((s) => s.requestConfirm)
   const notify = useStore((s) => s.notify)
   const setGraph = useStore((s) => s.setGraph)
+  const graph = useStore((s) => s.graph)
   const [showBackends, setShowBackends] = useState(false)
+  const [spawn, setSpawn] = useState<{ members: SpawnedMember[]; orchestratorId: string } | null>(null)
 
   // one global subscription for the app's lifetime (this component is always mounted)
   useEffect(() => {
@@ -62,6 +66,16 @@ export default function AdvisorModal() {
   const newChat = (): void => { setMsgs([]); setSessionId(undefined); setStreamingTurn(null) }
 
   const sendToBuilder = (brief: AdvisorBrief): void => {
+    if (brief.team && brief.team.length) {
+      const orch = graph?.nodes.find((n) => n.kind === 'orchestrator')
+      if (!orch) {
+        notify({ kind: 'error', message: 'Add an Orchestrator first — then the Advisor can build a team.' })
+        return
+      }
+      setSpawn({ members: briefTeamToSpawnedMembers(brief.team), orchestratorId: orch.id })
+      if (brief.goal) seedGoal(brief.goal)
+      return
+    }
     if (!brief.goal) return
     seedGoal(brief.goal)
     setOpen(false)
@@ -104,7 +118,7 @@ export default function AdvisorModal() {
                   {m.brief.summary && <div className="advisor-rec-summary">{m.brief.summary}</div>}
                   {m.brief.stack && m.brief.stack.length > 0 && <div className="muted">Stack: {m.brief.stack.join(', ')}</div>}
                   <div className="advisor-rec-actions">
-                    {m.brief.goal && <button className="btn primary" onClick={() => sendToBuilder(m.brief!)}>Send to team builder</button>}
+                    {(m.brief.goal || (m.brief.team && m.brief.team.length > 0)) && <button className="btn primary" onClick={() => sendToBuilder(m.brief!)}>Send to team builder</button>}
                     {Object.keys(applyableSettings(m.brief)).length > 0 && <button className="btn" onClick={() => void applySettings(m.brief!)}>Apply settings</button>}
                     {m.brief.backendPresetId && <button className="btn" onClick={() => setShowBackends(true)}>Set up backend</button>}
                   </div>
@@ -138,6 +152,7 @@ export default function AdvisorModal() {
       </div>
     </Modal>
     {showBackends && <BackendsModal onClose={() => setShowBackends(false)} />}
+    {spawn && <TeamSpawnModal members={spawn.members} orchestratorId={spawn.orchestratorId} onClose={() => setSpawn(null)} />}
     </>
   )
 }
