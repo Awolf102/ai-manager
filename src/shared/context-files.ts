@@ -40,6 +40,7 @@ export function scopeAppliesTo(
 
 const KIND_PLURAL: Record<AgentKind, string> = {
   orchestrator: 'Orchestrator',
+  director: 'Directors',
   manager: 'Managers',
   worker: 'Workers'
 }
@@ -48,7 +49,7 @@ const KIND_PLURAL: Record<AgentKind, string> = {
 export function scopeLabel(scope: ContextScope | undefined, nodes: AgentNodeData[]): string {
   const kinds = scope?.kinds ?? []
   const ids = scope?.nodeIds ?? []
-  const kindLabels = (['orchestrator', 'manager', 'worker'] as AgentKind[])
+  const kindLabels = (['orchestrator', 'director', 'manager', 'worker'] as AgentKind[])
     .filter((k) => kinds.includes(k))
     .map((k) => KIND_PLURAL[k])
   const named = ids

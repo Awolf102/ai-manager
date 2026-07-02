@@ -4,7 +4,7 @@
 import type { EnvEntry } from './env-file'
 export type { EnvEntry } from './env-file'
 
-export type AgentKind = 'orchestrator' | 'manager' | 'worker'
+export type AgentKind = 'orchestrator' | 'director' | 'manager' | 'worker'
 
 export type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | 'auto'
 
@@ -560,10 +560,11 @@ export const PERMISSION_MODES: PermissionMode[] = [
   'auto'
 ]
 
-export const AGENT_KINDS: AgentKind[] = ['orchestrator', 'manager', 'worker']
+export const AGENT_KINDS: AgentKind[] = ['orchestrator', 'director', 'manager', 'worker']
 
 export const DEFAULT_MODEL_BY_KIND: Record<AgentKind, string> = {
   orchestrator: 'claude-opus-4-8',
+  director: 'claude-opus-4-8',
   manager: 'claude-opus-4-8',
   worker: 'claude-sonnet-4-6'
 }

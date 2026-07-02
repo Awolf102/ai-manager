@@ -8,11 +8,11 @@ import { formatLessonBullet, portableLessons } from './lessons'
 import { slugify, uniqueSlug } from './slug'
 
 const MAX_ROLE_CHARS = 50_000
-const MAX_MEMBERS = 200
+const MAX_MEMBERS = 1000
 const MAX_LESSONS = 200
 const MAX_LESSON_CHARS = 2_000
 const PERMISSION_MODES: PermissionMode[] = ['default', 'acceptEdits', 'bypassPermissions', 'plan', 'auto']
-const AGENT_KINDS: AgentKind[] = ['orchestrator', 'manager', 'worker']
+const AGENT_KINDS: AgentKind[] = ['orchestrator', 'director', 'manager', 'worker']
 const KNOWN_MODELS: Set<string> = new Set(MODELS.map((m) => m.id))
 
 const POSITION_OFFSET = 48
