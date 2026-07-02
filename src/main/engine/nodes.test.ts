@@ -16,6 +16,7 @@ import {
   followThroughSection,
   followThroughAskSection,
   interruptFor,
+  resumeFollowUpAsk,
   formatFollowUps,
   assignPrompt,
   workerPrompt,
@@ -1945,5 +1946,25 @@ describe('interruptFor', () => {
     const iv = interruptFor({ ownerId: 'w1', question: 'What should it do?', source: 'follow-through', summary: 'chat icon', options: ['a', 'b'] })
     expect(iv.kind).toBe('follow-through')
     expect(iv.payload).toMatchObject({ askerId: 'w1', askerName: 'W1', summary: 'chat icon', question: 'What should it do?', options: ['a', 'b'] })
+  })
+})
+
+describe('resumeFollowUpAsk', () => {
+  it('records a followUp with the decision and does not scrub', async () => {
+    const e = eng(cannedAgent().runAgent)
+    const tasks: Record<string, TaskState> = {
+      t1: { task: { id: 't1', title: 'T1', description: 'd' }, ownerId: 'w1', status: 'pending', attempts: 1, output: '' }
+    }
+    await resumeFollowUpAsk(e, { ownerId: 'w1', taskIds: ['t1'], summary: 'chat icon' }, 'Open a chat panel', 'auto', tasks, {})
+    expect(e.followUps).toEqual([{ workerId: 'w1', summary: 'chat icon', decision: 'Open a chat panel' }])
+    expect(tasks.t1.status).toBe('done')
+  })
+  it('Skip records the sentinel decision', async () => {
+    const e = eng(cannedAgent().runAgent)
+    const tasks: Record<string, TaskState> = {
+      t1: { task: { id: 't1', title: 'T1', description: 'd' }, ownerId: 'w1', status: 'pending', attempts: 1, output: '' }
+    }
+    await resumeFollowUpAsk(e, { ownerId: 'w1', taskIds: ['t1'], summary: 's' }, '', 'auto', tasks, {})
+    expect(e.followUps[0].decision).toContain('skipped')
   })
 })
