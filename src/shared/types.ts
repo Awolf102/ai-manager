@@ -584,6 +584,7 @@ export const IPC = {
   openProject: 'project:open',
   getRecentProjects: 'project:recents',
   createAgent: 'agent:create',
+  duplicateAgent: 'agent:duplicate',
   updateAgent: 'agent:update',
   deleteAgent: 'agent:delete',
   setEdges: 'graph:setEdges',
@@ -662,6 +663,7 @@ export interface RendererApi {
   openProject: (path: string) => Promise<ProjectGraph | null>
   getRecentProjects: () => Promise<ProjectMeta[]>
   createAgent: (input: CreateAgentInput) => Promise<ProjectGraph>
+  duplicateAgent: (input: { sourceId: string; count: number; model?: string }) => Promise<ProjectGraph>
   updateAgent: (agent: Partial<AgentNodeData> & { id: string }) => Promise<ProjectGraph>
   deleteAgent: (agentId: string) => Promise<ProjectGraph>
   setEdges: (edges: GraphEdge[]) => Promise<ProjectGraph>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_PARALLEL, clampParallel, clampBulk, parallelCap } from './team-scale'
+import { DEFAULT_PARALLEL, clampParallel, clampBulk, parallelCap, duplicateNames } from './team-scale'
 
 describe('team-scale concurrency', () => {
   it('parallelCap is the default when largeTeamMode is off', () => {
@@ -17,5 +17,16 @@ describe('team-scale concurrency', () => {
     expect(clampBulk(500)).toBe(100)
     expect(clampBulk(-1)).toBe(1)
     expect(clampBulk(Number.NaN)).toBe(1)
+  })
+})
+
+describe('duplicateNames', () => {
+  it('numbers clones from 2, skipping taken names', () => {
+    expect(duplicateNames('Frontend Worker', 3, ['Frontend Worker'])).toEqual([
+      'Frontend Worker 2', 'Frontend Worker 3', 'Frontend Worker 4'
+    ])
+  })
+  it('strips an existing trailing number so a clone of "Worker 2" is not "Worker 2 2"', () => {
+    expect(duplicateNames('Worker 2', 2, ['Worker', 'Worker 2'])).toEqual(['Worker 3', 'Worker 4'])
   })
 })

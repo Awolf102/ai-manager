@@ -56,6 +56,9 @@ export function registerIpc(): void {
 
   // ---- graph / agents ----
   ipcMain.handle(IPC.createAgent, (_e, input: CreateAgentInput) => store.createAgent(input))
+  ipcMain.handle(IPC.duplicateAgent, (_e, input: { sourceId: string; count: number; model?: string }) =>
+    store.duplicateAgent(input.sourceId, input.count, { model: input.model })
+  )
   ipcMain.handle(IPC.updateAgent, (_e, agent: Partial<AgentNodeData> & { id: string }) =>
     store.updateAgent(agent)
   )

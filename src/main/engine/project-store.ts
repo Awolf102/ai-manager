@@ -28,6 +28,7 @@ import { slugify, uniqueSlug } from '../../shared/slug'
 import { isImageName, uniqueContextName, scopeAppliesTo } from '../../shared/context-files'
 import { parseLessonBullet } from '../../shared/lessons'
 import { buildTeamBundle, planTeamImport, validateTeamBundle, type TeamBundle } from '../../shared/team-bundle'
+import { duplicateNames } from '../../shared/team-scale'
 import { hasBackendToken, deleteBackendToken } from './backend-secrets'
 import { atomicWriteWithBackup, atomicWrite } from './atomic-write'
 import { createMutex, createKeyedMutex } from './mutex'
@@ -285,6 +286,45 @@ export async function createAgent(input: CreateAgentInput): Promise<ProjectGraph
 
   graph.nodes.push(agent)
   return saveGraph()
+}
+
+export async function duplicateAgent(
+  sourceId: string,
+  count: number,
+  opts?: { model?: string }
+): Promise<ProjectGraph> {
+  const { path, graph } = requireCurrent()
+  const src = graph.nodes.find((n) => n.id === sourceId)
+  if (!src) throw new Error(`Unknown agent: ${sourceId}`)
+  const n = Math.max(1, Math.min(count, 100))
+  const srcRole = await readRole(sourceId)
+  const parent = parentOf(sourceId)
+  const takenSlugs = new Set(graph.nodes.map((x) => x.slug))
+  const names = duplicateNames(src.name, n, graph.nodes.map((x) => x.name))
+  const writes: { dir: string; role: string; memory: string }[] = []
+  const newNodes: AgentNodeData[] = []
+  const newEdges: GraphEdge[] = []
+  names.forEach((name, i) => {
+    const id = randomUUID()
+    const slug = uniqueSlug(slugify(name), takenSlugs)
+    takenSlugs.add(slug)
+    writes.push({ dir: aimPath(path, AGENTS_DIR, slug), role: srcRole, memory: memoryTemplate(name) })
+    const node: AgentNodeData = {
+      id,
+      name,
+      slug,
+      kind: src.kind,
+      icon: iconForName(name, src.kind),
+      model: opts?.model ?? src.model,
+      permissionMode: src.permissionMode,
+      position: { x: src.position.x + (i + 1) * 40, y: src.position.y + (i + 1) * 40 }
+    }
+    if (src.skills && src.skills.length) node.skills = [...src.skills]
+    if (src.backendId) node.backendId = src.backendId
+    newNodes.push(node)
+    if (parent) newEdges.push({ id: `${parent.id}->${id}`, source: parent.id, target: id })
+  })
+  return commitTeamAdditions(graph, writes, newNodes, newEdges)
 }
 
 export async function updateAgent(

@@ -24,6 +24,7 @@ const api: RendererApi = {
   openProject: (path) => ipcRenderer.invoke(IPC.openProject, path),
   getRecentProjects: () => ipcRenderer.invoke(IPC.getRecentProjects),
   createAgent: (input) => ipcRenderer.invoke(IPC.createAgent, input),
+  duplicateAgent: (input) => ipcRenderer.invoke(IPC.duplicateAgent, input),
   updateAgent: (agent) => ipcRenderer.invoke(IPC.updateAgent, agent),
   deleteAgent: (agentId) => ipcRenderer.invoke(IPC.deleteAgent, agentId),
   setEdges: (edges) => ipcRenderer.invoke(IPC.setEdges, edges),
