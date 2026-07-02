@@ -14,7 +14,7 @@ export default function BranchChip() {
   const ref = useRef<HTMLDivElement>(null)
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
 
-  const refresh = (): void => { void window.api.gitInfo().then(setInfo) }
+  const refresh = (): void => { void window.api.gitInfo().then(setInfo).catch(() => setInfo(null)) }
   useEffect(() => { refresh() }, [projectPath])
   useEffect(() => {
     if (!open) return
