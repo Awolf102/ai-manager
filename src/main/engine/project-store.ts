@@ -357,12 +357,13 @@ export async function buildAgentContext(agentId: string): Promise<{
   memory: string
   context: ContextFile[]
   folders: ContextFolder[]
+  pairedDirs: PairedDir[]
 }> {
   const agent = getAgent(agentId)
   const [role, memory] = await Promise.all([readRole(agentId), readMemory(agentId)])
   const context = getContextFiles().filter((f) => scopeAppliesTo(f.scope, agent))
   const folders = getContextFolders().filter((f) => scopeAppliesTo(f.scope, agent))
-  return { agent, projectPath: getCurrentProjectPath(), role, memory, context, folders }
+  return { agent, projectPath: getCurrentProjectPath(), role, memory, context, folders, pairedDirs: getPairedDirs() }
 }
 
 // ---------- context files ----------

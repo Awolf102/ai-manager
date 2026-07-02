@@ -11,7 +11,9 @@ import {
   getPairedDirs,
   addPairedDirs,
   setPairedDirWritable,
-  removePairedDir
+  removePairedDir,
+  buildAgentContext,
+  createAgent
 } from './project-store'
 
 let proj: string
@@ -64,5 +66,18 @@ describe('paired dirs store', () => {
     expect(getPairedDirs()[0].writable).toBe(true)
     await removePairedDir(id)
     expect(getPairedDirs()).toEqual([])
+  })
+})
+
+describe('buildAgentContext exposes paired dirs', () => {
+  it('includes the project paired dirs for an agent', async () => {
+    const sub = join(proj, 'lib')
+    await fs.mkdir(sub)
+    await addPairedDirs([sub])
+    await createAgent({ name: 'Worker', kind: 'worker' })
+    const { getGraph } = await import('./project-store')
+    const id = getGraph().nodes[0].id
+    const ctx = await buildAgentContext(id)
+    expect(ctx.pairedDirs.map((d) => d.path)).toEqual([sub])
   })
 })
