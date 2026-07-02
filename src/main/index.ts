@@ -39,7 +39,7 @@ app.whenReady().then(() => {
   // Production-only CSP (defense-in-depth). Skipped in dev so Vite HMR/websocket are untouched.
   if (!process.env.ELECTRON_RENDERER_URL) {
     const CSP =
-      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'"
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-src 'self' http://localhost:* http://127.0.0.1:*"
     session.defaultSession.webRequest.onHeadersReceived((details, cb) => {
       cb({ responseHeaders: { ...details.responseHeaders, 'Content-Security-Policy': [CSP] } })
     })

@@ -108,7 +108,14 @@ export default function RunResultModal({
               <pre className="server-log" ref={logRef}>
                 {log || '(no output yet)'}
               </pre>
-              {url && <iframe className="rr-preview" src={url} title="Deliverable preview" />}
+              {url && (
+                <iframe
+                  className="rr-preview"
+                  src={url}
+                  title="Deliverable preview"
+                  sandbox="allow-scripts allow-same-origin"
+                />
+              )}
             </>
           ) : (
             <p className="rr-notes">

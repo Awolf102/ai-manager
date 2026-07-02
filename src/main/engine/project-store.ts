@@ -532,6 +532,7 @@ export async function listOutputImages(): Promise<OutputImage[]> {
         if (includeOutputImage(`${relPath}/_.png`, depth + 1)) await walk(join(dir, e.name), relPath, depth + 1)
         continue
       }
+      if (!e.isFile()) continue
       if (!includeOutputImage(relPath, depth)) continue
       let dataUrl: string | null = null
       try {
