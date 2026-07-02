@@ -381,7 +381,7 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
       const base: StreamAgentOptions = {
         wc: eng.wc,
         agentId: ownerId,
-        prompt: workerPrompt(state.goal, group.map((t) => t.task), es.lightPrompts) + (asksAvailable() ? askUserSection() : '') + (es.followThrough === 'headless' ? followThroughSection() : '') + (es.followThrough === 'ask' ? followThroughAskSection() : ''),
+        prompt: workerPrompt(state.goal, group.map((t) => t.task), es.lightPrompts, es.visionMode) + (asksAvailable() ? askUserSection() : '') + (es.followThrough === 'headless' ? followThroughSection() : '') + (es.followThrough === 'ask' ? followThroughAskSection() : ''),
         runId: eng.runId,
         stepId: ownerId,
         permissionMode: state.actingMode,
@@ -1538,17 +1538,23 @@ Reply with ONLY this JSON code block (no other text):
 \`\`\``
 }
 
-export function workerPrompt(goal: string, tasks: RunTask[], light = false): string {
+export function workerPrompt(goal: string, tasks: RunTask[], light = false, vision = false): string {
   const list = tasks.map((t, i) => `${i + 1}. ${t.title}\n   ${t.description}`).join('\n\n')
   if (light) {
+    const qa = vision
+      ? 'If your work is a design, brand, or copy deliverable, evaluate it against the creative intent — check visual hierarchy, brand and tonal consistency, and typographic craft — before reporting success.'
+      : 'If your work serves web pages, actually run it and confirm the entry page AND every asset it references return 200 before reporting success.'
     return `Team goal: ${goal}
 
 Complete the following task(s) in this project folder, making the necessary changes. Apply any relevant lessons from your memory.
 
 ${list}
 
-If your work serves web pages, actually run it and confirm the entry page AND every asset it references return 200 before reporting success. When finished, briefly report what you changed and flag anything you could not complete.`
+${qa} When finished, briefly report what you changed and flag anything you could not complete.`
   }
+  const qa = vision
+    ? 'If your work is a design, brand, or copy deliverable, do not rely on "it looks right" — evaluate it against the creative intent: check visual hierarchy, brand and tonal consistency, typographic craft, and that it reads as intended for its audience. Don\'t report success until the deliverable holds together.'
+    : 'If your work is a web app or anything that serves pages, do not rely on unit tests or "the code looks right" — actually run it and load the entry page: confirm it returns 200 AND every asset it references (CSS, JS, images) also returns 200. A static-path or route mismatch that 404s assets makes the page render as unstyled, broken HTML even when your code is correct. Don\'t report success until the page renders fully.'
   return `You are working as part of a team to achieve this overall goal:
 ${goal}
 
@@ -1556,7 +1562,7 @@ You have been assigned the following task(s). Complete them in this project fold
 
 ${list}
 
-If your work is a web app or anything that serves pages, do not rely on unit tests or "the code looks right" — actually run it and load the entry page: confirm it returns 200 AND every asset it references (CSS, JS, images) also returns 200. A static-path or route mismatch that 404s assets makes the page render as unstyled, broken HTML even when your code is correct. Don't report success until the page renders fully.
+${qa}
 
 When finished, briefly report what you changed and flag anything you could not complete.`
 }

@@ -568,6 +568,17 @@ describe('roleTemplate', () => {
   it('is unchanged for a worker (no director leakage)', () => {
     expect(roleTemplate('X', 'worker')).toContain('(Worker)')
   })
+  it('worker template is byte-for-byte off, creative on', () => {
+    expect(roleTemplate('X', 'worker')).toBe(roleTemplate('X', 'worker', false))
+    expect(roleTemplate('X', 'worker')).toContain('return 200')
+    const v = roleTemplate('X', 'worker', true)
+    expect(v).not.toContain('return 200')
+    expect(v).toContain('creative intent')
+  })
+  it('manager template is byte-for-byte off, creative on', () => {
+    expect(roleTemplate('X', 'manager')).toBe(roleTemplate('X', 'manager', false))
+    expect(roleTemplate('X', 'manager', true)).toContain('creative review')
+  })
 })
 
 describe('papercuts: project-store security', () => {
