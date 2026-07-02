@@ -37,6 +37,10 @@ describe('parseBrief', () => {
   it('returns null on malformed JSON', () => {
     expect(parseBrief('```brief\n{not json}\n```')).toBeNull()
   })
+  it('ignores a bare unlabeled code fence (requires a brief/json label)', () => {
+    expect(parseBrief('here is an example:\n```\n{"goal":"nope"}\n```')).toBeNull()
+    expect(parseBrief('```json\n{"goal":"yes"}\n```')).toEqual({ goal: 'yes' })
+  })
 })
 
 describe('applyableSettings', () => {

@@ -68,7 +68,7 @@ export function advisorSystemPrompt(ctx: AdvisorContext): string {
 
 /** Extract a fenced ```brief (or ```json) JSON object from the text, or null. */
 export function parseBrief(text: string): AdvisorBrief | null {
-  const fences = [...text.matchAll(/\x60{3}(?:brief|json)?\s*([\s\S]*?)\x60{3}/gi)]
+  const fences = [...text.matchAll(/\x60{3}(?:brief|json)\s*([\s\S]*?)\x60{3}/gi)]
   const candidates = fences.map((m) => m[1])
   for (const c of candidates.reverse()) {
     const start = c.indexOf('{')
