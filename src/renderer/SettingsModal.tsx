@@ -167,7 +167,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                 )}
                 <SettingRow
                   label="Never bypass permissions"
-                  desc="Forces any Full-auto or per-agent run down to “accept edits”, engine-wide. A hard ceiling."
+                  desc='Forces any Full-auto or per-agent run down to "accept edits", engine-wide. A hard ceiling.'
                   control={
                     <Switch
                       checked={s.lockBypassPermissions}
@@ -401,17 +401,37 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                 label="Follow-through"
                 desc={
                   s.followThrough === 'headless'
-                    ? "When a worker hits a feature whose behavior wasn’t specified, it builds a reasonable version instead of a placeholder and records what it assumed (shown in the run + History)."
-                    : 'Off — workers may leave placeholders for under-specified features.'
+                    ? "When a worker hits a feature whose behavior wasn't specified, it builds a reasonable version instead of a placeholder and records what it assumed."
+                    : s.followThrough === 'ask'
+                      ? 'When a worker hits an under-specified feature, it pauses and asks you, with clickable options it proposes. Your pick is recorded.'
+                      : 'Off — workers may leave placeholders for under-specified features.'
                 }
                 control={
-                  <select
-                    value={s.followThrough}
-                    onChange={(e) => void update({ followThrough: e.target.value as ProjectSettings['followThrough'] })}
-                  >
-                    <option value="off">Off</option>
-                    <option value="headless">Headless (auto-assume)</option>
-                  </select>
+                  <div className="gated-control">
+                    {s.followThrough === 'ask' && (
+                      <label className="gated-count">
+                        up to{' '}
+                        <input
+                          type="number"
+                          min={1}
+                          max={5}
+                          value={s.maxFollowThrough || 3}
+                          onChange={(e) => void update({ maxFollowThrough: Math.max(1, Math.min(5, Number(e.target.value) || 1)) })}
+                        />
+                      </label>
+                    )}
+                    <select
+                      value={s.followThrough}
+                      onChange={(e) => {
+                        const v = e.target.value as ProjectSettings['followThrough']
+                        void update(v === 'ask' ? { followThrough: v, maxFollowThrough: s.maxFollowThrough || 3 } : { followThrough: v })
+                      }}
+                    >
+                      <option value="off">Off</option>
+                      <option value="headless">Headless (auto-assume)</option>
+                      <option value="ask">Ask me</option>
+                    </select>
+                  </div>
                 }
               />
             </SettingSection>
