@@ -141,6 +141,8 @@ export interface ProjectSettings {
   largeTeamParallel: number
   /** per-action ceiling for bulk create/duplicate (clamped 1–100) */
   bulkCreateMax: number
+  /** treat the project as a creative/design project: biases team-building + reframes worker/QA prompts toward creative fidelity (off = byte-for-byte) */
+  visionMode: boolean
 }
 
 export const DEFAULT_SETTINGS: ProjectSettings = {
@@ -170,7 +172,8 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   maxFollowThrough: 0,
   largeTeamMode: false,
   largeTeamParallel: 6,
-  bulkCreateMax: 25
+  bulkCreateMax: 25,
+  visionMode: false
 }
 
 /** Which agents a context item applies to. Absent OR (kinds empty AND nodeIds empty) ⇒ all agents. */
