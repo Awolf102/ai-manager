@@ -99,7 +99,7 @@ Backend metadata returned to the renderer is augmented with `hasToken: boolean` 
 
 ## Interactions
 
-- **cheap-model-workers:** the transient worker override (`workerModelOverride`, swaps workers to a Claude tier) is **skipped for agents with a `backendId`** — a Claude model id would mismatch a non-Claude endpoint. A small helper `effectiveWorkerOverride(agent, settings)` returns `undefined` when `agent.backendId` is set, else `workerModelOverride(settings)`; applied at the 4 dispatch sites in `nodes.ts`.
+- **cheap-model-workers:** the transient `modelOverride` (used only by cheap-model-workers to swap a worker to a Claude tier) would mismatch a non-Claude endpoint. Handled at the single runner seam: in `streamAgent`, when a backend resolves (`kind === 'env'`), the model sent is `agent.model` (the backend model id) and `modelOverride` is ignored; otherwise `opts.modelOverride ?? agent.model` as today. This neutralizes any override source for backend agents at one place — no change to the 4 `nodes.ts` dispatch sites.
 - **Effort caps:** unknown backend model ids already pass through `clampEffort` unchanged (no clamp) — safe, no change.
 - **autoAssignModels:** only assigns Claude tiers at spawn; backends are assigned manually — no conflict.
 
