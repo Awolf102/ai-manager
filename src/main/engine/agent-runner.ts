@@ -16,6 +16,7 @@ import { buildAgentContext, getSettings, updateAgent } from './project-store'
 import { buildPermissionOptions } from './permission-options'
 import { actingModeFor } from './acting-mode'
 import { outputModeInstruction } from '../../shared/token-efficiency'
+import { withMaxOutputTokensEnv } from '../../shared/max-output-tokens'
 import { resolveBackendEnv, type BackendResolution } from './backend-resolve'
 
 /** Role + persistent memory + the user's project context (files + folders + paired dirs), appended onto the preset prompt. */
@@ -158,7 +159,8 @@ export async function streamAgent(
     }
     const { writablePaths } = splitPairedDirs(pairedDirs)
     if (writablePaths.length > 0) options.additionalDirectories = writablePaths
-    if (run.env) options.env = run.env
+    const composedEnv = withMaxOutputTokensEnv(run.env, process.env, getSettings().maxOutputTokens)
+    if (composedEnv) options.env = composedEnv
     if (opts.disallowedTools && opts.disallowedTools.length > 0) {
       options.disallowedTools = opts.disallowedTools
     }
