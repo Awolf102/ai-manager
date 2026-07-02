@@ -17,3 +17,9 @@ describe('follow-through setting', () => {
     expect(DEFAULT_SETTINGS.followThrough).toBe('off')
   })
 })
+
+describe('follow-through ask settings', () => {
+  it('defaults maxFollowThrough to 0', () => {
+    expect(DEFAULT_SETTINGS.maxFollowThrough).toBe(0)
+  })
+})

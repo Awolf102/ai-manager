@@ -11,6 +11,7 @@ import type { StreamAgentOptions } from './agent-runner'
 import type {
   Assignment,
   Effort,
+  Interrupt,
   OrchestrationEvent,
   PermissionMode,
   RunPhase,
@@ -39,7 +40,7 @@ import {
 } from './project-store'
 import { parseHandoff } from '../../shared/handoff'
 import { parseAskUser, redactUserAnswer } from '../../shared/ask-user'
-import { parseFollowUps } from '../../shared/follow-through'
+import { parseFollowUps, parseFollowUpAsk } from '../../shared/follow-through'
 import { clampEffort } from '../../shared/model-caps'
 import { capEffort } from '../../shared/token-efficiency'
 
@@ -92,6 +93,7 @@ export function seedRunState(args: {
     replanAttempts: 0,
     replanStageCursor: 0,
     userRequestCount: 0,
+    followThroughCount: 0,
     final: ''
   }
 }
@@ -268,43 +270,97 @@ async function resumeAsker(
   }
 }
 
+/** Resume a follow-through asker with the user's decision (or Skip). Records the resolution
+ *  as a followUp (cycle-1 surfacing) and does NOT scrub — a scope decision isn't a secret. */
+export async function resumeFollowUpAsk(
+  eng: Eng,
+  item: { ownerId: string; taskIds: string[]; sessionId?: string; summary?: string },
+  answer: string,
+  actingMode: PermissionMode,
+  tasks: Record<string, TaskState>,
+  steps: Record<string, RunStepRecord>
+): Promise<void> {
+  const owned = item.taskIds.map((id) => tasks[id]).filter(Boolean)
+  const titles = owned.map((t) => t.task.title)
+  const decision = answer.trim() || '(skipped — the worker proceeded with a reasonable assumption)'
+  setStatus(eng, steps, item.ownerId, 'working', titles)
+  try {
+    const r = await eng.runAgent({
+      wc: eng.wc,
+      agentId: item.ownerId,
+      prompt: answerResumePrompt(answer),
+      runId: eng.runId,
+      stepId: item.ownerId,
+      permissionMode: actingMode,
+      resume: true,
+      resumeSessionId: item.sessionId,
+      abort: eng.abort,
+      modelOverride: workerModelOverride(getSettings())
+    })
+    if (r.sessionId) await updateAgent({ id: item.ownerId, sessionId: r.sessionId })
+    const out = r.text || '(no output)'
+    for (const t of owned) {
+      t.status = 'done'
+      t.output = out
+    }
+    steps[item.ownerId] = { ...stepBase(item.ownerId, steps), output: out }
+    setStatus(eng, steps, item.ownerId, eng.abort.signal.aborted ? 'skipped' : 'done', titles)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    for (const t of owned) {
+      t.status = 'done'
+      t.output = `ERROR: ${msg}`
+    }
+    steps[item.ownerId] = { ...stepBase(item.ownerId, steps), output: `ERROR: ${msg}` }
+    setStatus(eng, steps, item.ownerId, 'error', titles)
+  }
+  eng.followUps.push({ workerId: item.ownerId, summary: item.summary ?? '', decision })
+  eng.emit({ runId: eng.runId, type: 'follow-up', workerId: item.ownerId, summary: item.summary ?? '', decision })
+}
+
 async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeResult> {
   const tasks = structuredClone(state.tasks)
   const steps = { ...state.steps }
   const maxUserRequests = getSettings().maxUserRequests ?? 0
   let userRequestCount = state.userRequestCount ?? 0
+  const maxFollowThrough = getSettings().maxFollowThrough ?? 0
+  let followThroughCount = state.followThroughCount ?? 0
   const userRequests = [...(state.userRequests ?? [])]
   // collected when a worker asks during a wave (one is chosen to pause on)
-  const asks: { ownerId: string; taskIds: string[]; sessionId?: string; question: string }[] = []
+  const asks: { ownerId: string; taskIds: string[]; sessionId?: string; question: string; source: 'ask-user' | 'follow-through'; summary?: string; options?: string[] }[] = []
   const asksAvailable = (): boolean => maxUserRequests > 0 && userRequestCount < maxUserRequests
+  const followThroughAskAvailable = (): boolean => getSettings().followThrough === 'ask' && followThroughCount < maxFollowThrough
   // cleared on EVERY return so a consumed answer never persists (sensitive)
   const scrub = { resumeInput: undefined, pendingAsk: undefined, askQueue: undefined } as Partial<RunState>
 
   // ── RE-ENTRY: a human answered (or skipped). Resume the asking worker, then drain any queued asks. ──
   if (state.resumeInput !== undefined && state.pendingAsk) {
-    await resumeAsker(eng, state.pendingAsk, String(state.resumeInput ?? ''), state.actingMode, tasks, steps)
-    userRequestCount += 1
-    await io.checkpoint({ ...state, ...scrub, tasks: structuredClone(tasks), steps: { ...steps }, userRequestCount, phase: 'executing', ...(io.collectExtras?.() ?? {}) })
+    const answer = String(state.resumeInput ?? '')
+    if (state.pendingAsk.source === 'follow-through') {
+      await resumeFollowUpAsk(eng, state.pendingAsk, answer, state.actingMode, tasks, steps)
+      followThroughCount += 1
+    } else {
+      await resumeAsker(eng, state.pendingAsk, answer, state.actingMode, tasks, steps)
+      userRequestCount += 1
+    }
+    await io.checkpoint({ ...state, ...scrub, tasks: structuredClone(tasks), steps: { ...steps }, userRequestCount, followThroughCount, phase: 'executing', ...(io.collectExtras?.() ?? {}) })
     const queue = state.askQueue ?? []
     if (queue.length > 0) {
       const [next, ...rest] = queue
-      userRequests.push({ askerId: next.ownerId, question: next.question })
+      if (next.source !== 'follow-through') userRequests.push({ askerId: next.ownerId, question: next.question })
       return {
         patch: {
           resumeInput: undefined,
           tasks,
           steps,
           userRequestCount,
+          followThroughCount,
           ...(userRequests.length ? { userRequests } : {}),
           pendingAsk: next,
           askQueue: rest.length ? rest : undefined,
           phase: 'executing'
         },
-        interrupt: {
-          kind: 'ask-user',
-          prompt: next.question,
-          payload: { askerId: next.ownerId, askerName: getAgent(next.ownerId).name, question: next.question }
-        }
+        interrupt: interruptFor(next)
       }
     }
   }
@@ -324,7 +380,7 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
       const base: StreamAgentOptions = {
         wc: eng.wc,
         agentId: ownerId,
-        prompt: workerPrompt(state.goal, group.map((t) => t.task), es.lightPrompts) + (asksAvailable() ? askUserSection() : '') + (es.followThrough === 'headless' ? followThroughSection() : ''),
+        prompt: workerPrompt(state.goal, group.map((t) => t.task), es.lightPrompts) + (asksAvailable() ? askUserSection() : '') + (es.followThrough === 'headless' ? followThroughSection() : '') + (es.followThrough === 'ask' ? followThroughAskSection() : ''),
         runId: eng.runId,
         stepId: ownerId,
         permissionMode: state.actingMode,
@@ -345,12 +401,21 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
           eng.emit({ runId: eng.runId, type: 'follow-up', workerId: ownerId, summary: fu.summary, decision: fu.decision })
         }
       }
+      // ── FOLLOW-THROUGH ASK: a worker wants the user to decide an under-specified feature → pause. ──
+      if (followThroughAskAvailable()) {
+        const fa = parseFollowUpAsk(text)
+        if (fa) {
+          for (const t of group) tasks[t.task.id].status = 'pending'
+          asks.push({ ownerId, taskIds: group.map((t) => t.task.id), sessionId, question: fa.question, source: 'follow-through', summary: fa.summary, options: fa.options })
+          return
+        }
+      }
       // ── ASK DETECTION: a worker asked → leave its group pending, record the ask. ──
       if (asksAvailable()) {
         const req = parseAskUser(text)
         if (req) {
           for (const t of group) tasks[t.task.id].status = 'pending'
-          asks.push({ ownerId, taskIds: group.map((t) => t.task.id), sessionId, question: req.question })
+          asks.push({ ownerId, taskIds: group.map((t) => t.task.id), sessionId, question: req.question, source: 'ask-user' })
           return
         }
       }
@@ -387,7 +452,7 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
     if (maxReplans > 0 && state.replanAttempts < maxReplans) {
       const boundary = pendingStageBoundary(tasks, state.replanStageCursor)
       if (boundary != null) {
-        return { patch: { ...scrub, tasks, steps, userRequestCount, ...(userRequests.length ? { userRequests } : {}), replanStageCursor: boundary, phase: 'replanning' }, goto: 'replan' }
+        return { patch: { ...scrub, tasks, steps, userRequestCount, followThroughCount, ...(userRequests.length ? { userRequests } : {}), replanStageCursor: boundary, phase: 'replanning' }, goto: 'replan' }
       }
     }
     let ready = pending.filter((t) => depsSatisfied(t, tasks))
@@ -403,37 +468,47 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
     }
     await mapCapped([...byOwner.entries()], MAX_PARALLEL, ([ownerId, group]) => runGroup(ownerId, group))
 
-    // ── Workers asked during this wave → queue them; present up to the user-request budget. ──
+    // ── Workers asked during this wave → queue them; present up to the per-source budget. ──
     if (asks.length > 0 && !eng.abort.signal.aborted) {
       asks.sort((a, b) => state.plan.findIndex((p) => p.id === a.taskIds[0]) - state.plan.findIndex((p) => p.id === b.taskIds[0]))
-      const slots = Math.max(1, maxUserRequests - userRequestCount) // remaining budget (>=1 while asks fired)
-      const present = asks.slice(0, slots)
-      const overflow = asks.slice(slots)
-      // over-budget askers: resume their captured session with no answer — never re-run fresh, never lost
-      for (const ask of overflow) await resumeAsker(eng, ask, '', state.actingMode, tasks, steps)
+      const hitlRemaining = maxUserRequests - userRequestCount
+      const ftRemaining = maxFollowThrough - followThroughCount
+      const present: typeof asks = []
+      const overflow: typeof asks = []
+      let hitlTaken = 0
+      let ftTaken = 0
+      for (const a of asks) {
+        if (a.source === 'follow-through') {
+          if (ftTaken < ftRemaining) { present.push(a); ftTaken += 1 } else overflow.push(a)
+        } else {
+          if (hitlTaken < hitlRemaining) { present.push(a); hitlTaken += 1 } else overflow.push(a)
+        }
+      }
+      // over-budget askers: resume best-effort with no answer — never re-run fresh, never lost
+      for (const ask of overflow) {
+        if (ask.source === 'follow-through') await resumeFollowUpAsk(eng, ask, '', state.actingMode, tasks, steps)
+        else await resumeAsker(eng, ask, '', state.actingMode, tasks, steps)
+      }
       const [head, ...rest] = present
-      userRequests.push({ askerId: head.ownerId, question: head.question })
+      if (head.source !== 'follow-through') userRequests.push({ askerId: head.ownerId, question: head.question })
       return {
         patch: {
           resumeInput: undefined,
           tasks,
           steps,
           userRequestCount,
+          followThroughCount,
           ...(userRequests.length ? { userRequests } : {}),
           pendingAsk: head,
           askQueue: rest.length ? rest : undefined,
           phase: 'executing'
         },
-        interrupt: {
-          kind: 'ask-user',
-          prompt: head.question,
-          payload: { askerId: head.ownerId, askerName: getAgent(head.ownerId).name, question: head.question }
-        }
+        interrupt: interruptFor(head)
       }
     }
   }
 
-  return { patch: { ...scrub, tasks, steps, userRequestCount, ...(userRequests.length ? { userRequests } : {}), phase: 'reviewing' } }
+  return { patch: { ...scrub, tasks, steps, userRequestCount, followThroughCount, ...(userRequests.length ? { userRequests } : {}), phase: 'reviewing' } }
 }
 
 /** The immediate manager that reviews a task (the owner's parent), or the orchestrator. */
@@ -1335,6 +1410,37 @@ export function followThroughSection(): string {
 { "summary": "<what was under-specified>", "decision": "<what you built and why>" }
 \`\`\`
 You may include more than one followup block if you made several such decisions.`
+}
+
+export function followThroughAskSection(): string {
+  return `\n\nFOLLOW-THROUGH (ask): If you encounter a feature whose intended behavior was not clearly specified (for example a button or control with no described action), do NOT assume — pause and ask the user. Reply with ONLY this block and nothing else:
+\`\`\`followup
+{ "summary": "<what is under-specified>", "question": "<what you need decided>", "options": ["<option 1>", "<option 2>"] }
+\`\`\`
+Propose 2–4 concrete options you'd recommend. Ask only for genuinely under-specified features; otherwise finish normally.`
+}
+
+/** Build the pause interrupt for a collected ask item, by source. */
+export function interruptFor(item: {
+  ownerId: string
+  question: string
+  source?: 'ask-user' | 'follow-through'
+  summary?: string
+  options?: string[]
+}): Interrupt {
+  const askerName = getAgent(item.ownerId).name
+  if (item.source === 'follow-through') {
+    return {
+      kind: 'follow-through',
+      prompt: item.question,
+      payload: { askerId: item.ownerId, askerName, summary: item.summary ?? '', question: item.question, options: item.options ?? [] }
+    }
+  }
+  return {
+    kind: 'ask-user',
+    prompt: item.question,
+    payload: { askerId: item.ownerId, askerName, question: item.question }
+  }
 }
 
 /** Synthesis section listing headless follow-through decisions, so the final report

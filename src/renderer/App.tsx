@@ -15,6 +15,7 @@ import ContextModal from './ContextModal'
 import { BrandMark } from './BrandMark'
 import CanvasEmptyState from './CanvasEmptyState'
 import HitlModal from './HitlModal'
+import FollowThroughModal from './FollowThroughModal'
 import ConfirmDialog from './ConfirmDialog'
 import ToastViewport from './ToastViewport'
 import PanelDivider from './PanelDivider'
@@ -380,6 +381,7 @@ export default function App() {
       {showContext && <ContextModal onClose={() => setShowContext(false)} />}
       {showFaq && <FaqModal onClose={() => setShowFaq(false)} />}
       <HitlModal />
+      <FollowThroughModal />
       <ConfirmDialog />
       <ToastViewport />
       {authBanner}

@@ -126,8 +126,10 @@ export interface ProjectSettings {
   cheapModelTier: string
   /** use trimmed variants of the app's internal scaffolding prompts */
   lightPrompts: boolean
-  /** how workers handle an under-specified feature: 'off' = no change, 'headless' = infer + build + record */
-  followThrough: 'off' | 'headless'
+  /** how workers handle an under-specified feature: 'off' = no change, 'headless' = infer + build + record, 'ask' = pause to ask the user */
+  followThrough: 'off' | 'headless' | 'ask'
+  /** pause budget for followThrough === 'ask' (0 = no pauses) */
+  maxFollowThrough: number
 }
 
 export const DEFAULT_SETTINGS: ProjectSettings = {
@@ -153,7 +155,8 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   cheapModelWorkers: false,
   cheapModelTier: 'claude-haiku-4-5',
   lightPrompts: false,
-  followThrough: 'off'
+  followThrough: 'off',
+  maxFollowThrough: 0
 }
 
 /** Which agents a context item applies to. Absent OR (kinds empty AND nodeIds empty) ⇒ all agents. */
@@ -471,10 +474,12 @@ export interface RunState {
   followUps?: { workerId: string; summary: string; decision: string }[]
   /** bounds worker→user questions this run (mirrors replanAttempts) */
   userRequestCount: number
+  /** bounds follow-through 'ask' pauses this run (mirrors userRequestCount) */
+  followThroughCount: number
   /** the worker waiting on a user answer; carries its session id across resume (never the answer) */
-  pendingAsk?: { ownerId: string; taskIds: string[]; sessionId?: string; question: string }
+  pendingAsk?: { ownerId: string; taskIds: string[]; sessionId?: string; question: string; source?: 'ask-user' | 'follow-through'; summary?: string; options?: string[] }
   /** remaining same-wave asks to present after pendingAsk (queue); checkpoint-only, never in History */
-  askQueue?: { ownerId: string; taskIds: string[]; sessionId?: string; question: string }[]
+  askQueue?: { ownerId: string; taskIds: string[]; sessionId?: string; question: string; source?: 'ask-user' | 'follow-through'; summary?: string; options?: string[] }[]
   final: string
   error?: string
   /** set when the run paused for human input (Stage 3) */
