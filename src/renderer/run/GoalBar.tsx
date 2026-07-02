@@ -7,6 +7,7 @@ import TeamSpawnModal from '../TeamSpawnModal'
 import RunResultModal from './RunResultModal'
 import RecentPrompts from './RecentPrompts'
 import type { RunManifest, SpawnedMember } from '../../shared/types'
+import { parallelCap, teamSizeCaption } from '../../shared/team-scale'
 
 const MAX_GOAL_HEIGHT = 360 // px — focused expansion cap (~18 lines), then the textarea scrolls
 
@@ -56,6 +57,8 @@ export default function GoalBar() {
   const canDraft = !!target && !!goal.trim() && hasSpecialists && !running && !drafting
   const canBuild = !!target && !!goal.trim() && !running && !spawning
   const canRunResult = !!target && !running && !detecting
+  const nodes = graph?.nodes ?? []
+  const showHeadsUp = !!graph && (graph.settings.largeTeamMode || nodes.length >= 8)
 
   const buildTeam = async (): Promise<void> => {
     if (!target || !goal.trim() || running || spawning) return
@@ -174,6 +177,11 @@ export default function GoalBar() {
           <Rocket size={14} /> {detecting ? 'Launching…' : 'Launch app'}
         </button>
       </span>
+      {showHeadsUp && (
+        <span className="goal-target" title="Team size and concurrency for this run">
+          {teamSizeCaption(nodes, parallelCap(graph!.settings))}
+        </span>
+      )}
       {running ? (
         <button
           className="btn danger"

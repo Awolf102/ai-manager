@@ -13,7 +13,8 @@ export function draftRolesPrompt(
   goal: string,
   roster: DraftRosterAgent[],
   edges: { source: string; target: string }[],
-  offered: { id: string; description: string }[] = []
+  offered: { id: string; description: string }[] = [],
+  largeTeam = false
 ): string {
   const nameById = new Map(roster.map((a) => [a.id, a.name]))
   const agents = roster
@@ -30,6 +31,7 @@ export function draftRolesPrompt(
         .map((s) => `- ${s.id}: ${s.description}`)
         .join('\n')}`
     : ''
+  const roleKinds = largeTeam ? 'Worker|Manager|Director' : 'Worker|Manager'
   return `You are the lead orchestrator. Draft a tailored role for each specialist on your team so they are well-suited to this goal. Each role becomes that agent's role.md and is reused across future goals, so write a DURABLE specialty (informed by the goal, not narrowly tied to it).
 
 GOAL:
@@ -42,7 +44,7 @@ REPORTING STRUCTURE (source delegates work down to target):
 ${topology}${skillsBlock}
 
 For each agent, write a COMPLETE role.md in this shape:
-# Role: <name> (<Worker|Manager>)
+# Role: <name> (<${roleKinds}>)
 
 ## Specialty
 <1-3 sentences naming this agent's distinct focus on this team>

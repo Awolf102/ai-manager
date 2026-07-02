@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Copy, Trash2 } from 'lucide-react'
 import { useStore } from '../store'
 import { AGENT_KINDS, MODELS } from '../../shared/types'
 import type { AgentKind, AgentNodeData, DiscoveredPlugin } from '../../shared/types'
+import { clampBulk } from '../../shared/team-scale'
 import BackendsModal from '../BackendsModal'
 
 export default function AgentConfigPanel() {
@@ -18,9 +19,13 @@ export default function AgentConfigPanel() {
     void window.api.listSkills().then(setCatalog)
   }, [])
 
+  const [dupCount, setDupCount] = useState(1)
+  const [dupModel, setDupModel] = useState<string>('')
+
   const agent = graph?.nodes.find((n) => n.id === selectedId)
   if (!agent) return null
 
+  const settings = graph?.settings
   const backends = graph?.backends ?? []
   const selectedBackend = backends.find((b) => b.id === agent.backendId)
   const modelOptions = selectedBackend ? selectedBackend.models : MODELS
@@ -40,6 +45,11 @@ export default function AgentConfigPanel() {
     if (!ok) return
     setGraph(await window.api.deleteAgent(agent.id))
     select(null)
+  }
+
+  const duplicate = async (): Promise<void> => {
+    const model = settings?.largeTeamMode ? (dupModel || settings.cheapModelTier) : undefined
+    setGraph(await window.api.duplicateAgent({ sourceId: agent.id, count: clampBulk(dupCount), model }))
   }
 
   const onBackendChange = (id: string): void => {
@@ -124,6 +134,28 @@ export default function AgentConfigPanel() {
           <input readOnly value={agent.sessionId} />
         </div>
       )}
+      <div className="field">
+        <label>Duplicate</label>
+        <div className="gated-control">
+          <input
+            type="number"
+            min={1}
+            max={100}
+            value={dupCount}
+            title="How many copies"
+            onChange={(e) => setDupCount(clampBulk(Number(e.target.value)))}
+          />
+          {settings?.largeTeamMode && (
+            <select value={dupModel} onChange={(e) => setDupModel(e.target.value)} title="Model for the copies">
+              <option value="">Cheap tier ({settings.cheapModelTier})</option>
+              {MODELS.map((m) => (<option key={m.id} value={m.id}>{m.label}</option>))}
+            </select>
+          )}
+          <button className="btn" onClick={() => void duplicate()}>
+            <Copy size={13} /> Duplicate ×{clampBulk(dupCount)}
+          </button>
+        </div>
+      </div>
       <button className="btn danger" onClick={remove}>
         <Trash2 size={13} /> Delete agent
       </button>

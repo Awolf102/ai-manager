@@ -1,10 +1,11 @@
 // Pure helpers + types for the Advisor assistant (no node/DOM imports).
-import type { ProjectSettings } from './types'
+import type { ProjectSettings, SpawnedMember } from './types'
 
 export interface AdvisorBriefTeamMember {
   name: string
-  kind: 'manager' | 'worker'
+  kind: 'director' | 'manager' | 'worker'
   role: string
+  reportsTo?: string
 }
 
 export interface AdvisorBrief {
@@ -55,7 +56,7 @@ export function advisorSystemPrompt(ctx: AdvisorContext): string {
     'You are READ-ONLY: you can read the project to ground your advice, but you cannot change settings, files, or run anything. The user confirms every action.',
     '',
     '## When you have a concrete recommendation the user could act on',
-    'Include ONE fenced code block labelled `brief` containing JSON with any of these optional fields: `goal` (string, a build goal), `summary` (string), `stack` (string[]), `settings` (object of cost/efficiency knobs only), `backendPresetId` (string), `team` ({name,kind,role}[]). Keep your normal prose OUTSIDE the block. The app renders the brief as buttons the user confirms — never assume it was applied. Never put secrets (API keys, tokens) anywhere.',
+    'Include ONE fenced code block labelled `brief` containing JSON with any of these optional fields: `goal` (string, a build goal), `summary` (string), `stack` (string[]), `settings` (object of cost/efficiency knobs only), `backendPresetId` (string), `team` ({name,kind,role,reportsTo?}[] — kind is director|manager|worker; reportsTo is another member\'s name or "orchestrator", so you can propose an orchestrator→director→manager→worker hierarchy for a large goal). Keep your normal prose OUTSIDE the block. The app renders the brief as buttons the user confirms — never assume it was applied. Never put secrets (API keys, tokens) anywhere.',
     '',
     '## Current project settings (cost/efficiency knobs)',
     knobs,
@@ -94,4 +95,21 @@ export function applyableSettings(brief: AdvisorBrief): Partial<ProjectSettings>
     }
   }
   return out
+}
+
+/** Map an Advisor brief team to SpawnedMember[] for applySpawnedTeam: temp ids, name→id reportsTo,
+ *  anything unresolved (missing / literal "orchestrator" / unknown name) → "orchestrator". */
+export function briefTeamToSpawnedMembers(team: AdvisorBriefTeamMember[]): SpawnedMember[] {
+  const idByName = new Map<string, string>()
+  const withIds = team.map((m, i) => {
+    const id = `b${i + 1}`
+    idByName.set(m.name.trim(), id)
+    return { m, id }
+  })
+  return withIds.map(({ m, id }) => {
+    const raw = (m.reportsTo ?? '').trim()
+    const reportsTo =
+      !raw || raw.toLowerCase() === 'orchestrator' ? 'orchestrator' : idByName.get(raw) ?? 'orchestrator'
+    return { id, name: m.name.trim(), kind: m.kind, role: m.role, reportsTo }
+  })
 }

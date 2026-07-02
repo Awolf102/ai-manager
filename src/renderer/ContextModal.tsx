@@ -34,6 +34,7 @@ function Thumb({ file }: { file: ContextFile }) {
 
 const KINDS: { k: AgentKind; label: string }[] = [
   { k: 'orchestrator', label: 'Orchestrator' },
+  { k: 'director', label: 'Directors' },
   { k: 'manager', label: 'Managers' },
   { k: 'worker', label: 'Workers' }
 ]

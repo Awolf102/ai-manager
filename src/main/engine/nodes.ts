@@ -43,6 +43,7 @@ import { parseAskUser, redactUserAnswer } from '../../shared/ask-user'
 import { parseFollowUps, parseFollowUpAsk } from '../../shared/follow-through'
 import { clampEffort } from '../../shared/model-caps'
 import { capEffort } from '../../shared/token-efficiency'
+import { parallelCap } from '../../shared/team-scale'
 
 export const MAX_PARALLEL = 3
 
@@ -466,7 +467,7 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
       list.push(t)
       byOwner.set(t.ownerId!, list)
     }
-    await mapCapped([...byOwner.entries()], MAX_PARALLEL, ([ownerId, group]) => runGroup(ownerId, group))
+    await mapCapped([...byOwner.entries()], parallelCap(getSettings()), ([ownerId, group]) => runGroup(ownerId, group))
 
     // ── Workers asked during this wave → queue them; present up to the per-source budget. ──
     if (asks.length > 0 && !eng.abort.signal.aborted) {
@@ -541,7 +542,7 @@ async function domainReviewNode(state: RunState, _io: NodeIO, eng: Eng): Promise
   }
 
   const recorded: TaskVerdict[] = []
-  await mapCapped([...groups.entries()], MAX_PARALLEL, async ([reviewerId, group]) => {
+  await mapCapped([...groups.entries()], parallelCap(getSettings()), async ([reviewerId, group]) => {
     if (eng.abort.signal.aborted) return
     setStatus(eng, steps, reviewerId, 'reviewing', group.map((t) => t.task.title))
     const items = group.map((t) => ({
@@ -642,7 +643,7 @@ async function repairNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeRe
   const steps = { ...state.steps }
   const failed = Object.values(tasks).filter((t) => t.ownerId && t.status === 'failed')
 
-  await mapCapped(failed, MAX_PARALLEL, async (t) => {
+  await mapCapped(failed, parallelCap(getSettings()), async (t) => {
     if (eng.abort.signal.aborted) return
     const ownerId = t.ownerId!
     setStatus(eng, steps, ownerId, 'working', [t.task.title])
@@ -758,7 +759,7 @@ async function reflectNode(state: RunState, _io: NodeIO, eng: Eng): Promise<Node
   }
   const steps = { ...state.steps }
   const reflections = [...state.reflections]
-  await mapCapped(workerIdsOf(state.tasks), MAX_PARALLEL, async (wid) => {
+  await mapCapped(workerIdsOf(state.tasks), parallelCap(getSettings()), async (wid) => {
     if (eng.abort.signal.aborted) return
     const wTasks = owned.filter((t) => t.ownerId === wid)
     setStatus(eng, steps, wid, 'reflecting', wTasks.map((t) => t.task.title))
@@ -778,7 +779,7 @@ async function reflectNode(state: RunState, _io: NodeIO, eng: Eng): Promise<Node
   })
 
   // reviewers (managers + the orchestrator's integration pass) reflect on their QA work
-  await mapCapped(reviewerIdsOf(state), MAX_PARALLEL, async (rid) => {
+  await mapCapped(reviewerIdsOf(state), parallelCap(getSettings()), async (rid) => {
     if (eng.abort.signal.aborted) return
     const reviewed =
       rid === state.orchestratorId
@@ -850,7 +851,7 @@ async function planStep(
   const parsed = await runStructured(
     eng,
     orchestratorId,
-    planPrompt(goal),
+    planPrompt(goal, getSettings().largeTeamMode),
     (v): v is { tasks: unknown[] } => Array.isArray((v as { tasks?: unknown })?.tasks),
     { permissionMode: 'default', disallowedTools: THINK_DISALLOW }
   )
@@ -1192,21 +1193,24 @@ function ownedTasks(state: RunState): TaskState[] {
   return Object.values(state.tasks).filter((t) => t.ownerId)
 }
 
-/** True when at least one owned task's immediate parent is a manager (the team is two-tier). */
+/** True when at least one owned task's immediate parent is a manager or director (an intermediate review tier exists). */
 export function hasManagers(state: RunState): boolean {
-  return ownedTasks(state).some((t) => parentOf(t.ownerId!)?.kind === 'manager')
+  return ownedTasks(state).some((t) => {
+    const k = parentOf(t.ownerId!)?.kind
+    return k === 'manager' || k === 'director'
+  })
 }
 
 /**
- * The nodes that performed a review this run, for reflection: the manager parents of owned
- * tasks, plus the orchestrator when the integration pass ran (i.e. when managers exist).
- * Empty for flat teams — so flat teams keep worker-only reflection.
+ * The nodes that performed a review this run, for reflection: the manager or director parents
+ * of owned tasks, plus the orchestrator when the integration pass ran (i.e. when an intermediate
+ * tier exists). Empty for flat teams — so flat teams keep worker-only reflection.
  */
 export function reviewerIdsOf(state: RunState): string[] {
   const ids = new Set<string>()
   for (const t of ownedTasks(state)) {
     const p = parentOf(t.ownerId!)
-    if (p && p.kind === 'manager') ids.add(p.id)
+    if (p && (p.kind === 'manager' || p.kind === 'director')) ids.add(p.id)
   }
   if (hasManagers(state)) ids.add(state.orchestratorId)
   return [...ids]
@@ -1465,11 +1469,14 @@ export function formatFollowUps(state: RunState): string {
 const STRICT_REMINDER =
   '\n\nIMPORTANT: Your previous reply could not be parsed. Reply with ONLY the JSON code block described above — no prose before or after.'
 
-function planPrompt(goal: string): string {
+export function planPrompt(goal: string, largeTeam = false): string {
+  const scale = largeTeam
+    ? `\n\nThis is a LARGE team. Plan at a BROAD, PROGRAM level: produce a small number (~3–8) of high-level workstreams, each of which a director or manager can own and break down further with their own team. Prefer few broad tasks over many fine-grained ones.`
+    : ''
   return `You are planning work to achieve the user's goal for this project. You may READ files to inform the plan, but do NOT make any changes.
 
 GOAL:
-${goal}
+${goal}${scale}
 
 Produce a concise, ordered list of concrete tasks that together fully achieve the goal. Each task should be self-contained and suitable to hand to a single specialist. Prefer the smallest set of tasks that covers the goal.
 

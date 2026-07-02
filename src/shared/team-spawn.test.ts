@@ -115,6 +115,23 @@ describe('parseSpawnedTeam model', () => {
   })
 })
 
+describe('director-aware spawn', () => {
+  it('is byte-for-byte when largeTeam is off', () => {
+    expect(spawnTeamPrompt('g', 'Orky', [])).toBe(spawnTeamPrompt('g', 'Orky', [], [], false, false))
+    expect(spawnTeamPrompt('g', 'Orky', [])).not.toContain('director')
+  })
+  it('mentions directors when largeTeam is on', () => {
+    const p = spawnTeamPrompt('g', 'Orky', [], [], false, true)
+    expect(p).toContain('director')
+    expect(p).toContain('director|manager|worker')
+  })
+  it('parses a director member', () => {
+    const text = '```json\n{ "members": [ { "id": "d1", "name": "Lead", "kind": "director", "role": "r", "reportsTo": "orchestrator" } ] }\n```'
+    const members = parseSpawnedTeam(text)
+    expect(members?.[0].kind).toBe('director')
+  })
+})
+
 describe('pickSpawnModel', () => {
   it('uses the proposed model when autoAssign is on and it is set', () => {
     expect(pickSpawnModel({ id: 'a', name: 'A', kind: 'worker', role: 'r', reportsTo: 'orchestrator', model: 'claude-opus-4-8' }, true)).toBe('claude-opus-4-8')

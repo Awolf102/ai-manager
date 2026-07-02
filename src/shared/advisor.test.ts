@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { DEFAULT_SETTINGS } from './types'
-import { advisorSystemPrompt, parseBrief, applyableSettings, type AdvisorContext } from './advisor'
+import { advisorSystemPrompt, parseBrief, applyableSettings, briefTeamToSpawnedMembers, type AdvisorContext } from './advisor'
 
 const ctx: AdvisorContext = {
   projectName: 'Acme',
@@ -40,6 +40,29 @@ describe('parseBrief', () => {
   it('ignores a bare unlabeled code fence (requires a brief/json label)', () => {
     expect(parseBrief('here is an example:\n```\n{"goal":"nope"}\n```')).toBeNull()
     expect(parseBrief('```json\n{"goal":"yes"}\n```')).toEqual({ goal: 'yes' })
+  })
+})
+
+describe('briefTeamToSpawnedMembers', () => {
+  it('resolves reportsTo by member name and defaults to orchestrator', () => {
+    const out = briefTeamToSpawnedMembers([
+      { name: 'Platform Lead', kind: 'director', role: 'r' },
+      { name: 'API Manager', kind: 'manager', role: 'r', reportsTo: 'Platform Lead' },
+      { name: 'DB Worker', kind: 'worker', role: 'r', reportsTo: 'API Manager' }
+    ])
+    expect(out).toHaveLength(3)
+    expect(out[0].reportsTo).toBe('orchestrator') // no reportsTo → orchestrator
+    expect(out[1].reportsTo).toBe(out[0].id)      // by name
+    expect(out[2].reportsTo).toBe(out[1].id)
+    expect(out[0].kind).toBe('director')
+  })
+  it('sends an unknown or literal-orchestrator reportsTo to orchestrator', () => {
+    const out = briefTeamToSpawnedMembers([
+      { name: 'A', kind: 'worker', role: 'r', reportsTo: 'orchestrator' },
+      { name: 'B', kind: 'worker', role: 'r', reportsTo: 'Nobody' }
+    ])
+    expect(out[0].reportsTo).toBe('orchestrator')
+    expect(out[1].reportsTo).toBe('orchestrator')
   })
 })
 

@@ -44,6 +44,7 @@ import {
   applyReflection,
   getRecentProjects,
   isValidBrainPath,
+  roleTemplate,
 } from './project-store'
 
 async function tmpProject(): Promise<string> {
@@ -554,6 +555,18 @@ describe('team-write transactionality (#15)', () => {
     }
     const reopened = await openProject(proj)
     expect(reopened.nodes).toHaveLength(0) // nothing imported
+  })
+})
+
+describe('roleTemplate', () => {
+  it('gives a director a program-lead role', () => {
+    const r = roleTemplate('Platform Lead', 'director')
+    expect(r).toContain('# Role: Platform Lead (Director)')
+    expect(r.toLowerCase()).toContain('program')
+    expect(r.toLowerCase()).toContain('managers')
+  })
+  it('is unchanged for a worker (no director leakage)', () => {
+    expect(roleTemplate('X', 'worker')).toContain('(Worker)')
   })
 })
 

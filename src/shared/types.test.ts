@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_SETTINGS } from './types'
+import { DEFAULT_SETTINGS, AGENT_KINDS, DEFAULT_MODEL_BY_KIND } from './types'
+import { iconForName } from './icons'
 
 describe('DEFAULT_SETTINGS token-efficiency fields', () => {
   it('defaults every token-efficiency lever to off/neutral', () => {
@@ -21,5 +22,17 @@ describe('follow-through setting', () => {
 describe('follow-through ask settings', () => {
   it('defaults maxFollowThrough to 0', () => {
     expect(DEFAULT_SETTINGS.maxFollowThrough).toBe(0)
+  })
+})
+
+describe('director AgentKind', () => {
+  it('is in AGENT_KINDS in chain order', () => {
+    expect(AGENT_KINDS).toEqual(['orchestrator', 'director', 'manager', 'worker'])
+  })
+  it('defaults a director to Opus', () => {
+    expect(DEFAULT_MODEL_BY_KIND.director).toBe('claude-opus-4-8')
+  })
+  it('falls back a director icon to compass', () => {
+    expect(iconForName('Delivery Lead', 'director')).toBe('compass')
   })
 })

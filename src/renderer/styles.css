@@ -369,6 +369,9 @@ button {
 .agent-node.kind-orchestrator {
   background-image: var(--gloss), radial-gradient(140% 90% at 0% 0%, var(--orchestrator-tint), transparent 62%);
 }
+.agent-node.kind-director {
+  background-image: var(--gloss), radial-gradient(140% 90% at 0% 0%, var(--director-tint), transparent 62%);
+}
 .agent-node.kind-manager {
   background-image: var(--gloss), radial-gradient(140% 90% at 0% 0%, var(--manager-tint), transparent 62%);
 }
@@ -394,6 +397,7 @@ button {
 }
 
 .kind-orchestrator .agent-icon { color: var(--orchestrator); background: var(--orchestrator-tint); }
+.kind-director .agent-icon { color: var(--director); background: var(--director-tint); }
 .kind-manager .agent-icon { color: var(--manager); background: var(--manager-tint); }
 .kind-worker .agent-icon { color: var(--worker); background: var(--worker-tint); }
 
@@ -410,6 +414,7 @@ button {
 
 .agent-kind { font-size: var(--text-xs); color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.5px; }
 .kind-orchestrator .agent-kind { color: var(--orchestrator); }
+.kind-director .agent-kind { color: var(--director); }
 .kind-manager .agent-kind { color: var(--manager); }
 .kind-worker .agent-kind { color: var(--worker); }
 
@@ -1626,6 +1631,8 @@ button {
 /* role-tinted agent names — tree + narration feed (rose stays as the unknown fallback) */
 .run-row-name.kind-orchestrator,
 .activity-agent.kind-orchestrator { color: var(--orchestrator); }
+.run-row-name.kind-director,
+.activity-agent.kind-director { color: var(--director); }
 .run-row-name.kind-manager,
 .activity-agent.kind-manager { color: var(--manager); }
 .run-row-name.kind-worker,

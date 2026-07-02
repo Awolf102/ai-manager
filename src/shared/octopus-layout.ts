@@ -1,6 +1,6 @@
 export interface LayoutNode {
   id: string
-  kind: 'orchestrator' | 'manager' | 'worker'
+  kind: 'orchestrator' | 'director' | 'manager' | 'worker'
 }
 export interface LayoutEdge {
   source: string

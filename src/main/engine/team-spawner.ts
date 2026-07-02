@@ -28,7 +28,7 @@ export async function spawnTeam(
   })
   const offered = offeredSkills(discovered, 40)
   const validIds = discovered.flatMap((p) => p.skills.map((sk) => sk.id))
-  const base = spawnTeamPrompt(opts.goal, getAgent(opts.orchestratorId).name, agents, offered, getSettings().autoAssignModels)
+  const base = spawnTeamPrompt(opts.goal, getAgent(opts.orchestratorId).name, agents, offered, s.autoAssignModels, s.largeTeamMode)
   let last = ''
   for (let attempt = 0; attempt < 2; attempt++) {
     const { text } = await runAgent({

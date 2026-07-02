@@ -4,7 +4,7 @@
 import type { EnvEntry } from './env-file'
 export type { EnvEntry } from './env-file'
 
-export type AgentKind = 'orchestrator' | 'manager' | 'worker'
+export type AgentKind = 'orchestrator' | 'director' | 'manager' | 'worker'
 
 export type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | 'auto'
 
@@ -13,7 +13,7 @@ export type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | '
 export interface SpawnedMember {
   id: string
   name: string
-  kind: 'manager' | 'worker'
+  kind: 'director' | 'manager' | 'worker'
   role: string
   reportsTo: string
   model?: string
@@ -135,6 +135,12 @@ export interface ProjectSettings {
   followThrough: 'off' | 'headless' | 'ask'
   /** pause budget for followThrough === 'ask' (0 = no pauses) */
   maxFollowThrough: number
+  /** master toggle for large-team behaviors: broad planning + director spawn/draft + raised concurrency (off = byte-for-byte) */
+  largeTeamMode: boolean
+  /** concurrency cap used only when largeTeamMode is on (clamped 1–24) */
+  largeTeamParallel: number
+  /** per-action ceiling for bulk create/duplicate (clamped 1–100) */
+  bulkCreateMax: number
 }
 
 export const DEFAULT_SETTINGS: ProjectSettings = {
@@ -161,12 +167,15 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   cheapModelTier: 'claude-haiku-4-5',
   lightPrompts: false,
   followThrough: 'off',
-  maxFollowThrough: 0
+  maxFollowThrough: 0,
+  largeTeamMode: false,
+  largeTeamParallel: 6,
+  bulkCreateMax: 25
 }
 
 /** Which agents a context item applies to. Absent OR (kinds empty AND nodeIds empty) ⇒ all agents. */
 export interface ContextScope {
-  kinds?: AgentKind[] // 'orchestrator' | 'manager' | 'worker'
+  kinds?: AgentKind[] // any subset of AgentKind
   nodeIds?: string[] // specific AgentNodeData ids
 }
 
@@ -560,10 +569,11 @@ export const PERMISSION_MODES: PermissionMode[] = [
   'auto'
 ]
 
-export const AGENT_KINDS: AgentKind[] = ['orchestrator', 'manager', 'worker']
+export const AGENT_KINDS: AgentKind[] = ['orchestrator', 'director', 'manager', 'worker']
 
 export const DEFAULT_MODEL_BY_KIND: Record<AgentKind, string> = {
   orchestrator: 'claude-opus-4-8',
+  director: 'claude-opus-4-8',
   manager: 'claude-opus-4-8',
   worker: 'claude-sonnet-4-6'
 }
@@ -574,6 +584,7 @@ export const IPC = {
   openProject: 'project:open',
   getRecentProjects: 'project:recents',
   createAgent: 'agent:create',
+  duplicateAgent: 'agent:duplicate',
   updateAgent: 'agent:update',
   deleteAgent: 'agent:delete',
   setEdges: 'graph:setEdges',
@@ -652,6 +663,7 @@ export interface RendererApi {
   openProject: (path: string) => Promise<ProjectGraph | null>
   getRecentProjects: () => Promise<ProjectMeta[]>
   createAgent: (input: CreateAgentInput) => Promise<ProjectGraph>
+  duplicateAgent: (input: { sourceId: string; count: number; model?: string }) => Promise<ProjectGraph>
   updateAgent: (agent: Partial<AgentNodeData> & { id: string }) => Promise<ProjectGraph>
   deleteAgent: (agentId: string) => Promise<ProjectGraph>
   setEdges: (edges: GraphEdge[]) => Promise<ProjectGraph>

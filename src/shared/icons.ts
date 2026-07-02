@@ -11,6 +11,7 @@ export type IconKey =
   | 'flask'
   | 'clipboard'
   | 'crown'
+  | 'compass'
   | 'shield'
   | 'pencil'
   | 'search'
@@ -40,6 +41,7 @@ const RULES: { pattern: RegExp; icon: IconKey }[] = [
 
 const KIND_FALLBACK: Record<string, IconKey> = {
   orchestrator: 'crown',
+  director: 'compass',
   manager: 'clipboard',
   worker: 'bot'
 }

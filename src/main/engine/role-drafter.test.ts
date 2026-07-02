@@ -13,7 +13,7 @@ const h = vi.hoisted(() => ({
 vi.mock('./project-store', () => ({
   rosterForDrafting: async () => h.roster,
   getAgent: (id: string) => ({ id, name: 'Boss' }),
-  getSettings: () => ({ skillInstallThreshold: 100000 })
+  getSettings: () => ({ skillInstallThreshold: 100000, largeTeamMode: false })
 }))
 vi.mock('./agent-runner', () => ({ streamAgent: async () => ({ text: '' }) }))
 vi.mock('./skill-discovery', () => ({ discoverSkills: async () => [] }))

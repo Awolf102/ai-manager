@@ -20,6 +20,7 @@ import {
   formatFollowUps,
   assignPrompt,
   workerPrompt,
+  planPrompt,
   type Eng,
   type AgentRunner
 } from './nodes'
@@ -41,6 +42,7 @@ const h = vi.hoisted(() => {
   return {
     agents: {
       o: mk('o', 'orchestrator'),
+      d: mk('d', 'director'),
       m: mk('m', 'manager'),
       w1: mk('w1', 'worker'),
       w2: mk('w2', 'worker')
@@ -56,7 +58,10 @@ const h = vi.hoisted(() => {
       maxReplans: 0,
       maxHandoffs: 0,
       maxUserRequests: 0,
-      followThrough: 'off'
+      followThrough: 'off',
+      largeTeamMode: false,
+      largeTeamParallel: 6,
+      bulkCreateMax: 25
     },
     memory: {} as Record<string, string>,
     reflections: [] as { id: string }[]
@@ -622,6 +627,22 @@ describe('hasManagers / reviewerIdsOf', () => {
 
   it('two-tier: the manager parent + the orchestrator are reviewers', () => {
     h.children = { o: ['m'], m: ['w1', 'w2'], w1: [], w2: [] }
+    const s = stateWith({ t1: { ownerId: 'w1' }, t2: { ownerId: 'w2' } })
+    expect(hasManagers(s)).toBe(true)
+    expect(reviewerIdsOf(s).sort()).toEqual(['m', 'o'])
+    h.children = { o: ['w1', 'w2'], w1: [], w2: [] }
+  })
+
+  it('director tier: a worker under a director → director + orchestrator review', () => {
+    h.children = { o: ['d'], d: ['w1', 'w2'], w1: [], w2: [] }
+    const s = stateWith({ t1: { ownerId: 'w1' }, t2: { ownerId: 'w2' } })
+    expect(hasManagers(s)).toBe(true)
+    expect(reviewerIdsOf(s).sort()).toEqual(['d', 'o'])
+    h.children = { o: ['w1', 'w2'], w1: [], w2: [] }
+  })
+
+  it('three tiers: workers under a manager under a director → manager + orchestrator', () => {
+    h.children = { o: ['d'], d: ['m'], m: ['w1', 'w2'], w1: [], w2: [] }
     const s = stateWith({ t1: { ownerId: 'w1' }, t2: { ownerId: 'w2' } })
     expect(hasManagers(s)).toBe(true)
     expect(reviewerIdsOf(s).sort()).toEqual(['m', 'o'])
@@ -2097,5 +2118,15 @@ describe('follow-through ask (engine)', () => {
     const e2 = eng(cannedAgent().runAgent)
     await resumeGraph(buildOrchestratorGraph(e2), 'run1', store, makeIO(e2.abort.signal, store), 'chat panel')
     expect(e2.followUps.some((f) => f.decision === 'chat panel' && f.summary === 'chat icon unspecified')).toBe(true)
+  })
+})
+
+describe('planPrompt broad planning', () => {
+  it('is byte-for-byte when largeTeam is off', () => {
+    expect(planPrompt('build X')).toBe(planPrompt('build X', false))
+    expect(planPrompt('build X')).not.toMatch(/program/i)
+  })
+  it('asks for a broad program-level plan when on', () => {
+    expect(planPrompt('build X', true)).toMatch(/program/i)
   })
 })
