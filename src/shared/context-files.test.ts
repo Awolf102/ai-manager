@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isImageName, uniqueContextName, buildContextBlock, scopeAppliesTo, scopeLabel } from './context-files'
+import { isImageName, uniqueContextName, buildContextBlock, buildWritableDirsBlock, scopeAppliesTo, scopeLabel } from './context-files'
 import type { ContextFile, ContextFolder, AgentNodeData } from './types'
 
 const mk = (over: Partial<ContextFile>): ContextFile => ({
@@ -152,5 +152,18 @@ describe('buildContextBlock with folders', () => {
     const out = buildContextBlock([mk({ fileName: 'a.md' })], [mkFolder({ path: '/code' })])
     expect(out).toContain('## Reference context the user provided')
     expect(out).toContain('## Referenced folders')
+  })
+})
+
+describe('buildWritableDirsBlock', () => {
+  it('returns empty string for empty/undefined input', () => {
+    expect(buildWritableDirsBlock()).toBe('')
+    expect(buildWritableDirsBlock([])).toBe('')
+  })
+  it('emits a Working directories section listing each path', () => {
+    const out = buildWritableDirsBlock(['/repo/shared', '/other/lib'])
+    expect(out).toContain('## Working directories (read + write)')
+    expect(out).toContain('- /repo/shared')
+    expect(out).toContain('- /other/lib')
   })
 })
