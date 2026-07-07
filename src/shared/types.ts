@@ -8,6 +8,9 @@ export type { OutputImage } from './output-images'
 
 export type AgentKind = 'orchestrator' | 'director' | 'manager' | 'worker'
 
+/** The runtime an agent executes on. Absent ⇒ 'claude-sdk' (the default). SP2 widens this union. */
+export type HarnessId = 'claude-sdk'
+
 export type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | 'auto'
 
 /** One agent the orchestrator proposes when building a team. `reportsTo` is another
@@ -55,6 +58,8 @@ export interface AgentNodeData {
   skills?: string[]
   /** references a ProjectGraph.backends entry; absent = default Claude login (byte-for-byte) */
   backendId?: string
+  /** the runtime this agent executes on; absent = 'claude-sdk' (the default, byte-for-byte) */
+  harness?: HarnessId
   /** last Claude Code session id captured from a headless run (for --resume) */
   sessionId?: string
   /** stable team-member identity that survives export/import (used by the portable-team feature) */

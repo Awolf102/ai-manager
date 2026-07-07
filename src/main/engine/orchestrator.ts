@@ -7,8 +7,8 @@ import type { WebContents } from 'electron'
 import type { OrchestrationEvent, ResumableRun, RunState, StartRunInput } from '../../shared/types'
 import { IPC } from '../../shared/types'
 import { toRunRecord, toRunStatus } from '../../shared/run-state'
-import { streamAgent } from './agent-runner'
 import { runGraph, resumeGraph, type NodeIO } from './graph'
+import { dispatchAgent } from './harness/registry'
 import { actingModeFor, buildOrchestratorGraph, seedRunState, type Eng } from './nodes'
 import { createRunStore, toResumableSummaries, type RunStore } from './run-store'
 import {
@@ -87,7 +87,7 @@ function makeDeps(
   const emitFn = (e: OrchestrationEvent): void => emit(wc, e)
   const headersPrinted = new Set<string>()
   const runAgent: Eng['runAgent'] = (opts) =>
-    streamAgent({ ...opts, header: headerGate(headersPrinted, opts.agentId, opts.header) })
+    dispatchAgent({ ...opts, header: headerGate(headersPrinted, opts.agentId, opts.header) })
   const eng: Eng = { wc, abort, runId, runAgent, emit: emitFn, handoffs: [], followUps: [] }
   const io: NodeIO = {
     signal: abort.signal,
