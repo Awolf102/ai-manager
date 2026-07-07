@@ -1,8 +1,16 @@
 import { streamAgent } from '../agent-runner'
 import { getAgent } from '../project-store'
 import type { StreamAgentOptions } from '../agent-runner'
+import type { AgentRunner } from '../nodes'
 import type { HarnessId } from '../../../shared/types'
 import type { Harness } from './types'
+
+/**
+ * Compile-time tripwire: every Harness must be usable as the engine's runAgent
+ * seam (Eng.runAgent = AgentRunner). If Harness.run or AgentRunner ever drifts,
+ * this assignment stops compiling — so SP2 harnesses are guaranteed to satisfy it.
+ */
+const _harnessRunSatisfiesAgentRunner: (h: Harness) => AgentRunner = (h) => h.run
 
 /** The Claude Agent SDK harness — the current (and, in SP1, only) runtime. */
 const claudeSdkHarness: Harness = { run: streamAgent }
