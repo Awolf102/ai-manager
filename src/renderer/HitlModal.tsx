@@ -10,7 +10,7 @@ export default function HitlModal() {
 
   const pending = run.pendingInterrupt
   if (!pending) return null
-  if (pending.kind === 'follow-through') return null
+  if (pending.kind === 'follow-through' || pending.kind === 'design-preview') return null
 
   if (run.interruptMinimized) {
     return (
