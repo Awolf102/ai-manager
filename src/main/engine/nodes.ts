@@ -44,6 +44,7 @@ import { parseFollowUps, parseFollowUpAsk } from '../../shared/follow-through'
 import { clampEffort } from '../../shared/model-caps'
 import { capEffort } from '../../shared/token-efficiency'
 import { parallelCap } from '../../shared/team-scale'
+import { designPreviewPrompt, INSPIRATION_GUIDE } from '../../shared/design-preview'
 
 export const MAX_PARALLEL = 3
 
@@ -102,11 +103,13 @@ export function seedRunState(args: {
 // ---------- the graph ----------
 
 export function buildOrchestratorGraph(eng: Eng): CompiledGraph {
+  const gate = getSettings().designPreview
   return {
     entry: 'plan',
     edges: {
       plan: 'route',
-      route: 'execute',
+      route: gate ? 'designPreviewGate' : 'execute',
+      ...(gate ? { designPreviewGate: 'execute' } : {}),
       execute: 'domainReview',
       replan: 'execute',
       escalate: 'reflect',
@@ -119,6 +122,7 @@ export function buildOrchestratorGraph(eng: Eng): CompiledGraph {
     nodes: {
       plan: (s, io) => planNode(s, io, eng),
       route: (s, io) => routeNode(s, io, eng),
+      ...(gate ? { designPreviewGate: (s, io) => designPreviewGateNode(s, io, eng) } : {}),
       execute: (s, io) => executeNode(s, io, eng),
       replan: (s, io) => replanNode(s, io, eng),
       escalate: (s, io) => escalateNode(s, io, eng),
@@ -319,6 +323,55 @@ export async function resumeFollowUpAsk(
   eng.emit({ runId: eng.runId, type: 'follow-up', workerId: item.ownerId, summary: item.summary ?? '', decision })
 }
 
+interface DesignDecision {
+  decision: 'approve' | 'changes'
+  feedback?: string
+}
+
+/** Run one focused orchestrator acting-call to (re)write design-preview.html. Throws on agent error. */
+async function generateDesignPreview(eng: Eng, state: RunState, feedback?: string): Promise<void> {
+  const s = getSettings()
+  const guide = s.usePreMadeInspirationGuide ? INSPIRATION_GUIDE : ''
+  const fb = feedback
+    ? `\n\nThe user requested changes to the previous preview: ${feedback}\nProduce a revised design-preview.html that addresses this.`
+    : ''
+  await eng.runAgent({
+    wc: eng.wc,
+    agentId: state.orchestratorId,
+    prompt: designPreviewPrompt(state.goal, guide) + fb,
+    runId: eng.runId,
+    stepId: state.orchestratorId,
+    permissionMode: state.actingMode,
+    abort: eng.abort
+  })
+}
+
+/**
+ * Design-preview approval gate. On fresh entry (or a 'changes' resume) it generates
+ * a preview and pauses (interrupt). On an 'approve' resume it records approval and
+ * proceeds to execute. Fails open (→ execute) if generation throws — never blocks a build.
+ */
+async function designPreviewGateNode(state: RunState, _io: NodeIO, eng: Eng): Promise<NodeResult> {
+  const decision = state.resumeInput as DesignDecision | undefined
+  if (decision?.decision === 'approve') {
+    return { patch: { resumeInput: undefined, designPreviewApproved: true, phase: 'executing' }, goto: 'execute' }
+  }
+  const steps = { ...state.steps }
+  setStatus(eng, steps, state.orchestratorId, 'working')
+  const feedback = decision?.decision === 'changes' ? decision.feedback : undefined
+  try {
+    await generateDesignPreview(eng, state, feedback)
+  } catch {
+    // fail-open: a preview failure must never block the build
+    return { patch: { resumeInput: undefined, steps, phase: 'executing' }, goto: 'execute' }
+  }
+  const iteration = (state.designPreviewIteration ?? 0) + 1
+  return {
+    patch: { resumeInput: undefined, steps, designPreviewIteration: iteration, phase: 'previewing' },
+    interrupt: { kind: 'design-preview', prompt: 'Review the design preview', payload: { iteration } }
+  }
+}
+
 async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeResult> {
   const tasks = structuredClone(state.tasks)
   const steps = { ...state.steps }
@@ -381,7 +434,7 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
       const base: StreamAgentOptions = {
         wc: eng.wc,
         agentId: ownerId,
-        prompt: workerPrompt(state.goal, group.map((t) => t.task), es.lightPrompts, es.visionMode) + (asksAvailable() ? askUserSection() : '') + (es.followThrough === 'headless' ? followThroughSection() : '') + (es.followThrough === 'ask' ? followThroughAskSection() : ''),
+        prompt: workerPrompt(state.goal, group.map((t) => t.task), es.lightPrompts, es.visionMode, state.designPreviewApproved === true) + (asksAvailable() ? askUserSection() : '') + (es.followThrough === 'headless' ? followThroughSection() : '') + (es.followThrough === 'ask' ? followThroughAskSection() : ''),
         runId: eng.runId,
         stepId: ownerId,
         permissionMode: state.actingMode,
@@ -1538,8 +1591,11 @@ Reply with ONLY this JSON code block (no other text):
 \`\`\``
 }
 
-export function workerPrompt(goal: string, tasks: RunTask[], light = false, vision = false): string {
+export function workerPrompt(goal: string, tasks: RunTask[], light = false, vision = false, designApproved = false): string {
   const list = tasks.map((t, i) => `${i + 1}. ${t.title}\n   ${t.description}`).join('\n\n')
+  const designNote = designApproved
+    ? ' An approved design-system preview is at design-preview.html — build the UI to match its palette, type, and components.'
+    : ''
   if (light) {
     const qa = vision
       ? 'If your work is a design, brand, or copy deliverable, evaluate it against the creative intent — check visual hierarchy, brand and tonal consistency, and typographic craft — before reporting success.'
@@ -1550,7 +1606,7 @@ Complete the following task(s) in this project folder, making the necessary chan
 
 ${list}
 
-${qa} When finished, briefly report what you changed and flag anything you could not complete.`
+${qa}${designNote} When finished, briefly report what you changed and flag anything you could not complete.`
   }
   const qa = vision
     ? 'If your work is a design, brand, or copy deliverable, do not rely on "it looks right" — evaluate it against the creative intent: check visual hierarchy, brand and tonal consistency, typographic craft, and that it reads as intended for its audience. Don\'t report success until the deliverable holds together.'
@@ -1562,7 +1618,7 @@ You have been assigned the following task(s). Complete them in this project fold
 
 ${list}
 
-${qa}
+${qa}${designNote}
 
 When finished, briefly report what you changed and flag anything you could not complete.`
 }

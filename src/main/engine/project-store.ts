@@ -64,6 +64,15 @@ export function getGraph(): ProjectGraph {
   return requireCurrent().graph
 }
 
+/** Read the design-preview HTML from the project root; '' if it doesn't exist. */
+export async function readDesignPreview(): Promise<string> {
+  try {
+    return await fs.readFile(join(getCurrentProjectPath(), 'design-preview.html'), 'utf8')
+  } catch {
+    return ''
+  }
+}
+
 export function getAgent(agentId: string): AgentNodeData {
   const { graph } = requireCurrent()
   const agent = graph.nodes.find((n) => n.id === agentId)

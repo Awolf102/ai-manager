@@ -1891,6 +1891,19 @@ describe('workerPrompt vision reframe', () => {
   })
 })
 
+describe('workerPrompt design-preview reference', () => {
+  const task = { id: 't1', title: 'T', description: 'D' }
+  it('appends the approved-design reference when designApproved is true', () => {
+    expect(workerPrompt('g', [task], false, false, true)).toContain('design-preview.html')
+    expect(workerPrompt('g', [task], true, false, true)).toContain('design-preview.html')
+  })
+  it('is byte-identical to today when designApproved is false/omitted', () => {
+    expect(workerPrompt('g', [task], false, false, false)).toBe(workerPrompt('g', [task], false, false))
+    expect(workerPrompt('g', [task], true, false, false)).toBe(workerPrompt('g', [task], true, false))
+    expect(workerPrompt('g', [task], false, false, false)).not.toContain('design-preview.html')
+  })
+})
+
 describe('followThroughSection', () => {
   it('is a non-empty instruction that references the followup block', () => {
     const s = followThroughSection()
@@ -2148,5 +2161,87 @@ describe('planPrompt broad planning', () => {
     expect(planPrompt('build X')).toBe(planPrompt('build X', false, false))
     expect(planPrompt('build X')).not.toMatch(/CREATIVE \/ DESIGN/)
     expect(planPrompt('build X', false, true)).toMatch(/design deliverables/i)
+  })
+})
+
+describe('designPreviewGate', () => {
+  afterEach(() => {
+    h.settings.designPreview = false
+    h.settings.usePreMadeInspirationGuide = false
+  })
+
+  function baseState(extra: Partial<RunState> = {}): RunState {
+    return { ...seedRunState({ runId: 'run1', goal: 'g', orchestratorId: 'o', actingMode: 'auto', startedAt: 'S' }), ...extra }
+  }
+
+  it('buildOrchestratorGraph inserts the gate between route and execute only when designPreview is on', () => {
+    h.settings.designPreview = false
+    const off = buildOrchestratorGraph(eng(async () => ({ text: '' })))
+    expect(off.edges.route).toBe('execute')
+    expect(off.nodes.designPreviewGate).toBeUndefined()
+
+    h.settings.designPreview = true
+    const on = buildOrchestratorGraph(eng(async () => ({ text: '' })))
+    expect(on.edges.route).toBe('designPreviewGate')
+    expect(on.edges.designPreviewGate).toBe('execute')
+    expect(typeof on.nodes.designPreviewGate).toBe('function')
+  })
+
+  it('fresh entry generates a preview and interrupts', async () => {
+    h.settings.designPreview = true
+    const calls: string[] = []
+    const e = eng(async (o) => {
+      calls.push(o.prompt)
+      return { text: 'ok' }
+    })
+    const store = fakeStore()
+    const graph = buildOrchestratorGraph(e)
+    const res = await graph.nodes.designPreviewGate(baseState({ resumeInput: undefined }), makeIO(e.abort.signal, store))
+    expect(calls[0]).toContain('design-preview.html')
+    expect(res.interrupt?.kind).toBe('design-preview')
+    expect(res.patch?.designPreviewIteration).toBe(1)
+  })
+
+  it('resume=approve proceeds to execute and records approval', async () => {
+    h.settings.designPreview = true
+    const e = eng(async () => ({ text: 'ok' }))
+    const store = fakeStore()
+    const graph = buildOrchestratorGraph(e)
+    const res = await graph.nodes.designPreviewGate(
+      baseState({ resumeInput: { decision: 'approve' } }),
+      makeIO(e.abort.signal, store)
+    )
+    expect(res.goto).toBe('execute')
+    expect(res.patch?.designPreviewApproved).toBe(true)
+  })
+
+  it('resume=changes regenerates with the feedback and re-interrupts', async () => {
+    h.settings.designPreview = true
+    const calls: string[] = []
+    const e = eng(async (o) => {
+      calls.push(o.prompt)
+      return { text: 'ok' }
+    })
+    const store = fakeStore()
+    const graph = buildOrchestratorGraph(e)
+    const res = await graph.nodes.designPreviewGate(
+      baseState({ resumeInput: { decision: 'changes', feedback: 'darker' }, designPreviewIteration: 1 }),
+      makeIO(e.abort.signal, store)
+    )
+    expect(calls[0]).toContain('darker')
+    expect(res.interrupt?.kind).toBe('design-preview')
+    expect(res.patch?.designPreviewIteration).toBe(2)
+  })
+
+  it('fails open to execute when generation throws', async () => {
+    h.settings.designPreview = true
+    const e = eng(async () => {
+      throw new Error('boom')
+    })
+    const store = fakeStore()
+    const graph = buildOrchestratorGraph(e)
+    const res = await graph.nodes.designPreviewGate(baseState({ resumeInput: undefined }), makeIO(e.abort.signal, store))
+    expect(res.goto).toBe('execute')
+    expect(res.interrupt).toBeUndefined()
   })
 })

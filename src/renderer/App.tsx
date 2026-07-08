@@ -17,6 +17,7 @@ import { BrandMark } from './BrandMark'
 import CanvasEmptyState from './CanvasEmptyState'
 import HitlModal from './HitlModal'
 import FollowThroughModal from './FollowThroughModal'
+import DesignPreviewModal from './DesignPreviewModal'
 import BranchChip from './BranchChip'
 import AddDirButton from './AddDirButton'
 import AdvisorModal from './AdvisorModal'
@@ -396,6 +397,7 @@ export default function App() {
       {showFaq && <FaqModal onClose={() => setShowFaq(false)} />}
       <HitlModal />
       <FollowThroughModal />
+      <DesignPreviewModal />
       <ConfirmDialog />
       <AdvisorModal />
       <ToastViewport />

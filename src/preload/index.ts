@@ -34,6 +34,7 @@ const api: RendererApi = {
   writeRole: (agentId, content) => ipcRenderer.invoke(IPC.writeRole, agentId, content),
   readEnv: () => ipcRenderer.invoke(IPC.readEnv),
   writeEnv: (entries: EnvEntry[]) => ipcRenderer.invoke(IPC.writeEnv, entries),
+  readDesignPreview: () => ipcRenderer.invoke(IPC.readDesignPreview),
   readMemory: (agentId) => ipcRenderer.invoke(IPC.readMemory, agentId),
   writeMemory: (agentId, content) => ipcRenderer.invoke(IPC.writeMemory, agentId, content),
   runHeadless: (input) => ipcRenderer.invoke(IPC.runHeadless, input),
