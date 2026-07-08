@@ -107,7 +107,7 @@ export function registerIpc(): void {
     orchestrator.startRun(e.sender, input)
   )
   ipcMain.handle(IPC.stopRun, (_e, runId: string) => orchestrator.stopRun(runId))
-  ipcMain.handle(IPC.resumeRun, (e: IpcMainInvokeEvent, runId: string, answer?: string) =>
+  ipcMain.handle(IPC.resumeRun, (e: IpcMainInvokeEvent, runId: string, answer?: unknown) =>
     orchestrator.resumeRun(e.sender, runId, answer)
   )
   ipcMain.handle(IPC.listResumable, () => orchestrator.listResumable())

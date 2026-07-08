@@ -152,6 +152,10 @@ export interface ProjectSettings {
   maxOutputTokens: number
   /** treat the project as a creative/design project: biases team-building + reframes worker/QA prompts toward creative fidelity (off = byte-for-byte) */
   visionMode: boolean
+  /** pause before building to show a design-system preview for approval (off = byte-for-byte) */
+  designPreview: boolean
+  /** inject the shipped de-branded structural guide into the design-preview generator (only meaningful when designPreview is on) */
+  usePreMadeInspirationGuide: boolean
 }
 
 export const DEFAULT_SETTINGS: ProjectSettings = {
@@ -183,7 +187,9 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   largeTeamParallel: 6,
   bulkCreateMax: 25,
   maxOutputTokens: 0,
-  visionMode: false
+  visionMode: false,
+  designPreview: false,
+  usePreMadeInspirationGuide: false
 }
 
 /** Which agents a context item applies to. Absent OR (kinds empty AND nodeIds empty) ⇒ all agents. */
@@ -474,6 +480,7 @@ export interface ServerReadyEvent {
 
 export type RunPhase =
   | 'planning'
+  | 'previewing'
   | 'routing'
   | 'executing'
   | 'reviewing'
@@ -564,6 +571,10 @@ export interface RunState {
   pendingInterrupt?: Interrupt
   /** human decision injected on resume; the paused node reads then clears it (Stage 3) */
   resumeInput?: unknown
+  /** design-preview gate: set true once the user approved the preview (checkpoint-only; undefined on old runs) */
+  designPreviewApproved?: boolean
+  /** design-preview gate: how many previews have been generated this run (display only) */
+  designPreviewIteration?: number
 }
 
 // ---- constants ----
@@ -701,7 +712,7 @@ export interface RendererApi {
   onPtyExit: (cb: (e: PtyExitEvent) => void) => () => void
   startRun: (input: StartRunInput) => Promise<{ runId: string }>
   stopRun: (runId: string) => Promise<void>
-  resumeRun: (runId: string, answer?: string) => Promise<void>
+  resumeRun: (runId: string, answer?: unknown) => Promise<void>
   listResumable: () => Promise<ResumableRun[]>
   discardRun: (runId: string) => Promise<void>
   listOutputImages: () => Promise<OutputImage[]>

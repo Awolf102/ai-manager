@@ -15,4 +15,9 @@ describe('DEFAULT_SETTINGS', () => {
   it('defaults maxOutputTokens to 0 (off — Claude Code default 32000, byte-for-byte)', () => {
     expect(DEFAULT_SETTINGS.maxOutputTokens).toBe(0)
   })
+
+  it('defaults design-preview fields to false (off — byte-for-byte)', () => {
+    expect(DEFAULT_SETTINGS.designPreview).toBe(false)
+    expect(DEFAULT_SETTINGS.usePreMadeInspirationGuide).toBe(false)
+  })
 })
