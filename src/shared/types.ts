@@ -618,6 +618,7 @@ export const IPC = {
   writeRole: 'role:write',
   readEnv: 'env:read',
   writeEnv: 'env:write',
+  readDesignPreview: 'design-preview:read',
   readMemory: 'memory:read',
   writeMemory: 'memory:write',
   runHeadless: 'run:headless',
@@ -698,6 +699,7 @@ export interface RendererApi {
   writeRole: (agentId: string, content: string) => Promise<void>
   readEnv: () => Promise<EnvEntry[]>
   writeEnv: (entries: EnvEntry[]) => Promise<void>
+  readDesignPreview: () => Promise<string>
   readMemory: (agentId: string) => Promise<string>
   writeMemory: (agentId: string, content: string) => Promise<void>
   runHeadless: (input: RunHeadlessInput) => Promise<{ runId: string }>

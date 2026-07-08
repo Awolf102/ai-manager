@@ -45,6 +45,7 @@ import {
   getRecentProjects,
   isValidBrainPath,
   roleTemplate,
+  readDesignPreview,
 } from './project-store'
 
 async function tmpProject(): Promise<string> {
@@ -618,5 +619,15 @@ describe('papercuts: project-store security', () => {
     // autoPushToTeam must NOT throw and must NOT recreate the file
     await autoPushToTeam()
     expect(existsSync(brainPath)).toBe(false)
+  })
+})
+
+describe('readDesignPreview', () => {
+  it('returns the file content, or empty string when absent', async () => {
+    const proj = await tmpProject()
+    await openProject(proj)
+    expect(await readDesignPreview()).toBe('')
+    await fs.writeFile(join(proj, 'design-preview.html'), '<h1>hi</h1>', 'utf8')
+    expect(await readDesignPreview()).toBe('<h1>hi</h1>')
   })
 })

@@ -78,6 +78,7 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.writeRole, (_e, id: string, content: string) => store.writeRole(id, content))
   ipcMain.handle(IPC.readEnv, () => envStore.readEnvFile())
   ipcMain.handle(IPC.writeEnv, (_e, entries: EnvEntry[]) => envStore.writeEnvFile(entries))
+  ipcMain.handle(IPC.readDesignPreview, () => store.readDesignPreview())
   ipcMain.handle(IPC.readMemory, (_e, id: string) => store.readMemory(id))
   ipcMain.handle(IPC.writeMemory, (_e, id: string, content: string) =>
     store.writeMemory(id, content)
