@@ -434,7 +434,7 @@ async function executeNode(state: RunState, io: NodeIO, eng: Eng): Promise<NodeR
       const base: StreamAgentOptions = {
         wc: eng.wc,
         agentId: ownerId,
-        prompt: workerPrompt(state.goal, group.map((t) => t.task), es.lightPrompts, es.visionMode) + (asksAvailable() ? askUserSection() : '') + (es.followThrough === 'headless' ? followThroughSection() : '') + (es.followThrough === 'ask' ? followThroughAskSection() : ''),
+        prompt: workerPrompt(state.goal, group.map((t) => t.task), es.lightPrompts, es.visionMode, state.designPreviewApproved === true) + (asksAvailable() ? askUserSection() : '') + (es.followThrough === 'headless' ? followThroughSection() : '') + (es.followThrough === 'ask' ? followThroughAskSection() : ''),
         runId: eng.runId,
         stepId: ownerId,
         permissionMode: state.actingMode,
@@ -1591,8 +1591,11 @@ Reply with ONLY this JSON code block (no other text):
 \`\`\``
 }
 
-export function workerPrompt(goal: string, tasks: RunTask[], light = false, vision = false): string {
+export function workerPrompt(goal: string, tasks: RunTask[], light = false, vision = false, designApproved = false): string {
   const list = tasks.map((t, i) => `${i + 1}. ${t.title}\n   ${t.description}`).join('\n\n')
+  const designNote = designApproved
+    ? ' An approved design-system preview is at design-preview.html — build the UI to match its palette, type, and components.'
+    : ''
   if (light) {
     const qa = vision
       ? 'If your work is a design, brand, or copy deliverable, evaluate it against the creative intent — check visual hierarchy, brand and tonal consistency, and typographic craft — before reporting success.'
@@ -1603,7 +1606,7 @@ Complete the following task(s) in this project folder, making the necessary chan
 
 ${list}
 
-${qa} When finished, briefly report what you changed and flag anything you could not complete.`
+${qa}${designNote} When finished, briefly report what you changed and flag anything you could not complete.`
   }
   const qa = vision
     ? 'If your work is a design, brand, or copy deliverable, do not rely on "it looks right" — evaluate it against the creative intent: check visual hierarchy, brand and tonal consistency, typographic craft, and that it reads as intended for its audience. Don\'t report success until the deliverable holds together.'
@@ -1615,7 +1618,7 @@ You have been assigned the following task(s). Complete them in this project fold
 
 ${list}
 
-${qa}
+${qa}${designNote}
 
 When finished, briefly report what you changed and flag anything you could not complete.`
 }

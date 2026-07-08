@@ -1891,6 +1891,19 @@ describe('workerPrompt vision reframe', () => {
   })
 })
 
+describe('workerPrompt design-preview reference', () => {
+  const task = { id: 't1', title: 'T', description: 'D' }
+  it('appends the approved-design reference when designApproved is true', () => {
+    expect(workerPrompt('g', [task], false, false, true)).toContain('design-preview.html')
+    expect(workerPrompt('g', [task], true, false, true)).toContain('design-preview.html')
+  })
+  it('is byte-identical to today when designApproved is false/omitted', () => {
+    expect(workerPrompt('g', [task], false, false, false)).toBe(workerPrompt('g', [task], false, false))
+    expect(workerPrompt('g', [task], true, false, false)).toBe(workerPrompt('g', [task], true, false))
+    expect(workerPrompt('g', [task], false, false, false)).not.toContain('design-preview.html')
+  })
+})
+
 describe('followThroughSection', () => {
   it('is a non-empty instruction that references the followup block', () => {
     const s = followThroughSection()
