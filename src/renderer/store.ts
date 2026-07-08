@@ -43,7 +43,7 @@ export interface RunState {
   handoffs: { askerId: string; peerId: string; ask: string }[]
   followUps: { workerId: string; summary: string; decision: string }[]
   userRequests: { askerId: string; question: string }[]
-  pendingInterrupt: { kind: 'ask-user' | 'follow-through'; question: string; askerName: string; askerId: string; summary?: string; options?: string[] } | null
+  pendingInterrupt: { kind: 'ask-user' | 'follow-through' | 'design-preview'; question: string; askerName: string; askerId: string; summary?: string; options?: string[]; iteration?: number } | null
   interruptMinimized: boolean
   memoryUpdated: Record<string, number>
   final: string
@@ -97,6 +97,7 @@ interface AppState {
   applyOrchestration: (e: OrchestrationEvent) => void
   selectStep: (id: string) => void
   answerInterrupt: (answer: string) => void
+  resolveDesignPreview: (decision: { decision: 'approve' } | { decision: 'changes'; feedback: string }) => void
   minimizeInterrupt: (v: boolean) => void
   setShowRunView: (v: boolean) => void
   openHistory: () => void
@@ -304,6 +305,12 @@ export const useStore = create<AppState>((set, get) => ({
           run.followUps = [...run.followUps, { workerId: e.workerId, summary: e.summary, decision: e.decision }]
           return { run }
         case 'interrupt': {
+          if (e.interrupt.kind === 'design-preview') {
+            const pl = e.interrupt.payload as { iteration?: number } | undefined
+            run.pendingInterrupt = { kind: 'design-preview', iteration: pl?.iteration ?? 1, question: '', askerName: '', askerId: '' }
+            run.interruptMinimized = false
+            return { run }
+          }
           const kind = e.interrupt.kind === 'follow-through' ? 'follow-through' : 'ask-user'
           const pl = e.interrupt.payload as { askerId?: string; askerName?: string; question?: string; summary?: string; options?: string[] } | undefined
           run.pendingInterrupt = {
@@ -346,6 +353,12 @@ export const useStore = create<AppState>((set, get) => ({
     set((s) => {
       const runId = s.run.runId
       if (runId) void window.api.resumeRun(runId, answer)
+      return { run: { ...s.run, pendingInterrupt: null, interruptMinimized: false } }
+    }),
+  resolveDesignPreview: (decision) =>
+    set((s) => {
+      const runId = s.run.runId
+      if (runId) void window.api.resumeRun(runId, decision)
       return { run: { ...s.run, pendingInterrupt: null, interruptMinimized: false } }
     }),
   minimizeInterrupt: (v) => set((s) => ({ run: { ...s.run, interruptMinimized: v } })),
