@@ -390,6 +390,32 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                   }
                 />
               </SettingSection>
+              <SettingSection title="Design preview">
+                <SettingRow
+                  label="Design preview"
+                  desc="Before building, the run pauses to show a design-system preview (palette, type, components) that you approve or send back for changes. Off = unchanged."
+                  control={
+                    <Switch
+                      checked={s.designPreview}
+                      label="Design preview"
+                      onChange={(v) => void update({ designPreview: v })}
+                    />
+                  }
+                />
+                {s.designPreview && (
+                  <SettingRow
+                    label="Use pre-made inspiration guide"
+                    desc="Give the preview generator a curated structural guide — layout and token approach only; colors and fonts are still chosen to fit your project."
+                    control={
+                      <Switch
+                        checked={s.usePreMadeInspirationGuide}
+                        label="Use pre-made inspiration guide"
+                        onChange={(v) => void update({ usePreMadeInspirationGuide: v })}
+                      />
+                    }
+                  />
+                )}
+              </SettingSection>
             </>
           )}
 
