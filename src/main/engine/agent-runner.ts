@@ -6,7 +6,7 @@ import type { Options, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { AgentStreamEvent, ContextFile, ContextFolder, Effort, PairedDir, PermissionMode, RunHeadlessInput } from '../../shared/types'
 import { IPC } from '../../shared/types'
 import { skillOptionsFor } from '../../shared/skill-trust'
-import { assembleAgentSkills, headlessNote } from '../../shared/skills-pack'
+import { assembleAgentSkills, headlessNote, withExtraSkills } from '../../shared/skills-pack'
 import { narrateTool } from '../../shared/narrate'
 import { discoverSkills } from './skill-discovery'
 import { resolvePackPath, discoverPackSkills } from './skills-pack'
@@ -112,6 +112,8 @@ export interface StreamAgentOptions {
   abort?: AbortController
   /** set false to suppress the "▶ name · model" header line */
   header?: boolean
+  /** force these pack skill names onto this run (e.g. design skills), even if the general pack is off */
+  extraSkillNames?: string[]
 }
 
 /**
@@ -172,7 +174,10 @@ export async function streamAgent(
     // assigned ids. Discovered paths are already verified to exist on disk.
     // Merge with the always-available skills pack (off = byte-for-byte unchanged).
     const perAgent = skillOptionsFor(agent.skills, await discoveredPlugins())
-    const { options: skillSdk } = assembleAgentSkills(perAgent, pack.path, pack.names)
+    let { options: skillSdk } = assembleAgentSkills(perAgent, pack.path, pack.names)
+    if (opts.extraSkillNames && opts.extraSkillNames.length > 0) {
+      skillSdk = withExtraSkills(skillSdk, opts.extraSkillNames, resolvePackPath(getSettings().skillsPackPath ?? ''))
+    }
     if (skillSdk) {
       options.plugins = skillSdk.plugins
       options.skills = skillSdk.skills
