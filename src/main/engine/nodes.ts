@@ -33,6 +33,7 @@ import {
   getEdges,
   getSettings,
   handoffPeersOf,
+  hasDesignSystem,
   parentOf,
   readMemory,
   rolesOf,
@@ -103,7 +104,7 @@ export function seedRunState(args: {
 // ---------- the graph ----------
 
 export function buildOrchestratorGraph(eng: Eng): CompiledGraph {
-  const gate = getSettings().designPreview
+  const gate = getSettings().designPreview && !hasDesignSystem()
   return {
     entry: 'plan',
     edges: {

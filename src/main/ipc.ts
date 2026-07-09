@@ -32,6 +32,7 @@ import { discoverSkills } from './engine/skill-discovery'
 import * as envStore from './engine/env-store'
 import * as gitEngine from './engine/git'
 import { setBackendToken, encryptionAvailable } from './engine/backend-secrets'
+import { enhanceDesignSystem } from './engine/design-enhancer'
 
 export function registerIpc(): void {
   // ---- project ----
@@ -79,6 +80,23 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.readEnv, () => envStore.readEnvFile())
   ipcMain.handle(IPC.writeEnv, (_e, entries: EnvEntry[]) => envStore.writeEnvFile(entries))
   ipcMain.handle(IPC.readDesignPreview, () => store.readDesignPreview())
+  ipcMain.handle(IPC.importDesignSystem, async (_e, path?: string) => {
+    let src = path
+    if (!src) {
+      const r = await dialog.showOpenDialog({ title: 'Import a design system (.html)', properties: ['openFile'], filters: [{ name: 'HTML', extensions: ['html', 'htm'] }] })
+      if (r.canceled || r.filePaths.length === 0) return store.getGraph()
+      src = r.filePaths[0]
+    }
+    return store.importDesignSystem(src)
+  })
+  ipcMain.handle(IPC.removeDesignSystem, () => store.removeDesignSystem())
+  ipcMain.handle(IPC.designSystemView, () => ({ designSystem: store.getGraph().designSystem, hasFile: store.hasDesignSystem() }))
+  ipcMain.handle(IPC.enhanceDesignSystem, (e: IpcMainInvokeEvent, directions: string[], note: string) =>
+    enhanceDesignSystem({ directions, note, wc: e.sender, abort: new AbortController() })
+  )
+  ipcMain.handle(IPC.readEnhancedDesign, () => store.readEnhancedDesign())
+  ipcMain.handle(IPC.adoptEnhancement, () => store.adoptEnhancement())
+  ipcMain.handle(IPC.discardEnhancement, () => store.discardEnhancement())
   ipcMain.handle(IPC.readMemory, (_e, id: string) => store.readMemory(id))
   ipcMain.handle(IPC.writeMemory, (_e, id: string, content: string) =>
     store.writeMemory(id, content)

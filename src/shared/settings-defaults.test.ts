@@ -20,4 +20,8 @@ describe('DEFAULT_SETTINGS', () => {
     expect(DEFAULT_SETTINGS.designPreview).toBe(false)
     expect(DEFAULT_SETTINGS.usePreMadeInspirationGuide).toBe(false)
   })
+
+  it('defaults autoApplyEnhancements to false', () => {
+    expect(DEFAULT_SETTINGS.autoApplyEnhancements).toBe(false)
+  })
 })

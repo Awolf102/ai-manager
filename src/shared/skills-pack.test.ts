@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  packSkillOptions, mergeSkillOptions, headlessNote, assembleAgentSkills, SKILLS_PACK_PLUGIN_ID
+  packSkillOptions, mergeSkillOptions, headlessNote, assembleAgentSkills, withExtraSkills, SKILLS_PACK_PLUGIN_ID
 } from './skills-pack'
 
 const pa = { plugins: [{ type: 'local' as const, path: '/a', skipMcpDiscovery: true as const }], skills: ['a:x'] }
@@ -49,5 +49,19 @@ describe('assembleAgentSkills', () => {
     const r = assembleAgentSkills(pa, '/pack', [])
     expect(r.options).toBe(pa)
     expect(r.note).toBe('')
+  })
+})
+
+describe('withExtraSkills', () => {
+  it('returns the base unchanged when no extra names', () => {
+    const base = { plugins: [{ type: 'local' as const, path: '/p', skipMcpDiscovery: true as const }], skills: ['a'] }
+    expect(withExtraSkills(base, [], '/pack')).toBe(base)
+    expect(withExtraSkills(null, [], '/pack')).toBe(null)
+  })
+  it('merges the pack-filtered extra skills into the base', () => {
+    const out = withExtraSkills(null, ['emil-design-eng'], '/pack')
+    expect(out).not.toBeNull()
+    expect(out!.skills.some((s) => s.includes('emil-design-eng'))).toBe(true)
+    expect(out!.plugins.some((p) => p.path === '/pack')).toBe(true)
   })
 })

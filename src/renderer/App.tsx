@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Bot, CircleHelp, Clock, Folder, FolderOpen, KeyRound, PanelRight, Paperclip, Plus, Settings as SettingsIcon, SquareTerminal, Terminal, Users } from 'lucide-react'
+import { Bot, CircleHelp, Clock, Folder, FolderOpen, KeyRound, PanelRight, Paperclip, Palette, Plus, Settings as SettingsIcon, SquareTerminal, Terminal, Users } from 'lucide-react'
 import { useStore } from './store'
 import TeamMenu from './TeamMenu'
 import FaqModal from './FaqModal'
@@ -18,6 +18,7 @@ import CanvasEmptyState from './CanvasEmptyState'
 import HitlModal from './HitlModal'
 import FollowThroughModal from './FollowThroughModal'
 import DesignPreviewModal from './DesignPreviewModal'
+import DesignSystemModal from './DesignSystemModal'
 import BranchChip from './BranchChip'
 import AddDirButton from './AddDirButton'
 import AdvisorModal from './AdvisorModal'
@@ -60,6 +61,7 @@ export default function App() {
   const focusGoal = useStore((s) => s.focusGoal)
   const openShellTerminal = useStore((s) => s.openShellTerminal)
   const setAdvisorOpen = useStore((s) => s.setAdvisorOpen)
+  const setShowDesignSystem = useStore((s) => s.setShowDesignSystem)
   const [showAdd, setShowAdd] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showContext, setShowContext] = useState(false)
@@ -217,6 +219,7 @@ export default function App() {
           <button className={`btn ${showEnv ? 'active' : ''}`} title="Environment variables (.env) — no AI" onClick={() => setShowEnv(true)}><KeyRound size={14} /> Env</button>
           <button className="btn" title="Open a shell at the project root" onClick={() => openShellTerminal()}><SquareTerminal size={14} /> Shell</button>
           <button className="btn" title="Advisor — plan, pick a model/service, write prompts" onClick={() => setAdvisorOpen(true)}><Bot size={14} /> Advisor</button>
+          <button className="btn" title="Design system — import or enhance the project's UI look" onClick={() => setShowDesignSystem(true)}><Palette size={14} /> Design</button>
           <AddDirButton />
           <button
             className={`btn ${showDock ? 'active' : ''}`}
@@ -398,6 +401,7 @@ export default function App() {
       <HitlModal />
       <FollowThroughModal />
       <DesignPreviewModal />
+      <DesignSystemModal />
       <ConfirmDialog />
       <AdvisorModal />
       <ToastViewport />

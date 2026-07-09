@@ -42,3 +42,14 @@ export function assembleAgentSkills(
     note: headlessNote(packNames)
   }
 }
+
+/** Merge a forced set of pack skills (by name) into `base`, regardless of the pack toggle.
+ *  `names` empty ⇒ returns `base` unchanged (reference-identical). */
+export function withExtraSkills(
+  base: SkillSdkOptions | null,
+  names: string[],
+  packPath: string
+): SkillSdkOptions | null {
+  if (names.length === 0) return base
+  return mergeSkillOptions(base, packSkillOptions(packPath, names))
+}
