@@ -156,6 +156,8 @@ export interface ProjectSettings {
   designPreview: boolean
   /** inject the shipped de-branded structural guide into the design-preview generator (only meaningful when designPreview is on) */
   usePreMadeInspirationGuide: boolean
+  /** adopt a design-system enhancement directly, skipping the before/after review */
+  autoApplyEnhancements: boolean
 }
 
 export const DEFAULT_SETTINGS: ProjectSettings = {
@@ -189,7 +191,8 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   maxOutputTokens: 0,
   visionMode: false,
   designPreview: false,
-  usePreMadeInspirationGuide: false
+  usePreMadeInspirationGuide: false,
+  autoApplyEnhancements: false
 }
 
 /** Which agents a context item applies to. Absent OR (kinds empty AND nodeIds empty) ⇒ all agents. */
@@ -265,6 +268,8 @@ export interface ProjectGraph {
   pairedDirs?: PairedDir[]
   /** Anthropic-compatible model backends for this project (tokens stored separately, encrypted) */
   backends?: Backend[]
+  /** an imported/enhanced design system the build follows (lives at <project>/design-preview.html) */
+  designSystem?: { fileName: string; addedAt: string; source: 'imported' | 'enhanced' }
 }
 
 // ---- IPC payloads ----
@@ -619,6 +624,13 @@ export const IPC = {
   readEnv: 'env:read',
   writeEnv: 'env:write',
   readDesignPreview: 'design-preview:read',
+  importDesignSystem: 'design-system:import',
+  removeDesignSystem: 'design-system:remove',
+  designSystemView: 'design-system:view',
+  enhanceDesignSystem: 'design-system:enhance',
+  readEnhancedDesign: 'design-system:read-enhanced',
+  adoptEnhancement: 'design-system:adopt',
+  discardEnhancement: 'design-system:discard',
   readMemory: 'memory:read',
   writeMemory: 'memory:write',
   runHeadless: 'run:headless',
@@ -700,6 +712,13 @@ export interface RendererApi {
   readEnv: () => Promise<EnvEntry[]>
   writeEnv: (entries: EnvEntry[]) => Promise<void>
   readDesignPreview: () => Promise<string>
+  importDesignSystem: (path?: string) => Promise<ProjectGraph>
+  removeDesignSystem: () => Promise<ProjectGraph>
+  designSystemView: () => Promise<{ designSystem?: ProjectGraph['designSystem']; hasFile: boolean }>
+  enhanceDesignSystem: (directions: string[], note: string) => Promise<void>
+  readEnhancedDesign: () => Promise<string>
+  adoptEnhancement: () => Promise<ProjectGraph>
+  discardEnhancement: () => Promise<void>
   readMemory: (agentId: string) => Promise<string>
   writeMemory: (agentId: string, content: string) => Promise<void>
   runHeadless: (input: RunHeadlessInput) => Promise<{ runId: string }>
