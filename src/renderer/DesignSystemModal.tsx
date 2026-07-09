@@ -41,6 +41,7 @@ export default function DesignSystemModal() {
       const labels = ENHANCE_PRESETS.filter((p) => directions.includes(p.id)).map((p) => p.label)
       await window.api.enhanceDesignSystem(labels, note)
       const [b, a] = await Promise.all([window.api.readDesignPreview(), window.api.readEnhancedDesign()])
+      if (!a) { setErr('The enhancement produced no output — try again.'); return }
       if (graph.settings.autoApplyEnhancements) {
         setGraph(await window.api.adoptEnhancement())
         setHtml(await window.api.readDesignPreview())
@@ -87,9 +88,9 @@ export default function DesignSystemModal() {
         <div className="modal-body">
           {err && <div className="chat-key-error">{err}</div>}
           <div className="modal-actions" style={{ justifyContent: 'flex-start', marginTop: 0 }}>
-            <button className="btn" onClick={() => void doImport()}>Import .html…</button>
+            <button className="btn" disabled={busy} onClick={() => void doImport()}>Import .html…</button>
             <button className="btn" onClick={() => setFaq((v) => !v)}>FAQ</button>
-            {ds && <button className="btn" onClick={() => void doRemove()}>Remove</button>}
+            {ds && <button className="btn" disabled={busy} onClick={() => void doRemove()}>Remove</button>}
           </div>
           {faq && (
             <div className="field" style={{ marginTop: 8 }}>
