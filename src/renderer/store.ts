@@ -119,6 +119,8 @@ interface AppState {
   focusGoal: () => void
   advisorOpen: boolean
   setAdvisorOpen: (v: boolean) => void
+  showDesignSystem: boolean
+  setShowDesignSystem: (v: boolean) => void
   pendingGoal: string | null
   seedGoal: (text: string) => void
   clearPendingGoal: () => void
@@ -406,6 +408,8 @@ export const useStore = create<AppState>((set, get) => ({
   focusGoal: () => set((s) => ({ goalFocusTick: s.goalFocusTick + 1 })),
   advisorOpen: false,
   setAdvisorOpen: (v) => set({ advisorOpen: v }),
+  showDesignSystem: false,
+  setShowDesignSystem: (v) => set({ showDesignSystem: v }),
   pendingGoal: null,
   seedGoal: (text) => set((s) => ({ pendingGoal: text, goalFocusTick: s.goalFocusTick + 1 })),
   clearPendingGoal: () => set({ pendingGoal: null }),
