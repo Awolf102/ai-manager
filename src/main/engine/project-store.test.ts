@@ -46,6 +46,9 @@ import {
   isValidBrainPath,
   roleTemplate,
   readDesignPreview,
+  importDesignSystem,
+  removeDesignSystem,
+  hasDesignSystem,
 } from './project-store'
 
 async function tmpProject(): Promise<string> {
@@ -629,5 +632,28 @@ describe('readDesignPreview', () => {
     expect(await readDesignPreview()).toBe('')
     await fs.writeFile(join(proj, 'design-preview.html'), '<h1>hi</h1>', 'utf8')
     expect(await readDesignPreview()).toBe('<h1>hi</h1>')
+  })
+})
+
+describe('design system import/remove', () => {
+  it('imports a design system, marks the graph, and removes it', async () => {
+    const proj = await fs.mkdtemp(join(tmpdir(), 'aim-ds-'))
+    await openProject(proj)
+    const src = join(proj, 'src-design.html')
+    await fs.writeFile(src, '<html>DS</html>', 'utf8')
+
+    expect(hasDesignSystem()).toBe(false)
+    const g = await importDesignSystem(src)
+    expect(g.designSystem?.source).toBe('imported')
+    expect(g.designSystem?.fileName).toBe('src-design.html')
+    expect(await fs.readFile(join(proj, 'design-preview.html'), 'utf8')).toBe('<html>DS</html>')
+    expect(hasDesignSystem()).toBe(true)
+
+    await expect(importDesignSystem(join(proj, 'nope.txt'))).rejects.toThrow()
+
+    await removeDesignSystem()
+    expect(hasDesignSystem()).toBe(false)
+    await expect(fs.access(join(proj, 'design-preview.html'))).rejects.toThrow()
+    await fs.rm(proj, { recursive: true, force: true })
   })
 })

@@ -42,6 +42,7 @@ const GRAPH_FILE = 'graph.json'
 const AGENTS_DIR = 'agents'
 const TRASH_DIR = '.trash'
 const CONTEXT_DIR = 'context'
+const DESIGN_PREVIEW_FILE = 'design-preview.html'
 
 let current: { path: string; graph: ProjectGraph } | null = null
 
@@ -67,10 +68,35 @@ export function getGraph(): ProjectGraph {
 /** Read the design-preview HTML from the project root; '' if it doesn't exist. */
 export async function readDesignPreview(): Promise<string> {
   try {
-    return await fs.readFile(join(getCurrentProjectPath(), 'design-preview.html'), 'utf8')
+    return await fs.readFile(join(getCurrentProjectPath(), DESIGN_PREVIEW_FILE), 'utf8')
   } catch {
     return ''
   }
+}
+
+/** True when the project has an imported/enhanced design system. */
+export function hasDesignSystem(): boolean {
+  return getGraph().designSystem != null
+}
+
+/** Import a self-contained HTML design system → becomes the project's design-preview.html. */
+export async function importDesignSystem(sourcePath: string): Promise<ProjectGraph> {
+  const { path, graph } = requireCurrent()
+  const stat = await fs.lstat(sourcePath)
+  if (stat.isSymbolicLink() || !stat.isFile()) throw new Error('Design system must be a file')
+  if (!/\.html?$/i.test(sourcePath)) throw new Error('Design system must be an .html file')
+  if (stat.size > 25 * 1024 * 1024) throw new Error('Design system file is too large (max 25 MB)')
+  await fs.copyFile(sourcePath, join(path, DESIGN_PREVIEW_FILE))
+  graph.designSystem = { fileName: basename(sourcePath), addedAt: new Date().toISOString(), source: 'imported' }
+  return saveGraph()
+}
+
+/** Clear the design system marker + delete design-preview.html (best-effort). */
+export async function removeDesignSystem(): Promise<ProjectGraph> {
+  const { path, graph } = requireCurrent()
+  delete graph.designSystem
+  try { await fs.rm(join(path, DESIGN_PREVIEW_FILE)) } catch { /* best-effort */ }
+  return saveGraph()
 }
 
 export function getAgent(agentId: string): AgentNodeData {
