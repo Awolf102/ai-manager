@@ -17,6 +17,7 @@ import {
   getAgent,
   getCheckpointDir,
   getSettings,
+  hasDesignSystem,
   saveRun
 } from './project-store'
 
@@ -41,6 +42,7 @@ export function startRun(wc: WebContents, input: StartRunInput): { runId: string
     actingMode: actingModeFor(settings.autonomy),
     startedAt: new Date().toISOString()
   })
+  if (hasDesignSystem()) state.designPreviewApproved = true
   const abort = new AbortController()
   active.set(runId, abort)
   void drive(wc, state, abort).finally(() => active.delete(runId))

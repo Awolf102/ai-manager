@@ -64,7 +64,8 @@ const h = vi.hoisted(() => {
       bulkCreateMax: 25
     },
     memory: {} as Record<string, string>,
-    reflections: [] as { id: string }[]
+    reflections: [] as { id: string }[],
+    designSystem: false
   }
 })
 
@@ -85,7 +86,8 @@ vi.mock('./project-store', () => ({
   applyReflection: async (id: string, r: unknown) => {
     h.reflections.push({ id, ...(r as object) } as { id: string })
   },
-  updateAgent: async () => {}
+  updateAgent: async () => {},
+  hasDesignSystem: () => h.designSystem
 }))
 
 function fakeStore() {
@@ -2243,5 +2245,27 @@ describe('designPreviewGate', () => {
     const res = await graph.nodes.designPreviewGate(baseState({ resumeInput: undefined }), makeIO(e.abort.signal, store))
     expect(res.goto).toBe('execute')
     expect(res.interrupt).toBeUndefined()
+  })
+})
+
+describe('design-system gate-skip', () => {
+  afterEach(() => {
+    h.settings.designPreview = false
+    h.designSystem = false
+  })
+
+  it('skips the generate-gate when a design system is imported', () => {
+    h.settings.designPreview = true
+    h.designSystem = true
+    const g = buildOrchestratorGraph(eng(async () => ({ text: '' })))
+    expect(g.edges.route).toBe('execute')
+    expect(g.nodes.designPreviewGate).toBeUndefined()
+  })
+
+  it('keeps the gate when designPreview is on and no design system', () => {
+    h.settings.designPreview = true
+    h.designSystem = false
+    const g = buildOrchestratorGraph(eng(async () => ({ text: '' })))
+    expect(g.edges.route).toBe('designPreviewGate')
   })
 })
