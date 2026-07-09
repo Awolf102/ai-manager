@@ -49,6 +49,9 @@ import {
   importDesignSystem,
   removeDesignSystem,
   hasDesignSystem,
+  readEnhancedDesign,
+  adoptEnhancement,
+  discardEnhancement,
 } from './project-store'
 
 async function tmpProject(): Promise<string> {
@@ -654,6 +657,27 @@ describe('design system import/remove', () => {
     await removeDesignSystem()
     expect(hasDesignSystem()).toBe(false)
     await expect(fs.access(join(proj, 'design-preview.html'))).rejects.toThrow()
+    await fs.rm(proj, { recursive: true, force: true })
+  })
+})
+
+describe('enhancement candidate', () => {
+  it('reads, adopts, and discards an enhancement candidate', async () => {
+    const proj = await fs.mkdtemp(join(tmpdir(), 'aim-enh-'))
+    await openProject(proj)
+    await fs.writeFile(join(proj, 'design-preview.html'), '<html>BEFORE</html>', 'utf8')
+    await fs.mkdir(join(proj, '.ai-manager'), { recursive: true })
+    await fs.writeFile(join(proj, '.ai-manager', 'design-enhanced.html'), '<html>AFTER</html>', 'utf8')
+
+    expect(await readEnhancedDesign()).toBe('<html>AFTER</html>')
+    const g = await adoptEnhancement()
+    expect(g.designSystem?.source).toBe('enhanced')
+    expect(await fs.readFile(join(proj, 'design-preview.html'), 'utf8')).toBe('<html>AFTER</html>')
+    expect(await readEnhancedDesign()).toBe('') // candidate consumed
+
+    await fs.writeFile(join(proj, '.ai-manager', 'design-enhanced.html'), '<x/>', 'utf8')
+    await discardEnhancement()
+    expect(await readEnhancedDesign()).toBe('')
     await fs.rm(proj, { recursive: true, force: true })
   })
 })

@@ -43,6 +43,7 @@ const AGENTS_DIR = 'agents'
 const TRASH_DIR = '.trash'
 const CONTEXT_DIR = 'context'
 const DESIGN_PREVIEW_FILE = 'design-preview.html'
+const DESIGN_ENHANCED_FILE = 'design-enhanced.html' // under .ai-manager/
 
 let current: { path: string; graph: ProjectGraph } | null = null
 
@@ -97,6 +98,34 @@ export async function removeDesignSystem(): Promise<ProjectGraph> {
   delete graph.designSystem
   try { await fs.rm(join(path, DESIGN_PREVIEW_FILE)) } catch { /* best-effort */ }
   return saveGraph()
+}
+
+/** Read the enhancement candidate; '' if none. */
+export async function readEnhancedDesign(): Promise<string> {
+  try {
+    return await fs.readFile(aimPath(getCurrentProjectPath(), DESIGN_ENHANCED_FILE), 'utf8')
+  } catch {
+    return ''
+  }
+}
+
+/** Adopt the candidate as the live design; flip the marker to 'enhanced'; remove the candidate. */
+export async function adoptEnhancement(): Promise<ProjectGraph> {
+  const { path, graph } = requireCurrent()
+  const cand = aimPath(path, DESIGN_ENHANCED_FILE)
+  await fs.copyFile(cand, join(path, DESIGN_PREVIEW_FILE))
+  try { await fs.rm(cand) } catch { /* best-effort */ }
+  graph.designSystem = {
+    fileName: graph.designSystem?.fileName ?? 'enhanced',
+    addedAt: new Date().toISOString(),
+    source: 'enhanced'
+  }
+  return saveGraph()
+}
+
+/** Discard the candidate; keep the current design. */
+export async function discardEnhancement(): Promise<void> {
+  try { await fs.rm(aimPath(getCurrentProjectPath(), DESIGN_ENHANCED_FILE)) } catch { /* best-effort */ }
 }
 
 export function getAgent(agentId: string): AgentNodeData {
