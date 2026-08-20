@@ -1,7 +1,9 @@
 # Third-Party Notices
 
-This project's own source (`src/`, `scripts/`, `docs/`) is MIT licensed — see
-[LICENSE](LICENSE).
+The MIT license in [LICENSE](LICENSE) covers the **original work** in this
+repository — `src/`, `scripts/`, `docs/`, and the root configuration files. It does
+not apply to any third-party material listed below, which remains the property of its
+respective authors under its own license terms.
 
 ## Runtime dependencies
 
