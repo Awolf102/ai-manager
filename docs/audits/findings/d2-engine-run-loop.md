@@ -1,5 +1,12 @@
 # Dimension 2 — Code correctness (engine run loop)
 
+> **Status: historical — remediated.** This is an internal audit report from the
+> 2026-06 review cycle, kept for the record. Every Critical and Important finding
+> below has been fixed and merged; see
+> [`docs/audits/2026-06-27-remediation-cycles.md`](../2026-06-27-remediation-cycles.md)
+> for the per-cycle remediation log. Do not read the findings below as open issues.
+
+
 <!-- VERIFICATION-ANCHOR -->
 
 

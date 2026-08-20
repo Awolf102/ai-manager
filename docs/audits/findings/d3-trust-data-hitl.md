@@ -1,5 +1,12 @@
 # Audit D3 — Security: trust boundaries, plugins, team-data import, context-file copy, HITL secret handling
 
+> **Status: historical — remediated.** This is an internal audit report from the
+> 2026-06 review cycle, kept for the record. Every Critical and Important finding
+> below has been fixed and merged; see
+> [`docs/audits/2026-06-27-remediation-cycles.md`](../2026-06-27-remediation-cycles.md)
+> for the per-cycle remediation log. Do not read the findings below as open issues.
+
+
 Scope: a read-only security review of the trust boundaries around (1) Claude Code plugin/skill auto-discovery and loading (`shared/skill-trust.ts`, `main/engine/skill-discovery.ts`, `main/engine/agent-runner.ts`), (2) portable team bundle / team-brain import from arbitrary files (`shared/team-bundle.ts`, `shared/team-brain.ts`, `main/engine/project-store.ts`, `main/ipc.ts`), (3) project context-file copy (`shared/context-files.ts`, `shared/slug.ts`, `project-store.ts`), and (4) the explicit ask — confirming HITL answers are actually scrubbed from every persisted artifact (`shared/ask-user.ts`, `main/engine/nodes.ts`, `graph.ts`, `run-store.ts`, `project-store.ts`, `HistoryView.tsx`, `agent-runner.ts`). Findings are ordered Critical → Important → Minor. The headline results: the plugin trust rule trusts the *entire* Anthropic-hosted marketplace (240 third-party plugins) regardless of author/installs, and loading such a plugin loads its **hooks** (code), not just SKILL.md guidance; and the HITL answer, while correctly scrubbed from the app's own checkpoint fields, still reaches disk via the SDK session transcript and (if the agent echoes it) via the persisted run output — so the memory's claim "the answer never hits disk" is not strictly true.
 
 ---

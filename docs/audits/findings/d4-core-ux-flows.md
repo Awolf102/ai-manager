@@ -1,5 +1,12 @@
 # Dimension 4 — UX/Product (core renderer flows)
 
+> **Status: historical — remediated.** This is an internal audit report from the
+> 2026-06 review cycle, kept for the record. Every Critical and Important finding
+> below has been fixed and merged; see
+> [`docs/audits/2026-06-27-remediation-cycles.md`](../2026-06-27-remediation-cycles.md)
+> for the per-cycle remediation log. Do not read the findings below as open issues.
+
+
 **Scope:** A read-only UX/product review of the core renderer flows that a user (including non-technical
 people) touches every session: the project picker, the top bar, the GoalBar action cluster
 (Run / Draft roles / Build team / Run result / Stop), the org-chart canvas (placing nodes, drawing report vs

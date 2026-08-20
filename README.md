@@ -1,7 +1,10 @@
 # AI Manager
 
-A macOS desktop app to assemble a team of cooperating **Claude Code agents** as an
-org chart, all working inside one local project folder.
+A desktop app (Electron) to assemble a team of cooperating **Claude Code agents** as
+an org chart, all working inside one local project folder.
+
+> **On the name:** `ai-manager` is the repository/working name; **Orkestr** is the
+> product name used in `PRODUCT.md` and `DESIGN.md`. Same app.
 
 - **Orchestrator** (top) — takes the goal, plans, and reviews.
 - **Manager(s)** (middle) — route tasks to the worker whose role matches.
@@ -19,6 +22,7 @@ memory-learning loop is designed into the data model and built in later phases.
 
 ## Prerequisites
 
+- **Platform:** macOS and Linux (developed and used on both). Windows is not tested.
 - **Node** 18+ (developed on 26.x).
 - **Claude Code CLI** installed and logged in (`claude` on your PATH). The app uses
   your existing Claude Code subscription login — no API key required.
@@ -93,7 +97,7 @@ agents run real commands and edits, keep the project under **git**.
 - Role + memory are injected per session (role as an appended system prompt, memory as
   context), so multiple agents sharing one folder don't collide. Headless runs also load
   the project's own Claude config (`settingSources: ['project']`) for codebase context.
-- Default models: Opus 4.8 for orchestrator/manager, Sonnet 4.6 for workers — change per
+- Default models: Opus 5 for orchestrator/director/manager, Sonnet 5 for workers — change per
   agent in the side panel. Permission mode defaults to `acceptEdits`.
 
 ## Project layout
@@ -118,3 +122,60 @@ src/
 - **Phase 3 (built):** review verdict, a configurable repair loop, and memory learning —
   workers write wins/losses to `memory.md`, loaded on the next run. See
   `docs/phase3-learning-loop.md`.
+
+## Repository map
+
+```
+src/           the app (Electron main / preload / shared / renderer) — see "Project layout" above
+docs/          design specs, per-feature implementation plans, and audit reports
+docs/audits/   internal security & correctness audits (historical — all findings remediated)
+scripts/       dev utilities (skill discovery check, smoke check, skills pack setup)
+PRODUCT.md     product direction & design principles
+DESIGN.md      the design system (tokens are the source of truth in src/renderer/tokens.css)
+```
+
+### About `docs/audits/`
+
+This project was audited against itself across four dimensions (live verification,
+correctness, security/injection, UX). Those reports are **historical** — every Critical
+and Important finding has been fixed and merged, tracked cycle-by-cycle in
+[`docs/audits/2026-06-27-remediation-cycles.md`](docs/audits/2026-06-27-remediation-cycles.md).
+They are kept in the repo because the audit → triage → TDD-remediation loop is part of how
+this project was built, not because the issues are open.
+
+## Security model
+
+Agents run real commands and make real edits on your local machine. The design is
+explicit about this rather than hiding it:
+
+- **Planning and routing always run read-only.** Only the *acting* steps obey **Autonomy**.
+- **Autonomy is a user setting** — `Auto` (default, classifier-gated), `Cautious` (edits
+  only, no command execution), or `Full auto` (bypasses permission checks). Full auto is
+  behind an explicit acknowledgement gate, and a **Full-auto lock** in Settings → Security
+  clamps it back to `acceptEdits` at the SDK boundary.
+- **Known residual, by design:** `Full auto` is *not* filesystem-sandboxed — the Agent SDK
+  can widen directory access but cannot confine a bypassed run. An OS-level sandbox
+  (seatbelt / bubblewrap) is tracked as open work. Keep your project under **git**.
+- Untrusted external input (imported team bundles, attached context files) is validated,
+  normalized, and framed to agents as *data, not instructions*.
+
+## Development
+
+Third-party **agent skills** used while developing this repo (`.claude/skills/`,
+`.agents/skills/`) are **git-ignored** and installed per-developer. They are not part of
+the application: at runtime the app discovers skills from the user's own
+`~/.claude/plugins` (`src/main/engine/skill-discovery.ts`), never from this repository.
+Run `npm run skills:check` to see which trusted skill plugins the app will discover.
+
+```bash
+npm test           # vitest unit + integration suite
+npm run typecheck  # tsc for main + renderer
+npm run lint       # eslint
+```
+
+## License
+
+[MIT](LICENSE) © Aidan Wolf. Third-party attributions: [THIRD_PARTY-NOTICES.md](THIRD_PARTY-NOTICES.md).
+
+"Claude", "Claude Code", and "Anthropic" are trademarks of Anthropic PBC. This is an
+independent, unaffiliated project built on the publicly released Claude Agent SDK.

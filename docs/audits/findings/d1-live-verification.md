@@ -1,5 +1,12 @@
 # Dimension 1 — Live-verification sweep
 
+> **Status: historical — remediated.** This is an internal audit report from the
+> 2026-06 review cycle, kept for the record. Every Critical and Important finding
+> below has been fixed and merged; see
+> [`docs/audits/2026-06-27-remediation-cycles.md`](../2026-06-27-remediation-cycles.md)
+> for the per-cycle remediation log. Do not read the findings below as open issues.
+
+
 **Scope.** This audit traces, end-to-end (renderer → preload → IPC → engine → back), every recently-shipped
 feature that has green unit tests but was likely never exercised together against real Claude in the running app:
 two-tier review + v2 escalation, the three workflow-graph phases (clickable edge ordering, goal-locked mid-run

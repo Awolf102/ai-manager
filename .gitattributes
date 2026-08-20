@@ -1,0 +1,8 @@
+# Keep GitHub's language stats representative of the actual application code.
+# `docs/` holds design specs, implementation plans, and audit reports — prose,
+# not source.
+docs/**            linguist-documentation
+*.md               linguist-documentation
+
+# Generated / lockfiles
+package-lock.json  linguist-generated

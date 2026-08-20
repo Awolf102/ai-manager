@@ -1,5 +1,12 @@
 # Dimension 2 — Code correctness (shared pure logic)
 
+> **Status: historical — remediated.** This is an internal audit report from the
+> 2026-06 review cycle, kept for the record. Every Critical and Important finding
+> below has been fixed and merged; see
+> [`docs/audits/2026-06-27-remediation-cycles.md`](../2026-06-27-remediation-cycles.md)
+> for the per-cycle remediation log. Do not read the findings below as open issues.
+
+
 Static correctness review of every module under `src/shared/`. I read each file in full,
 cross-checked the engine/renderer call sites that consume these pure functions, and reproduced
 each suspected bug with a standalone Node script using the exact code (clamp rounding, fence regexes,

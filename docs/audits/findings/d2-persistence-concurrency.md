@@ -1,5 +1,12 @@
 # Dimension 2 — Code correctness: persistence & concurrency
 
+> **Status: historical — remediated.** This is an internal audit report from the
+> 2026-06 review cycle, kept for the record. Every Critical and Important finding
+> below has been fixed and merged; see
+> [`docs/audits/2026-06-27-remediation-cycles.md`](../2026-06-27-remediation-cycles.md)
+> for the per-cycle remediation log. Do not read the findings below as open issues.
+
+
 **Scope:** Static review of the persistence and concurrency layers — `src/main/engine/project-store.ts` (graph.json / role.md / memory.md / runs / team export-import + brain sync / applySpawnedTeam / context files), `run-store.ts` (durable run checkpoints), `agent-runner.ts` (one SDK `query()` per agent), `pty-manager.ts`, `env.ts`, `auth.ts`, plus the call sites that drive them concurrently (`nodes.ts` wave-loop with sibling cap 3, `orchestrator.ts`, `graph.ts`, `ipc.ts`). The headline pattern: up to 3 sibling agents run in parallel per wave and ALL of them perform read-modify-writes against ONE shared in-memory `graph` object and ONE non-atomic `graph.json` writer (`saveGraph`), with no lock or serialization anywhere. The run-checkpoint store IS atomic and per-run-keyed; the project-graph store is neither. Below, real (data-actually-lost) races are separated from theoretical ones.
 
 ---

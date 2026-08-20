@@ -16,15 +16,15 @@ fixing them.
 
 | Cycle | Title | Rolls in (audit #) | Primary files | Depends on | Live-verify first? |
 |---|---|---|---|---|---|
-| **S2** | Run-result launch hardening | #1 | `server-manager.ts`, `run-manifest.ts`, `manifest-detector.ts`, `RunResultModal.tsx` | — | no |
-| **U1** | Destructive-action guardrails | #8, #31 | `AgentConfigPanel.tsx`, `OrgChart.tsx`, `project-store.ts` (deleteAgent), `TeamSpawnModal.tsx`, `RoleDraftModal.tsx` | — | no |
-| **P1** | Crash-safe persistence (atomic writes) | #4, + run-store `.tmp` leak (Minor) | `project-store.ts` (saveGraph/openProject), `run-store.ts` | — | no |
-| **P2** | Race-safe mutations (serialize graph + memory, thread sessionId) | #5, #14, #16 | `project-store.ts` (updateAgent/applyReflection), `agent-runner.ts`, `nodes.ts` | **P1** (same files) | no |
-| **S1** | Autonomy blast-radius hardening | #3, #9, #20 | `agent-runner.ts` (additionalDirectories), `nodes.ts` (mode mapping), `SettingsModal.tsx`, `context-files.ts` (framing) | — | no |
-| **S3** | Plugin/skill trust hardening | #2, #19 | `skill-trust.ts`, `skill-discovery.ts`, `agent-runner.ts` | — | no |
-| **S4** | Team-bundle import validation | #17, #18, + context-file symlink/size (Minor) | `team-bundle.ts`, `project-store.ts` (importTeam/applySpawnedTeam), `agent-runner.ts` (runHeadless fallback) | — | no |
-| **S5** | HITL secret handling truth-up | #10, + abort-path scrub gap (Minor) | `nodes.ts`, `run-state.ts`, `graph.ts`, `HitlModal.tsx` | — | no |
-| **P3** | Durable resume actually works | #11, #12 | `run-store.ts` (wire `listResumable`), `orchestrator.ts`, `ipc.ts`, `store.ts`, renderer affordance | — | partial (HITL pause) |
+| **S2** ✅ | Run-result launch hardening | #1 | `server-manager.ts`, `run-manifest.ts`, `manifest-detector.ts`, `RunResultModal.tsx` | — | no |
+| **U1** ✅ | Destructive-action guardrails | #8, #31 | `AgentConfigPanel.tsx`, `OrgChart.tsx`, `project-store.ts` (deleteAgent), `TeamSpawnModal.tsx`, `RoleDraftModal.tsx` | — | no |
+| **P1** ✅ | Crash-safe persistence (atomic writes) | #4, + run-store `.tmp` leak (Minor) | `project-store.ts` (saveGraph/openProject), `run-store.ts` | — | no |
+| **P2** ✅ | Race-safe mutations (serialize graph + memory, thread sessionId) | #5, #14, #16 | `project-store.ts` (updateAgent/applyReflection), `agent-runner.ts`, `nodes.ts` | **P1** (same files) | no |
+| **S1** ✅ | Autonomy blast-radius hardening | #3, #9, #20 | `agent-runner.ts` (additionalDirectories), `nodes.ts` (mode mapping), `SettingsModal.tsx`, `context-files.ts` (framing) | — | no |
+| **S3** ✅ | Plugin/skill trust hardening | #2, #19 | `skill-trust.ts`, `skill-discovery.ts`, `agent-runner.ts` | — | no |
+| **S4** ✅ | Team-bundle import validation | #17, #18, + context-file symlink/size (Minor) | `team-bundle.ts`, `project-store.ts` (importTeam/applySpawnedTeam), `agent-runner.ts` (runHeadless fallback) | — | no |
+| **S5** ✅ | HITL secret handling truth-up | #10, + abort-path scrub gap (Minor) | `nodes.ts`, `run-state.ts`, `graph.ts`, `HitlModal.tsx` | — | no |
+| **P3** ✅ | Durable resume actually works | #11, #12 | `run-store.ts` (wire `listResumable`), `orchestrator.ts`, `ipc.ts`, `store.ts`, renderer affordance | — | partial (HITL pause) |
 | **HITL+R2** ✅ | HITL resume→synthesis + Handoff persistence (batched) | NEW HITL bug + #23, #27, #25 | `nodes.ts`, `graph.ts`, `orchestrator.ts` | live-verify ✓ | DONE 2026-06-29 (merge `f7ed25f`) |
 | **R1** ✅ | Replan/escalate state integrity | #6, #7, #13 | `replan.ts` (mergeReplan) | live-verify ✓ | DONE 2026-06-29 (merge `646783e`) |
 | **R3** ✅ | Scheduling edge cases | #22, #26, #15 | `nodes.ts` (multi-asker), `workflow-order.ts` (self-dep), `project-store.ts` (staged team writes) | — | DONE 2026-06-29 (merge `2cb2a4a`) |

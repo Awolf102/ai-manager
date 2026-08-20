@@ -6,3 +6,20 @@ dist/
 .vite/
 *.tsbuildinfo
 .superpowers/
+
+# Python bytecode (from skill helper scripts)
+__pycache__/
+*.pyc
+
+# Local agent/skill tooling caches (machine-specific paths, session ids)
+.impeccable/hook.cache.json
+**/.impeccable/hook.cache.json
+
+# Third-party agent skills used to DEVELOP this repo. Not part of the app —
+# the app discovers skills from ~/.claude/plugins at runtime. Installed
+# locally per-developer; see THIRD_PARTY-NOTICES.md.
+.claude/skills/
+.agents/skills/
+
+# Per-project agent data the app creates inside a target project folder
+.ai-manager/

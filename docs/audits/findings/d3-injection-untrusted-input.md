@@ -1,5 +1,12 @@
 # Dimension 3 — Security: Untrusted Input & Injection
 
+> **Status: historical — remediated.** This is an internal audit report from the
+> 2026-06 review cycle, kept for the record. Every Critical and Important finding
+> below has been fixed and merged; see
+> [`docs/audits/2026-06-27-remediation-cycles.md`](../2026-06-27-remediation-cycles.md)
+> for the per-cycle remediation log. Do not read the findings below as open issues.
+
+
 **Scope.** This review traces every place AI-Manager turns *untrusted* data — LLM (agent) output, target-repo / project file content, user-attached context files, and imported `*.aimteam.json` bundles — into a security-relevant *action*: a spawned shell process, a filesystem path, a handoff/escalate/replan target, a prompt that an autonomous agent will obey, or a checkpoint persisted to disk. The dominant risk is structural: in **Full autonomy** the engine maps to `permissionMode: 'bypassPermissions'` (`nodes.ts:62-66`, `actingModeFor`), i.e. the agents have full, *non-project-scoped* filesystem + Bash access, and the orchestration loop feeds them goal text, project file content, peer output, and reviewer feedback with little injection framing. Most LLM-output *parsers* are reasonably defensive (the handoff/draft/spawn parsers validate ids/targets against the real graph; slugs are re-slugified; `loadRun` uses `basename`), so the findings below are the places where a concrete source→sink path remains. Findings are ordered Critical → Important → Minor.
 
 ---

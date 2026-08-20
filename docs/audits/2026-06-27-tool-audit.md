@@ -1,5 +1,10 @@
 # AI-Manager — Full Tool Audit
 
+> **Status: historical — remediated.** Internal audit report, kept for the record.
+> The full must-fix backlog from this audit has been fixed and merged; see
+> [`2026-06-27-remediation-cycles.md`](./2026-06-27-remediation-cycles.md) for the
+> per-cycle log. Do not read the findings below as open issues.
+
 **Date:** 2026-06-27
 **Subject:** AI-Manager (Electron desktop app that orchestrates a team of Claude Code agents over a target project), `main` branch, working tree clean.
 
